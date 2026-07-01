@@ -4,7 +4,7 @@
 ![platform](https://img.shields.io/badge/platform-Windows-0078D4?style=flat-square)
 ![tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=flat-square)
 ![size](https://img.shields.io/badge/size-~15MB-9cf?style=flat-square)
-![i18n](https://img.shields.io/badge/UI-简中%20%7C%20繁中%20%7C%20EN-4470e0?style=flat-square)
+![i18n](https://img.shields.io/badge/UI-中文%20%7C%20EN-4470e0?style=flat-square)
 
 **[中文](#中文) · [English](#english)**
 
@@ -12,12 +12,12 @@
 
 ## 中文
 
-一款轻量的 Windows 桌面 Markdown 编辑器，**默认所见即所得，支持表格可视化增删改**，内置**简体中文 / 繁体中文 / 英文**三种界面。基于 Tauri 2 + Vditor，单文件便携 exe（约 15 MB），不依赖网络。
+一款轻量的 Windows 桌面 Markdown 编辑器，**默认所见即所得，支持表格可视化增删改**，内置**中英双语界面**（中文支持简体/繁体）。基于 Tauri 2 + Vditor，单文件便携 exe（约 15 MB），不依赖网络。
 
 ### ✨ 功能
 
 - **默认所见即所得**：直接编辑表格——点单元格改内容、光标进表浮出工具栏（上下插行 / 左右插列 / 删行删列 / 对齐 / 删表）、行/列数字框输入数字 + 回车**批量增删**
-- **三语界面**：简体中文 / 繁體中文 / English，跟随系统语言并记住你的选择
+- **中英双语界面**：中文（简体 / 繁体）/ English，跟随系统语言并记住你的选择
 - **多标签页**：打开多个文件互不覆盖，同路径自动跳转
 - **左侧大纲**：点击定位、✕ 删除章节（联动正文）、拖动重排
 - **多种打开方式**：双击 .md / 拖拽到窗口 / 命令行参数 / 单实例转发
@@ -72,12 +72,12 @@ npm run tauri build -- --no-bundle
 
 ## English
 
-A lightweight WYSIWYG Markdown editor for Windows with **visual table editing**, offering **Simplified Chinese / Traditional Chinese / English** interfaces. Built with Tauri 2 + Vditor. Single portable `.exe` (~15 MB), no install, no network.
+A lightweight WYSIWYG Markdown editor for Windows with **visual table editing**, offering a **bilingual interface** (English / Chinese, with both Simplified & Traditional). Built with Tauri 2 + Vditor. Single portable `.exe` (~15 MB), no install, no network.
 
 ### ✨ Features
 
 - **WYSIWYG by default**: edit tables directly — click a cell to edit, cursor into a table pops up a floating toolbar (insert row above/below, insert column left/right, delete row/column, align, delete table); type a number + Enter in the row/column box to **batch add/remove**
-- **3-language UI**: Simplified Chinese / 繁體中文 / English — auto-detects system language and remembers your choice
+- **Bilingual UI (English / Chinese)**: Chinese supports both Simplified & Traditional — auto-detects system language and remembers your choice
 - **Multi-tab**: open multiple files without overwriting; same path auto-switches
 - **Left outline**: click to navigate, ✕ to delete a section (updates body too), drag to reorder
 - **Multiple ways to open**: double-click .md / drag into window / command-line arg / single-instance forwarding
