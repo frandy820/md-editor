@@ -1,0 +1,86 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-family: "Microsoft YaHei", "Segoe UI", sans-serif; }
+body { display: flex; flex-direction: column; overflow: hidden; }
+
+#toolbar {
+  height: 42px; flex: 0 0 auto;
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 12px;
+  background: #f3f3f3; border-bottom: 1px solid #ddd;
+}
+#toolbar button {
+  padding: 4px 12px; cursor: pointer;
+  border: 1px solid #ccc; background: #fff; border-radius: 4px;
+  font-size: 13px;
+}
+#toolbar button:hover { background: #eef; }
+#btn-mode { margin-left: 4px; background: #eef3ff; border-color: #9db4e8; }
+#btn-mode:hover { background: #dbe6ff; }
+#file-title { margin-left: 8px; font-size: 13px; color: #333; }
+#encoding-badge { color: #999; font-size: 12px; }
+.mode-badge { font-size: 12px; padding: 2px 8px; border-radius: 10px; border: 1px solid #ddd; white-space: nowrap; line-height: 18px; }
+.mode-badge.ir { color: #666; background: #f3f3f3; }
+.mode-badge.wysiwyg { color: #fff; background: #4470e0; border-color: #4470e0; }
+
+#tabs { display: flex; height: 32px; flex: 0 0 auto; background: #ececec; border-bottom: 1px solid #ddd; overflow-x: auto; }
+#tabs::-webkit-scrollbar { height: 4px; }
+.tab { display: flex; align-items: center; gap: 6px; padding: 0 10px; height: 100%; cursor: pointer; font-size: 13px; border-right: 1px solid #ddd; white-space: nowrap; }
+.tab:hover { background: #f5f5f5; }
+.tab.active { background: #fff; border-bottom: 2px solid #4470e0; }
+.tab-name { color: #333; }
+.tab-close { color: #999; padding: 0 2px; }
+.tab-close:hover { color: #c33; }
+
+#main { flex: 1 1 auto; display: flex; overflow: hidden; }
+
+#outline-panel {
+  width: 250px; flex: 0 0 auto;
+  border-right: 1px solid #ddd;
+  background: #fafafa;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.panel-title {
+  padding: 8px 10px; font-size: 12px; color: #888;
+  border-bottom: 1px solid #eee; background: #f5f5f5;
+}
+#outline { flex: 1 1 auto; overflow: auto; list-style: none; }
+.outline-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 5px 6px; cursor: pointer; font-size: 13px; color: #333;
+  border-left: 3px solid transparent; user-select: none;
+}
+.outline-item:hover { background: #eaf2ff; }
+.outline-item.over { border-top: 2px solid #4470e0; }
+.outline-item.dragging { opacity: 0.35; }
+.outline-item .ot {
+  flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.outline-item .odel { color: #c33; opacity: 0; padding: 0 4px; font-size: 12px; }
+.outline-item:hover .odel { opacity: 0.8; }
+.empty { color: #aaa; padding: 12px; font-size: 12px; }
+
+#editor-wrap { flex: 1 1 auto; overflow: hidden; position: relative; }
+#editor { height: 100%; }
+#editor .vditor { border-radius: 0; border: none; }
+#empty-state { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: #fafafa; z-index: 5; }
+#empty-state[hidden] { display: none; }
+.empty-hint { color: #999; font-size: 14px; text-align: center; line-height: 1.9; padding: 0 24px; }
+
+/* table / edit-mode 带下拉面板，tooltip 易被面板遮挡，单独提高层级 */
+#editor .vditor-toolbar button[data-type="table"]::after,
+#editor .vditor-toolbar button[data-type="edit-mode"]::after,
+#editor .vditor-toolbar button[data-type="table"]::before,
+#editor .vditor-toolbar button[data-type="edit-mode"]::before {
+  z-index: 1000005 !important;
+}
+
+/* 关闭确认对话框（保存并关闭 / 不保存关闭 / 取消）—— z-index 必须高于 Vditor 浮层(1000005) */
+.modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 2147483647 !important; }
+.modal-mask[hidden] { display: none; }
+.modal { position: relative; z-index: 2147483647 !important; background: #fff; border-radius: 8px; padding: 20px 24px; box-shadow: 0 8px 30px rgba(0,0,0,0.3); min-width: 320px; }
+.modal-msg { font-size: 14px; color: #333; margin-bottom: 16px; }
+.modal-btns { display: flex; gap: 8px; justify-content: flex-end; }
+.modal-btns button { padding: 6px 14px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; font-size: 13px; }
+.modal-btns button:hover { background: #eef; }
+#cc-save { background: #4470e0; color: #fff; border-color: #4470e0; }
+#cc-cancel { color: #666; }

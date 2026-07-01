@@ -1,0 +1,31 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Rust / Tauri 构建产物
+src-tauri/target
+
+# Vditor 本地化资源（~23M，从 node_modules/vditor/dist 复制而来；
+# clone 后需手动复制：cp -r node_modules/vditor/dist/* public/vditor-assets/dist/）
+public/vditor-assets
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
