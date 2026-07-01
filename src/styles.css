@@ -16,6 +16,7 @@ body { display: flex; flex-direction: column; overflow: hidden; }
 #toolbar button:hover { background: #eef; }
 #btn-mode { margin-left: 4px; background: #eef3ff; border-color: #9db4e8; }
 #btn-mode:hover { background: #dbe6ff; }
+#lang-select { padding: 4px 6px; font-size: 13px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; }
 #file-title { margin-left: 8px; font-size: 13px; color: #333; }
 #encoding-badge { color: #999; font-size: 12px; }
 .mode-badge { font-size: 12px; padding: 2px 8px; border-radius: 10px; border: 1px solid #ddd; white-space: nowrap; line-height: 18px; }

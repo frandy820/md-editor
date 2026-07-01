@@ -7,6 +7,8 @@ import "vditor/dist/index.css";
 // 本地中文 i18n（从 vditor zh_CN.js 转成 ESM 值导入）：作为 options.i18n 注入，
 // Vditor 走 else 分支直接使用，不再从 unpkg CDN 动态加载 zh_CN.js（国内 404），且符合 CSP
 import zhCNI18n from "./i18n-zh-CN";
+import zhTWI18n from "./i18n-zh-TW";
+import enI18n from "./i18n-en";
 
 let vditor: Vditor | null = null;
 let outlineTimer: number | null = null;
@@ -14,6 +16,105 @@ let suppressInput = false; // setValue 时抑制 input 回调（避免切换/联
 let currentMode: "ir" | "wysiwyg" = "wysiwyg"; // 当前编辑模式（默认所见即所得，可直接编辑表格；可切回即时渲染）
 let vditorInited = false; // Vditor 是否已完成首次初始化（模式切换重建时不重跑 openDoc/pendingFile）
 let switchInFlight = false; // 模式切换重建中（destroy→after 之间），抑制重入避免并发销毁/重复实例/内容丢失
+
+// ---- i18n 国际化（简中 / 繁中 / 英文）----
+type Lang = "zh-CN" | "zh-TW" | "en";
+const VDITOR_I18N: Record<Lang, typeof zhCNI18n> = { "zh-CN": zhCNI18n, "zh-TW": zhTWI18n, "en": enI18n };
+const VDITOR_LANG: Record<Lang, "zh_CN" | "zh_TW" | "en_US"> = { "zh-CN": "zh_CN", "zh-TW": "zh_TW", "en": "en_US" };
+
+const UI_TEXT: Record<Lang, Record<string, string>> = {
+  "zh-CN": {
+    open: "📂 打开", save: "💾 保存", welcomeName: "欢迎", untitled: "未命名", noDoc: "（无）",
+    emptyHint: "📋 点击顶部「📂 打开」，或把 .md 文件拖入窗口，开始编辑",
+    noHeadings: "（暂无标题：用 # 添加章节）",
+    noOpenFile: "（暂无打开的文件：点顶部「打开」或把 .md 拖入窗口）",
+    deleteChapter: "删除该章节（含正文）", closeTab: "关闭",
+    openFail: "打开失败：", saveFail: "保存失败：", closeFail: "关闭失败：",
+    saveEmptySuf: "」内容为空，已跳过保存（避免清空文件）",
+    delTitle: "删除章节", delConfirmSuf: "」及其所有子内容？",
+    closeSaveMsg: "有未保存的修改，是否保存？", closeSave: "保存并关闭", closeDiscard: "不保存关闭", closeCancel: "取消",
+    modeWYSIWYG: "所见即所得", modeIR: "即时渲染", switchToIR: "切回即时渲染", switchToWYSIWYG: "所见即所得",
+    modeWYSIWYGTip: "当前：所见即所得模式（可直接编辑表格）", modeIRTip: "当前：即时渲染模式",
+    switchToIRTip: "切回即时渲染模式（Ctrl+Alt+M）", switchToWYSIWYGTip: "切到所见即所得模式以编辑表格（Ctrl+Alt+M）",
+    panelTitle: "大纲 · 点击定位 · ✕删除 · 拖动重排",
+    appName: "MD 编辑器",
+  },
+  "zh-TW": {
+    open: "📂 開啟", save: "💾 儲存", welcomeName: "歡迎", untitled: "未命名", noDoc: "（無）",
+    emptyHint: "📋 點擊頂部「📂 開啟」，或把 .md 檔案拖入視窗，開始編輯",
+    noHeadings: "（暫無標題：用 # 新增章節）",
+    noOpenFile: "（暫無開啟的檔案：點頂部「開啟」或把 .md 拖入視窗）",
+    deleteChapter: "刪除該章節（含正文）", closeTab: "關閉",
+    openFail: "開啟失敗：", saveFail: "儲存失敗：", closeFail: "關閉失敗：",
+    saveEmptySuf: "」內容為空，已跳過儲存（避免清空檔案）",
+    delTitle: "刪除章節", delConfirmSuf: "」及其所有子內容？",
+    closeSaveMsg: "有未儲存的修改，是否儲存？", closeSave: "儲存並關閉", closeDiscard: "不儲存關閉", closeCancel: "取消",
+    modeWYSIWYG: "所見即所得", modeIR: "即時渲染", switchToIR: "切回即時渲染", switchToWYSIWYG: "所見即所得",
+    modeWYSIWYGTip: "當前：所見即所得模式（可直接編輯表格）", modeIRTip: "當前：即時渲染模式",
+    switchToIRTip: "切回即時渲染模式（Ctrl+Alt+M）", switchToWYSIWYGTip: "切到所見即所得模式以編輯表格（Ctrl+Alt+M）",
+    panelTitle: "大綱 · 點擊定位 · ✕刪除 · 拖曳重排",
+    appName: "MD 編輯器",
+  },
+  "en": {
+    open: "📂 Open", save: "💾 Save", welcomeName: "Welcome", untitled: "Untitled", noDoc: "(none)",
+    emptyHint: '📋 Click "Open" above, or drag a .md file into the window to start editing',
+    noHeadings: "(No headings yet: use # to add a section)",
+    noOpenFile: '(No file open: click "Open" above or drag a .md file here)',
+    deleteChapter: "Delete this section (with content)", closeTab: "Close",
+    openFail: "Open failed: ", saveFail: "Save failed: ", closeFail: "Close failed: ",
+    saveEmptySuf: '" is empty, save skipped (to avoid clearing the file)',
+    delTitle: "Delete section", delConfirmSuf: '" and all its content?',
+    closeSaveMsg: "Unsaved changes. Save?", closeSave: "Save and close", closeDiscard: "Close without saving", closeCancel: "Cancel",
+    modeWYSIWYG: "WYSIWYG", modeIR: "Instant Rendering", switchToIR: "Markdown (IR)", switchToWYSIWYG: "WYSIWYG",
+    modeWYSIWYGTip: "Current: WYSIWYG mode (visual table editing)", modeIRTip: "Current: Markdown (IR) mode",
+    switchToIRTip: "Switch to Markdown (IR) (Ctrl+Alt+M)", switchToWYSIWYGTip: "Switch to WYSIWYG to edit tables (Ctrl+Alt+M)",
+    panelTitle: "Outline · click to navigate · ✕ delete · drag to reorder",
+    appName: "MD Editor",
+  },
+};
+
+const WELCOME_TEXT: Record<Lang, string> = {
+  "zh-CN": `# 欢迎使用 MD 编辑器
+
+- 双击 .md 文件或拖拽 .md 到窗口打开
+- 支持**多个标签页**，互不覆盖
+- 左侧大纲：点击定位、✕ 删除章节、拖动重排章节
+- 顶部「打开 / 保存」操作文件
+- 默认**所见即所得**模式，可直接编辑表格（点单元格、浮层增删行列/对齐、数字框回车批量增删）；需要源码即时渲染时点顶部「即时渲染」切回（Ctrl+Alt+M）
+`,
+  "zh-TW": `# 歡迎使用 MD 編輯器
+
+- 雙擊 .md 檔案或拖曳 .md 到視窗開啟
+- 支援**多個分頁**，互不覆蓋
+- 左側大綱：點擊定位、✕ 刪除章節、拖曳重排章節
+- 頂部「開啟 / 儲存」操作檔案
+- 預設**所見即所得**模式，可直接編輯表格（點儲存格、浮動工具列增刪列/欄/對齊、數字框 Enter 批次增刪）；需要原始碼即時渲染時點頂部「即時渲染」切回（Ctrl+Alt+M）
+`,
+  "en": `# Welcome to MD Editor
+
+- Double-click a .md file or drag it into the window to open
+- Open multiple files in **tabs** (they won't overwrite each other)
+- Left outline: click to navigate, ✕ to delete a section, drag to reorder
+- Top toolbar: Open / Save
+- Default **WYSIWYG** mode — edit tables visually (click a cell, use the floating toolbar to add/remove rows & columns, or type a number + Enter to batch-edit). Switch to **Markdown (IR)** via the top button (Ctrl+Alt+M)
+`,
+};
+
+function detectLang(): Lang {
+  // try/catch：隐私模式/存储被禁用时 getItem 抛错——detectLang 在模块顶层(先于 boot)同步执行，
+  // 不兜底会整页白屏。navigator 同理防御。
+  let saved: string | null = null;
+  try { saved = localStorage.getItem("md-editor-lang"); } catch { /* 存储禁用/损坏 → 回退 navigator */ }
+  if (saved === "zh-CN" || saved === "zh-TW" || saved === "en") return saved;
+  let nl = "zh-cn";
+  try { nl = (navigator.language || "zh-CN").toLowerCase(); } catch { /* navigator 不可用 → 默认简中 */ }
+  if (nl.startsWith("zh-tw") || nl.startsWith("zh-hk") || nl.startsWith("zh-hant")) return "zh-TW";
+  if (nl.startsWith("en")) return "en";
+  return "zh-CN"; // 简体中文默认（含 zh-cn / zh / 其他）
+}
+let currentLang: Lang = detectLang();
+function t(key: string): string { return UI_TEXT[currentLang][key] ?? UI_TEXT["en"][key] ?? key; }
+function welcomeMd(): string { return WELCOME_TEXT[currentLang]; }
 
 // ---- 多标签页：每个打开的文档一个 Doc ----
 interface Doc {
@@ -41,15 +142,6 @@ interface Section {
   start: number;
   end: number;
 }
-
-const WELCOME = `# 欢迎使用 MD 编辑器
-
-- 双击 .md 文件或拖拽 .md 到窗口打开
-- 支持**多个标签页**，互不覆盖
-- 左侧大纲：点击定位、✕ 删除章节、拖动重排章节
-- 顶部「打开 / 保存」操作文件
-- 默认**所见即所得**模式，可直接编辑表格（点单元格、浮层增删行列/对齐、数字框回车批量增删）；需要源码即时渲染时点顶部「即时渲染」切回（Ctrl+Alt+M）
-`;
 
 function esc(s: string): string {
   return s
@@ -99,7 +191,7 @@ function rebuildOutline() {
   const ul = document.getElementById("outline")!;
   ul.innerHTML = "";
   if (secs.length === 0) {
-    ul.innerHTML = '<li class="empty">（暂无标题：用 # 添加章节）</li>';
+    ul.innerHTML = '<li class="empty">' + esc(t("noHeadings")) + "</li>";
     return;
   }
   secs.forEach((s, idx) => {
@@ -109,7 +201,7 @@ function rebuildOutline() {
     li.dataset.id = s.id;
     li.innerHTML =
       `<span class="ot" title="${esc(s.title)}">${esc(s.title)}</span>` +
-      `<span class="odel" title="删除该章节（含正文）">✕</span>`;
+      `<span class="odel" title="${esc(t("deleteChapter"))}">✕</span>`;
     li.addEventListener("click", () => scrollToHeading(idx));
     li.querySelector(".odel")!.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -191,10 +283,15 @@ async function deleteSection(id: string) {
   const s = secs.find((x) => x.id === id);
   if (!s) return;
   let ok = false;
+  // 英文正文不前置 delTitle（否则生成 'Delete section"标题" and all its content?' 病句：
+  // 引号孤立 + 与标题框 'Delete section' 重复）。中文用「删除章节「标题」…」结构（「」配对正确）。
+  // delTitle 仍作为 confirm 弹窗的标题框。
+  const delQ = currentLang === "en" ? '"' : "「";
+  const delMsg = (currentLang === "en" ? "" : t("delTitle")) + delQ + s.title + t("delConfirmSuf");
   try {
-    ok = await confirm(`删除章节「${s.title}」及其下属全部内容？`, { title: "删除章节", kind: "warning" });
+    ok = await confirm(delMsg, { title: t("delTitle"), kind: "warning" });
   } catch {
-    ok = window.confirm(`删除章节「${s.title}」及其下属全部内容？`);
+    ok = window.confirm(delMsg);
   }
   if (!ok) return;
   const lines = doc.content.split("\n");
@@ -234,35 +331,11 @@ function moveSection(dragId: string, targetId: string, pos: "before" | "after") 
   updateTitle();
 }
 
-function applyToolbarTooltips() {
-  const tipMap: Record<string, string> = {
-    headings: "标题（同时作为左侧大纲的章节）",
-    bold: "加粗  Ctrl+B",
-    italic: "斜体  Ctrl+I",
-    strike: "删除线",
-    line: "分隔线",
-    quote: "引用块",
-    list: "无序列表",
-    "ordered-list": "有序列表",
-    check: "任务清单",
-    outdent: "减少缩进",
-    indent: "增加缩进",
-    code: "代码块",
-    "inline-code": "行内代码",
-    link: "超链接",
-    table: "表格",
-    undo: "撤销  Ctrl+Z",
-    redo: "重做  Ctrl+Y",
-    "edit-mode": "切换编辑模式（即时渲染 / 源码 / 分屏）",
-    fullscreen: "全屏",
-  };
+// 工具栏 tooltip 文字走 Vditor 注入的 i18n（自动多语言）；此处只把方向改成向下，
+// 避开 #editor-wrap overflow:hidden 向上裁剪（[TAURI-01] 第4坑）
+function fixToolbarTooltipDirection() {
   document.querySelectorAll<HTMLElement>("#editor .vditor-toolbar [data-type]").forEach((btn) => {
-    const dt = btn.getAttribute("data-type") || "";
-    if (tipMap[dt]) {
-      btn.setAttribute("aria-label", tipMap[dt]);
-      // tooltip 方向改向下，避开 #editor-wrap overflow:hidden 向上裁剪
-      btn.className = btn.className.replace(/vditor-tooltipped__n[we]?/, "vditor-tooltipped__s");
-    }
+    btn.className = btn.className.replace(/vditor-tooltipped__n[we]?/, "vditor-tooltipped__s");
   });
 }
 
@@ -279,7 +352,7 @@ function renderTabs() {
     const close = document.createElement("span");
     close.className = "tab-close";
     close.textContent = "✕";
-    close.title = "关闭";
+    close.title = t("closeTab");
     tab.appendChild(name);
     tab.appendChild(close);
     tab.addEventListener("click", () => switchDoc(doc.id));
@@ -319,7 +392,7 @@ function showEmptyState() {
   document.getElementById("empty-state")!.hidden = false;
   if (vditor) { suppressInput = true; vditor.setValue(""); suppressInput = false; }
   const ul = document.getElementById("outline");
-  if (ul) ul.innerHTML = '<li class="empty">（暂无打开的文件：点顶部「打开」或把 .md 拖入窗口）</li>';
+  if (ul) ul.innerHTML = '<li class="empty">' + esc(t("noOpenFile")) + "</li>";
   updateTitle(); // 兜底：确保空状态下标题显示「（无）」而非残留旧文档名
 }
 function hideEmptyState() {
@@ -361,7 +434,7 @@ function openDoc(path: string | null, content: string, name?: string, encoding?:
   const doc: Doc = {
     id: newDocId(),
     path,
-    name: name || (path ? path.split(/[\\/]/).pop()! : "未命名"),
+    name: name || (path ? path.split(/[\\/]/).pop()! : t("untitled")),
     content,
     dirty: false,
     encoding: encoding || "",
@@ -373,7 +446,7 @@ function openDoc(path: string | null, content: string, name?: string, encoding?:
 function updateTitle() {
   const doc = activeDoc();
   const el = document.getElementById("file-title")!;
-  el.textContent = doc ? (doc.dirty ? "● " : "") + doc.name : "（无）";
+  el.textContent = doc ? (doc.dirty ? "● " : "") + doc.name : t("noDoc");
   document.getElementById("encoding-badge")!.textContent = doc && doc.encoding ? ` ${doc.encoding}` : "";
 }
 
@@ -382,7 +455,7 @@ async function loadFile(path: string) {
     const [content, enc] = await invoke<[string, string]>("open_file", { path });
     openDoc(path, content, undefined, enc);
   } catch (e) {
-    alert("打开失败：" + e);
+    alert(t("openFail") + e);
   }
 }
 
@@ -393,36 +466,18 @@ type VditorOptions = NonNullable<ConstructorParameters<typeof Vditor>[1]>;
 function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
   return {
     mode,
-    lang: "zh_CN",
-    i18n: zhCNI18n, // 注入本地 i18n（不走 CDN i18n）
+    lang: VDITOR_LANG[currentLang],
+    i18n: VDITOR_I18N[currentLang], // 注入本地 i18n（当前语言），工具栏 tooltip 自动走 i18n
     cdn: "/vditor-assets", // lute(markdown 引擎)/icons/method 等本地加载，符合 CSP，不依赖 unpkg
     height: "100%",
     cache: { enable: false },
     preview: { hljs: { lineNumber: false, style: "github" } },
     toolbar: [
-      { name: "headings", tip: "标题（同时作为左侧大纲的章节）" },
-      { name: "bold", tip: "加粗  Ctrl+B" },
-      { name: "italic", tip: "斜体  Ctrl+I" },
-      { name: "strike", tip: "删除线" },
-      "|",
-      { name: "line", tip: "分隔线" },
-      { name: "quote", tip: "引用块" },
-      { name: "list", tip: "无序列表" },
-      { name: "ordered-list", tip: "有序列表" },
-      { name: "check", tip: "任务清单" },
-      { name: "outdent", tip: "减少缩进" },
-      { name: "indent", tip: "增加缩进" },
-      "|",
-      { name: "code", tip: "代码块" },
-      { name: "inline-code", tip: "行内代码" },
-      { name: "link", tip: "超链接" },
-      { name: "table", tip: "表格" },
-      "|",
-      { name: "undo", tip: "撤销  Ctrl+Z" },
-      { name: "redo", tip: "重做  Ctrl+Y" },
-      "|",
-      { name: "edit-mode", tip: "切换编辑模式（即时渲染 / 源码 / 分屏）" },
-      { name: "fullscreen", tip: "全屏" },
+      "headings", "bold", "italic", "strike", "|",
+      "line", "quote", "list", "ordered-list", "check", "outdent", "indent", "|",
+      "code", "inline-code", "link", "table", "|",
+      "undo", "redo", "|",
+      "edit-mode", "fullscreen",
     ],
     input: () => {
       if (suppressInput) return;
@@ -437,11 +492,11 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
       scheduleOutline();
     },
     after: () => {
-      applyToolbarTooltips();
+      fixToolbarTooltipDirection();
       if (!vditorInited) {
         // 首次初始化：打开欢迎文档、处理命令行传入的文件
         vditorInited = true;
-        openDoc(null, WELCOME, "欢迎");
+        openDoc(null, welcomeMd(), t("welcomeName"));
         if (pendingFile) {
           const f = pendingFile;
           pendingFile = null;
@@ -496,24 +551,63 @@ function updateModeUI() {
   const badge = document.getElementById("mode-badge");
   if (currentMode === "wysiwyg") {
     if (btn) {
-      btn.textContent = "切回即时渲染";
-      btn.title = "切回即时渲染模式（Ctrl+Alt+M）";
+      btn.textContent = t("switchToIR");
+      btn.title = t("switchToIRTip");
     }
     if (badge) {
-      badge.textContent = "所见即所得";
-      badge.title = "当前：所见即所得模式（可直接编辑表格）";
+      badge.textContent = t("modeWYSIWYG");
+      badge.title = t("modeWYSIWYGTip");
       badge.className = "mode-badge wysiwyg";
     }
   } else {
     if (btn) {
-      btn.textContent = "所见即所得";
-      btn.title = "切到所见即所得模式以编辑表格（Ctrl+Alt+M）";
+      btn.textContent = t("switchToWYSIWYG");
+      btn.title = t("switchToWYSIWYGTip");
     }
     if (badge) {
-      badge.textContent = "即时渲染";
-      badge.title = "当前：即时渲染模式（默认）";
+      badge.textContent = t("modeIR");
+      badge.title = t("modeIRTip");
       badge.className = "mode-badge ir";
     }
+  }
+}
+
+// 把所有静态 DOM 文案更新到当前语言（语言切换 / 初始化时调用）
+function applyAllText() {
+  document.getElementById("btn-open")!.textContent = t("open");
+  document.getElementById("btn-save")!.textContent = t("save");
+  const pt = document.getElementById("panel-title"); if (pt) pt.textContent = t("panelTitle");
+  const eh = document.getElementById("empty-hint"); if (eh) eh.textContent = t("emptyHint");
+  const cmsg = document.getElementById("cc-msg"); if (cmsg) cmsg.textContent = t("closeSaveMsg");
+  const csave = document.getElementById("cc-save"); if (csave) csave.textContent = t("closeSave");
+  const cdisc = document.getElementById("cc-discard"); if (cdisc) cdisc.textContent = t("closeDiscard");
+  const ccan = document.getElementById("cc-cancel"); if (ccan) ccan.textContent = t("closeCancel");
+  const sel = document.getElementById("lang-select") as HTMLSelectElement | null;
+  if (sel) sel.value = currentLang;
+  document.documentElement.lang = currentLang; // a11y：屏幕阅读器发音/CSS :lang/繁体字体回退随语言
+  document.title = t("appName"); // 浏览器标签/Tauri 窗口/任务栏标题随语言
+  updateModeUI();
+}
+
+// 切换界面语言：持久化(localStorage) + Vditor 重建(注入新语言 i18n) + 静态文案更新
+function setLang(lang: Lang) {
+  // 重入锁：模式切换(switchMode)重建中(switchInFlight)不重入，避免并发 destroy/new 致双实例/DOM 残留/内容丢失
+  if (lang === currentLang || switchInFlight) return;
+  currentLang = lang;
+  try { localStorage.setItem("md-editor-lang", lang); } catch { /* 存储禁用，仅本次会话生效 */ }
+  applyAllText();
+  if (vditor) {
+    switchInFlight = true; // 语言切换重建期间上锁，与 switchMode 互斥（after 回调统一释放）
+    const cur = activeDoc();
+    if (cur) {
+      const v = vditor.getValue();
+      if (v !== "" || cur.content === "") cur.content = v;
+      // 欢迎页(无 path)随语言切换更新欢迎内容；用户文档(有 path)保留原内容不动
+      if (!cur.path) { cur.content = welcomeMd(); cur.name = t("welcomeName"); cur.dirty = false; }
+    }
+    vditor.destroy();
+    vditor = null;
+    vditor = new Vditor("editor", vditorOptions(currentMode));
   }
 }
 
@@ -635,7 +729,8 @@ async function saveDoc(doc: Doc): Promise<boolean> {
     doc.name = path.split(/[\\/]/).pop()!;
   }
   if (doc.content === "") {
-    alert("「" + doc.name + "」内容为空，已跳过保存（避免清空文件）");
+    const seq = currentLang === "en" ? '"' : "「";
+    alert(seq + doc.name + t("saveEmptySuf"));
     return false;
   }
   try {
@@ -643,7 +738,7 @@ async function saveDoc(doc: Doc): Promise<boolean> {
     doc.dirty = false;
     return true;
   } catch (e) {
-    alert("保存「" + doc.name + "」失败：" + e);
+    alert(t("saveFail") + doc.name + " — " + e);
     return false;
   }
 }
@@ -681,6 +776,9 @@ async function boot() {
     }
   });
   updateModeUI();
+  applyAllText(); // 初始化静态文案到当前语言
+  const langSel = document.getElementById("lang-select") as HTMLSelectElement | null;
+  if (langSel) langSel.addEventListener("change", () => setLang(langSel.value as Lang));
   bindTablePopoverVisibility(); // WYSIWYG 表格浮层显示（补 Vditor 重建后不自动触发的缺陷）
   bindTableInputConfirm(); // 表格行列数字框：确认（回车/失焦）后才增删，避免逐字符删数据
 
@@ -701,7 +799,7 @@ async function boot() {
       try {
         await win.destroy();
       } catch (e) {
-        alert("关闭失败：" + e);
+        alert(t("closeFail") + e);
       }
     });
   } catch {
@@ -749,7 +847,7 @@ async function boot() {
       updateTitle();
       renderTabs();
     } catch (e) {
-      alert("保存失败：" + e);
+      alert(t("saveFail") + e);
     }
   });
 }
