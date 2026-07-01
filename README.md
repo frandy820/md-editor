@@ -6,6 +6,8 @@
 ![size](https://img.shields.io/badge/size-~15MB-9cf?style=flat-square)
 ![i18n](https://img.shields.io/badge/UI-中文%20%7C%20EN-4470e0?style=flat-square)
 
+![MD 编辑器 · 表格可视化编辑](docs/screenshots/table-edit.png)
+
 **[中文](#中文) · [English](#english)**
 
 ---
@@ -13,6 +15,8 @@
 ## 中文
 
 一款轻量的 Windows 桌面 Markdown 编辑器，**默认所见即所得，支持表格可视化增删改**，内置**中英双语界面**（中文支持简体/繁体）。基于 Tauri 2 + Vditor，单文件便携 exe（约 15 MB），不依赖网络。
+
+> 📑 目录：[功能](#-功能) · [下载](#-下载) · [用法](#-用法) · [竞品对比](#-竞品对比) · [构建](#-从源码构建) · [技术栈](#-技术栈)
 
 ### ✨ 功能
 
@@ -24,7 +28,18 @@
 - **编码自动识别**：UTF-8 / UTF-8(BOM) / GBK
 - **隐私**：不请求麦克风（已禁用编辑器内核自带的录音模块）
 
+<details>
+<summary>📸 界面截图</summary>
+
+![主界面（简体中文）](docs/screenshots/main-zh.png)
+
+![英文界面](docs/screenshots/en.png)
+
+</details>
+
 ### 📥 下载
+
+[![下载 md-editor.exe](https://img.shields.io/badge/⬇下载-md--editor.exe-4470e0?style=for-the-badge)](https://github.com/frandy820/md-editor/releases/latest)
 
 去 [Releases](https://github.com/frandy820/md-editor/releases) 下载 `md-editor.exe`，双击即可运行（便携，免安装）。
 
@@ -40,6 +55,16 @@
 | 大纲 | 左侧：点章节定位 / ✕ 删章节 / 拖动重排 |
 | 快捷键 | `Ctrl+B` 加粗、`Ctrl+I` 斜体、`Ctrl+S` 保存、`Ctrl+Alt+M` 切模式 |
 | 保存 | 统一写 UTF-8 无 BOM；拖入打开的文件保留原路径，可直接保存 |
+
+### 🆚 竞品对比
+
+| 项目 | 免费 | 便携免安装 | 表格可视化编辑 | 中英双语 | 开源 |
+|---|---|---|---|---|---|
+| **md-editor** | ✅ | ✅ 单文件 exe | ✅ 浮层 + 数字框批量 | ✅ | ✅ |
+| Typora | ⚠️ 收费 | ❌ 需安装 | ⚠️ 基础 | ✅ | ❌ |
+| MarkText | ✅ | ❌ 需安装 | ⚠️ 基础 | ⚠️ | ✅ |
+| Obsidian | ✅ | ❌ 需安装 | ⚠️ 需插件 | ✅ | ❌ |
+| Easy MD | ✅ | ❌ | ⚠️ 弱 | ❌ | ✅ |
 
 ### 🛠️ 从源码构建
 
@@ -74,6 +99,8 @@ npm run tauri build -- --no-bundle
 
 A lightweight WYSIWYG Markdown editor for Windows with **visual table editing**, offering a **bilingual interface** (English / Chinese, with both Simplified & Traditional). Built with Tauri 2 + Vditor. Single portable `.exe` (~15 MB), no install, no network.
 
+> 📑 Contents: [Features](#-features) · [Download](#-download) · [Usage](#-usage) · [Comparison](#-comparison) · [Build](#-build-from-source) · [Tech stack](#-tech-stack)
+
 ### ✨ Features
 
 - **WYSIWYG by default**: edit tables directly — click a cell to edit, cursor into a table pops up a floating toolbar (insert row above/below, insert column left/right, delete row/column, align, delete table); type a number + Enter in the row/column box to **batch add/remove**
@@ -84,7 +111,18 @@ A lightweight WYSIWYG Markdown editor for Windows with **visual table editing**,
 - **Encoding auto-detection**: UTF-8 / UTF-8(BOM) / GBK
 - **Privacy**: no microphone access (the editor core's built-in recording module is disabled)
 
+<details>
+<summary>📸 Screenshots</summary>
+
+![Main UI (Simplified Chinese)](docs/screenshots/main-zh.png)
+
+![English UI](docs/screenshots/en.png)
+
+</details>
+
 ### 📥 Download
+
+[![Download md-editor.exe](https://img.shields.io/badge/⬇Download-md--editor.exe-4470e0?style=for-the-badge)](https://github.com/frandy820/md-editor/releases/latest)
 
 Grab `md-editor.exe` from [Releases](https://github.com/frandy820/md-editor/releases) — double-click to run (portable, no install).
 
@@ -100,6 +138,16 @@ Grab `md-editor.exe` from [Releases](https://github.com/frandy820/md-editor/rele
 | Outline | Left panel: click a heading to navigate / ✕ to delete / drag to reorder |
 | Shortcuts | `Ctrl+B` bold, `Ctrl+I` italic, `Ctrl+S` save, `Ctrl+Alt+M` toggle mode |
 | Save | Always writes UTF-8 without BOM; dragged-in files keep their path for direct save |
+
+### 🆚 Comparison
+
+| Project | Free | Portable (no install) | Visual table editing | Bilingual (EN/中) | Open source |
+|---|---|---|---|---|---|
+| **md-editor** | ✅ | ✅ single .exe | ✅ toolbar + batch | ✅ | ✅ |
+| Typora | ⚠️ paid | ❌ install | ⚠️ basic | ✅ | ❌ |
+| MarkText | ✅ | ❌ install | ⚠️ basic | ⚠️ | ✅ |
+| Obsidian | ✅ | ❌ install | ⚠️ plugin | ✅ | ❌ |
+| Easy MD | ✅ | ❌ | ⚠️ weak | ❌ | ✅ |
 
 ### 🛠️ Build from source
 
