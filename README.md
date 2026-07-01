@@ -1,5 +1,12 @@
 # MD 编辑器（md-editor）
 
+![license](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
+![platform](https://img.shields.io/badge/platform-Windows-0078D4?style=flat-square)
+![tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=flat-square)
+![size](https://img.shields.io/badge/size-~14MB-9cf?style=flat-square)
+
+> **English:** A lightweight WYSIWYG Markdown editor for Windows with visual table editing — insert/delete rows & columns, alignment, batch edit via number inputs. Built with Tauri 2 + Vditor. Single portable `.exe` (~14MB), no install, no network.
+
 一款轻量的 Windows 桌面 Markdown 编辑器，**默认所见即所得，支持表格可视化增删改**。基于 Tauri 2 + Vditor，单文件便携 exe（约 14MB），不依赖网络。
 
 ## ✨ 功能
