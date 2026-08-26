@@ -44,6 +44,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     exportStagePage: "正在生成页面…", exportStagePrint: "正在打印为 PDF…", exportStageSave: "正在保存文件…",
     fontSizeTip: "字号：先框选文字，再选字号",
     selectFirstTip: "请先在编辑区框选要改字号的文字，再选字号",
+    wordCount: "字",
     appName: "MD 编辑器",
   },
   "zh-TW": {
@@ -64,6 +65,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     exportStagePage: "正在產生頁面…", exportStagePrint: "正在列印為 PDF…", exportStageSave: "正在儲存檔案…",
     fontSizeTip: "字號：先框選文字，再選字號",
     selectFirstTip: "請先在編輯區框選要改字號的文字，再選字號",
+    wordCount: "字",
     appName: "MD 編輯器",
   },
   "en": {
@@ -84,6 +86,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     exportStagePage: "Generating pages…", exportStagePrint: "Printing to PDF…", exportStageSave: "Saving file…",
     fontSizeTip: "Font size: select text first, then pick a size",
     selectFirstTip: "Select the text in the editor first, then pick a size",
+    wordCount: "words",
     appName: "MD Editor",
   },
 };
@@ -644,7 +647,23 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
     cdn: "/vditor-assets", // lute(markdown 引擎)/icons/method 等本地加载，符合 CSP，不依赖 unpkg
     height: "100%",
     cache: { enable: false },
-    preview: { hljs: { lineNumber: false, style: "github" } },
+    // 字数统计（type text = 按渲染后文本统计，符合中文字数直觉；after 补三语单位，样式由 styles.css 钉右下角）
+    counter: {
+      enable: true, type: "text",
+      after: (len: number) => {
+        const el = document.querySelector<HTMLElement>(".vditor-counter");
+        if (el) el.innerText = `${len} ${t("wordCount")}`;
+      },
+    },
+    // :emoji: 补全的表情图片走本地资源（默认 unpkg CDN，CSP 禁外联且离线不可用）
+    hint: { emojiPath: "/vditor-assets/dist/images/emoji" },
+    preview: {
+      hljs: { lineNumber: true, style: "github" },
+      // 数学公式 KaTeX（引擎资源已本地化；inlineDigit 允许行内 $ 后跟数字，兼容中文排版场景）
+      math: { engine: "KaTeX", inlineDigit: true },
+      // 中英文之间自动加空格（仅渲染层，不写回源码）
+      markdown: { autoSpace: true },
+    },
     toolbar: [
       "headings", "bold", "italic", "strike", "|",
       "line", "quote", "list", "ordered-list", "check", "outdent", "indent", "|",
