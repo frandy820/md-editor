@@ -100,3 +100,9 @@ body { display: flex; flex-direction: column; overflow: hidden; }
 .export-pct { margin-top: 8px; font-size: 12px; color: #888; }
 /* 需求3：字号交互期间 contenteditable 失焦选区高亮透明，用此层模拟框选（固定于视口，随 savedRange 矩形定位） */
 .fontsel-hl { position: fixed; background: rgba(68,112,224,0.30); pointer-events: none; z-index: 999999; border-radius: 1px; }
+/* 字数统计：Vditor 默认把 counter 挤进工具栏占一整行，钉到编辑器右下角浮动显示 */
+#editor .vditor { position: relative; }
+#editor .vditor-counter {
+  position: absolute; right: 12px; bottom: 8px; z-index: 19;
+  font-size: 12px; color: #999; opacity: 0.7; pointer-events: none;
+}
