@@ -1027,9 +1027,9 @@ const TYPEWRITER_KEY = "md-editor-typewriter";
 let focusModeOn = false;
 let typewriterOn = false;
 
-// 编辑区滚动容器：从 .vditor-wysiwyg/.vditor-ir 向上找第一个可滚动祖先（Vditor 结构不保证层级，运行时探测）
+// 编辑区滚动容器：从 pre.vditor-reset 自身起向上找第一个可滚动元素（实测滚动就发生在 pre 自身，overflowY:auto）
 function editorScrollEl(): HTMLElement | null {
-  const root = document.querySelector(".vditor-wysiwyg, .vditor-ir") as HTMLElement | null;
+  const root = document.querySelector(".vditor-wysiwyg pre.vditor-reset, .vditor-ir pre.vditor-reset") as HTMLElement | null;
   let el: HTMLElement | null = root;
   while (el) {
     const st = getComputedStyle(el);
@@ -1207,13 +1207,17 @@ function closeFind() {
 }
 
 // 单个替换：DOM Range 选中 → execCommand 插入（走 Vditor 键入管线：内容/undo/大纲联动）
+// 焦点必须先回编辑区再重设 selection：点击"替换"按钮后焦点在按钮上，此时 execCommand 的
+// "替换当前选区"不生效（表现为只插入不删除旧词）
 function replaceCurrent() {
   const m = findMatches[findIndex];
   if (!m || !vditor) return;
   const rep = (document.getElementById("replace-input") as HTMLInputElement).value;
+  const root = document.querySelector(".vditor-wysiwyg pre.vditor-reset, .vditor-ir pre.vditor-reset") as HTMLElement | null;
   try {
     const r = document.createRange();
     r.setStart(m.node, m.start); r.setEnd(m.node, m.end);
+    root?.focus();
     const sel = getSelection(); sel!.removeAllRanges(); sel!.addRange(r);
     if (!document.execCommand("insertText", false, rep)) return;
   } catch { return; }
@@ -1282,7 +1286,10 @@ function bindFindBar() {
     }
   });
   // 编辑内容变化 → 高亮同步（document input 捕获 contenteditable 键入，避免动 vditor 共用 input 回调链）
-  document.addEventListener("input", () => {
+  // 排除查找条自身输入：否则会清掉 find-input 的 250ms 定时器（同一 debounce 变量被互踩 → findIndex 恒 -1）
+  document.addEventListener("input", (e) => {
+    const tid = (e.target as HTMLElement)?.id;
+    if (tid === "find-input" || tid === "replace-input") return;
     if (document.getElementById("find-bar")?.hidden) return;
     window.clearTimeout(findInputDebounce);
     findInputDebounce = window.setTimeout(() => refreshFind(false), 400);
