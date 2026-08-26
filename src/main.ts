@@ -1257,6 +1257,7 @@ function bindFindBar() {
     findInputDebounce = window.setTimeout(() => refreshFind(true), 250);
   });
   inp.addEventListener("keydown", (e) => {
+    if (e.isComposing) return; // IME 组合态的 Enter/Esc 交给输入法
     if (e.key === "Enter") { e.preventDefault(); gotoMatch(e.shiftKey ? findIndex - 1 : findIndex + 1); }
     else if (e.key === "Escape") { e.preventDefault(); closeFind(); }
   });
@@ -1274,8 +1275,22 @@ function bindFindBar() {
     replaceAllMatches();
   });
   (document.getElementById("replace-input") as HTMLInputElement).addEventListener("keydown", (e) => {
+    if (e.isComposing) return;
     if (e.key === "Escape") { e.preventDefault(); closeFind(); }
   });
+  // 全局 Esc 兜底：焦点不在查找条输入框时（如在编辑区）Esc 也能关闭
+  window.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || e.isComposing) return;
+    const bar = document.getElementById("find-bar");
+    if (bar && !bar.hidden) { e.preventDefault(); closeFind(); }
+  });
+  // 点击查找条外部 → 收起（VSCode/Typora 惯例，兼作关闭路径兜底）
+  document.addEventListener("pointerdown", (e) => {
+    const bar = document.getElementById("find-bar");
+    if (!bar || bar.hidden) return;
+    if (e.target instanceof Node && bar.contains(e.target)) return;
+    closeFind();
+  }, true);
   document.getElementById("btn-find")!.addEventListener("click", () => openFind(false));
   // Ctrl+F / Ctrl+H（WebView2 无原生查找 UI，无冲突）
   window.addEventListener("keydown", (e) => {
