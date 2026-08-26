@@ -19,6 +19,7 @@ body { display: flex; flex-direction: column; overflow: hidden; }
 #lang-select, #font-size-select { padding: 4px 6px; font-size: 13px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; }
 #file-title { margin-left: 8px; font-size: 13px; color: #333; }
 #encoding-badge { color: #999; font-size: 12px; }
+#app-version { color: #bbb; font-size: 11px; margin-left: 2px; white-space: nowrap; }
 .mode-badge { font-size: 12px; padding: 2px 8px; border-radius: 10px; border: 1px solid #ddd; white-space: nowrap; line-height: 18px; }
 .mode-badge.ir { color: #666; background: #f3f3f3; }
 .mode-badge.wysiwyg { color: #fff; background: #4470e0; border-color: #4470e0; }
@@ -111,9 +112,10 @@ body { display: flex; flex-direction: column; overflow: hidden; }
 /* 专注模式：当前块之外的顶层块淡化（F8） */
 body.focus-mode .vditor-reset > :not(.fw-current) { opacity: 0.22; transition: opacity 0.25s; }
 body.focus-mode .vditor-reset > .fw-current { opacity: 1; }
-/* 查找替换浮条（编辑区右上角） */
+/* 查找替换浮条（编辑区右上角）。z-index 必须高于 Vditor 浮层(tooltip 1000005)：
+   曾用 400，被 tooltip 伪元素盖住时点 ✕ 无反应；低于 modal(2147483647) */
 #find-bar {
-  position: absolute; top: 6px; right: 14px; z-index: 400;
+  position: absolute; top: 6px; right: 14px; z-index: 2000000;
   background: #fff; border: 1px solid #ccc; border-radius: 6px;
   box-shadow: 0 2px 10px rgba(0,0,0,.15); padding: 6px 8px;
   display: flex; flex-direction: column; gap: 6px;
