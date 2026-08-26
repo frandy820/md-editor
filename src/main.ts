@@ -1287,11 +1287,7 @@ function bindFindBar() {
   // 浮层闪现、IME 状态切换）都会吃掉事件且无任何报错——用户两次报告"点✕无反应"。
   // pointerdown 按下即触发；closeFind 幂等（bar.hidden 直接 return），后续 click 重入无害。
   document.getElementById("find-close")!.addEventListener("pointerdown", (e) => { e.preventDefault(); closeFind(); });
-  onDown("find-toggle-replace", () => {
-    const row = document.getElementById("replace-row")!;
-    row.hidden = !row.hidden;
-    if (!row.hidden) (document.getElementById("replace-input") as HTMLInputElement).focus();
-  });
+  // ⇄"展开/收起替换"按钮已按用户要求移除：替换行只由 Ctrl+H 控制
   onDown("replace-one", replaceCurrent);
   onDown("replace-all", () => {
     if (findMatches.length > 500 && !confirm(t("replaceManyConfirm"))) return;
@@ -1307,14 +1303,19 @@ function bindFindBar() {
     const bar = document.getElementById("find-bar");
     if (bar && !bar.hidden) { e.preventDefault(); closeFind(); }
   });
-  // 点击查找条外部 → 收起（VSCode/Typora 惯例，兼作关闭路径兜底）
+  // 点击查找条外部 → 收起（VSCode/Typora 惯例，兼作关闭路径兜底）。
+  // 🔍按钮例外：它的 click 做 toggle（关了再点=重开），若此处先收起会被 click 立即重开，toggle 失效
   document.addEventListener("pointerdown", (e) => {
     const bar = document.getElementById("find-bar");
     if (!bar || bar.hidden) return;
-    if (e.target instanceof Node && bar.contains(e.target)) return;
+    if (e.target instanceof Node && (bar.contains(e.target) || document.getElementById("btn-find")?.contains(e.target))) return;
     closeFind();
   }, true);
-  document.getElementById("btn-find")!.addEventListener("click", () => openFind(false));
+  // 🔍查找按钮 toggle：开→关（用户预期：再点一次消失）。Ctrl+F/H 仍只开（编辑中快捷键不反关）
+  document.getElementById("btn-find")!.addEventListener("click", () => {
+    const bar = document.getElementById("find-bar")!;
+    if (!bar.hidden) closeFind(); else openFind(false);
+  });
   // Ctrl+F / Ctrl+H（WebView2 无原生查找 UI，无冲突）
   window.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "f" || e.key === "F")) {

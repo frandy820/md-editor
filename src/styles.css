@@ -113,7 +113,11 @@ body { display: flex; flex-direction: column; overflow: hidden; }
 body.focus-mode .vditor-reset > :not(.fw-current) { opacity: 0.22; transition: opacity 0.25s; }
 body.focus-mode .vditor-reset > .fw-current { opacity: 1; }
 /* 查找替换浮条（编辑区右上角）。z-index 必须高于 Vditor 浮层(tooltip 1000005)：
-   曾用 400，被 tooltip 伪元素盖住时点 ✕ 无反应；低于 modal(2147483647) */
+   曾用 400，被 tooltip 伪元素盖住时点 ✕ 无反应；低于 modal(2147483647)。
+   ⚠ [hidden] 规则必须 !important：#find-bar 的 display:flex 与 .find-row 的 display:flex
+   特异性高于 UA 的 [hidden]{display:none}——曾致 hidden 属性切换了但视觉永不消失，
+   用户四轮"点✕没反应"的真因（此前误判为事件绑定/剪贴板死锁） */
+#find-bar[hidden], #find-bar [hidden] { display: none !important; }
 #find-bar {
   position: absolute; top: 6px; right: 14px; z-index: 2000000;
   background: #fff; border: 1px solid #ccc; border-radius: 6px;
