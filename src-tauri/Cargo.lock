@@ -1945,8 +1945,9 @@ dependencies = [
 
 [[package]]
 name = "md-editor"
-version = "0.2.6"
+version = "0.3.0"
 dependencies = [
+ "base64 0.22.1",
  "encoding_rs",
  "serde",
  "serde_json",

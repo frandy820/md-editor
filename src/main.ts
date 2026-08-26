@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { listen } from "@tauri-apps/api/event";
 import { open as openDialog, save as saveDialog, confirm } from "@tauri-apps/plugin-dialog";
@@ -41,7 +41,9 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     modeWYSIWYGTip: "当前：所见即所得模式（可直接编辑表格）", modeIRTip: "当前：即时渲染模式",
     switchToIRTip: "切回即时渲染模式（Ctrl+Alt+M）", switchToWYSIWYGTip: "切到所见即所得模式以编辑表格（Ctrl+Alt+M）",
     panelTitle: "大纲 · 点击定位 · ✕删除 · 拖动重排",
-    export: "🖨 导出 PDF", exportNoDoc: "（请先打开或新建文档再导出）", exportFail: "导出失败：", exporting: "正在导出 PDF，请稍候…",
+    export: "💾 导出 ▾", exportNoDoc: "（请先打开或新建文档再导出）", exportFail: "导出失败：", exporting: "正在导出 PDF，请稍候…",
+    exportDone: "导出完成：", pandocMissing: "Pandoc（放入 pandoc.exe 到软件旁即解锁）", pandocReady: "Pandoc 已就绪",
+    exportImageSlices: "文档较长，已分片导出多张 PNG：", pasteImgUntitledHint: "（提示：文档尚未保存，截图存到了应用目录，保存文档后建议用「另存为」整理）",
     exportStagePage: "正在生成页面…", exportStagePrint: "正在打印为 PDF…", exportStageSave: "正在保存文件…",
     fontSizeTip: "字号：先框选文字，再选字号",
     selectFirstTip: "请先在编辑区框选要改字号的文字，再选字号",
@@ -68,7 +70,9 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     modeWYSIWYGTip: "當前：所見即所得模式（可直接編輯表格）", modeIRTip: "當前：即時渲染模式",
     switchToIRTip: "切回即時渲染模式（Ctrl+Alt+M）", switchToWYSIWYGTip: "切到所見即所得模式以編輯表格（Ctrl+Alt+M）",
     panelTitle: "大綱 · 點擊定位 · ✕刪除 · 拖曳重排",
-    export: "🖨 匯出 PDF", exportNoDoc: "（請先開啟或新增文件再匯出）", exportFail: "匯出失敗：", exporting: "正在匯出 PDF，請稍候…",
+    export: "💾 匯出 ▾", exportNoDoc: "（請先開啟或新增文件再匯出）", exportFail: "匯出失敗：", exporting: "正在匯出 PDF，請稍候…",
+    exportDone: "匯出完成：", pandocMissing: "Pandoc（放入 pandoc.exe 到軟體旁即解鎖）", pandocReady: "Pandoc 已就緒",
+    exportImageSlices: "文件較長，已分片匯出多張 PNG：", pasteImgUntitledHint: "（提示：文件尚未儲存，截圖存到了應用目錄，儲存文件後建議整理）",
     exportStagePage: "正在產生頁面…", exportStagePrint: "正在列印為 PDF…", exportStageSave: "正在儲存檔案…",
     fontSizeTip: "字號：先框選文字，再選字號",
     selectFirstTip: "請先在編輯區框選要改字號的文字，再選字號",
@@ -95,7 +99,9 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     modeWYSIWYGTip: "Current: WYSIWYG mode (visual table editing)", modeIRTip: "Current: Markdown (IR) mode",
     switchToIRTip: "Switch to Markdown (IR) (Ctrl+Alt+M)", switchToWYSIWYGTip: "Switch to WYSIWYG to edit tables (Ctrl+Alt+M)",
     panelTitle: "Outline · click to navigate · ✕ delete · drag to reorder",
-    export: "🖨 Export PDF", exportNoDoc: "(Open or create a document first)", exportFail: "Export failed: ", exporting: "Exporting PDF, please wait…",
+    export: "💾 Export ▾", exportNoDoc: "(Open or create a document first)", exportFail: "Export failed: ", exporting: "Exporting PDF, please wait…",
+    exportDone: "Exported: ", pandocMissing: "Pandoc (drop pandoc.exe beside the app to unlock)", pandocReady: "Pandoc ready",
+    exportImageSlices: "Long document, exported as multiple PNG slices: ", pasteImgUntitledHint: "(Tip: document not saved yet; screenshot stored in app folder)",
     exportStagePage: "Generating pages…", exportStagePrint: "Printing to PDF…", exportStageSave: "Saving file…",
     fontSizeTip: "Font size: select text first, then pick a size",
     selectFirstTip: "Select the text in the editor first, then pick a size",
@@ -683,6 +689,14 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
       math: { engine: "KaTeX", inlineDigit: true },
       // 中英文之间自动加空格（仅渲染层，不写回源码）
       markdown: { autoSpace: true },
+      // 本地相对路径图片在编辑器内预览：源码保持相对路径（可移植），渲染时换算为
+      // asset:// URL（webview 无法按 app origin 解析相对文件路径，会裂图）
+      transform: (html: string): string => resolvePreviewImages(html),
+    },
+    // 粘贴/拖入图片自动落地（Typora 式）：已保存文档 → 同目录 assets/截图_时间戳.png +
+    // 相对路径引用；未命名文档 → %APPDATA% pasted/ 绝对路径引用。返回 null 阻止默认上传 UI。
+    upload: {
+      handler: (files: File[]): Promise<null> => handlePasteImages(files),
     },
     toolbar: [
       "headings", "bold", "italic", "strike", "|",
@@ -1393,6 +1407,394 @@ table { border-collapse: collapse; }
 </html>`;
 }
 
+// ===== v0.3.0 导出中心：HTML 两档 / 图片长图 / DOCX / 复制富文本 / Pandoc 桥 =====
+// Typora 二分法：零依赖格式内置，长尾格式（EPUB/LaTeX/RTF）检测到用户自备 pandoc.exe 才点亮。
+
+/** File → 纯 base64（无 data: 前缀） */
+function fileToBase64(f: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve((fr.result as string).split(",")[1]);
+    fr.onerror = reject;
+    fr.readAsDataURL(f);
+  });
+}
+
+/** 粘贴/拖入图片落地：Rust 写 assets/（或未命名文档 pasted/）→ 插入引用 */
+async function handlePasteImages(files: File[]): Promise<null> {
+  const imgs = files.filter((f) => f.type.startsWith("image/"));
+  if (!imgs.length || !vditor) return null;
+  const doc = activeDoc();
+  const docDir = doc?.path ? doc.path.replace(/\\/g, "/").replace(/\/[^/]*$/, "") : "";
+  for (const f of imgs) {
+    try {
+      const b64 = await fileToBase64(f);
+      const ext = (f.name.split(".").pop() || "png").toLowerCase();
+      const r = await invoke<{ rel: string; abs: string }>("save_paste_image", { docDir, ext, dataB64: b64 });
+      vditor.insertValue(`\n![](${r.rel})\n`);
+    } catch (e) {
+      console.error("paste image save failed:", e);
+    }
+  }
+  return null; // 阻止 Vditor 默认上传 UI
+}
+
+/** 渲染层图片路径换算：源码保持可移植的相对路径，预览时转 asset:// URL（webview 按文件系统解析） */
+function resolvePreviewImages(html: string): string {
+  const doc = activeDoc();
+  const docDir = doc?.path ? doc.path.replace(/\\/g, "/").replace(/\/[^/]*$/, "") : null;
+  return html.replace(/(src=")([^"]+)(")/g, (m, p1: string, src: string, p3: string) => {
+    if (/^(https?:|data:|blob:|asset:|\/vditor-assets)/i.test(src)) return m;
+    let abs: string | null = null;
+    if (/^[A-Za-z]:\//.test(src)) abs = src; // 绝对路径（未命名文档粘贴的截图）
+    else if (docDir) abs = docDir + "/" + src.split("?")[0]; // 相对路径按文档目录解析
+    if (!abs) return m;
+    try { return p1 + convertFileSrc(abs) + p3; } catch { return m; }
+  });
+}
+
+let pandocPath: string | null = null;
+
+async function refreshPandocMenu(): Promise<void> {
+  try { pandocPath = await invoke<string | null>("detect_pandoc"); } catch { pandocPath = null; }
+  const label = document.getElementById("pandoc-label");
+  if (label) label.textContent = pandocPath ? t("pandocReady") : t("pandocMissing");
+  document.querySelectorAll<HTMLButtonElement>("#export-menu button[data-pandoc]").forEach((b) => {
+    b.disabled = !pandocPath;
+  });
+}
+
+/** 导出片段（与 PDF 同管线：getHTML + 相对图片解析），失败返回 null */
+function exportFragment(): string | null {
+  const doc = activeDoc();
+  if (!doc || !vditor) { alert(t("exportNoDoc")); return null; }
+  let fragmentHtml = "";
+  try { fragmentHtml = vditor.getHTML(); } catch (e) { alert(t("exportFail") + e); return null; }
+  if (!fragmentHtml) { alert(t("exportNoDoc")); return null; }
+  const tmp = document.createElement("div");
+  tmp.innerHTML = fragmentHtml;
+  resolveImageSources(tmp, doc.path);
+  return tmp.innerHTML;
+}
+
+async function pickExportPath(ext: string, filterName: string): Promise<string | null> {
+  const doc = activeDoc();
+  const baseName = (doc?.name || t("untitled")).replace(/\.[^.]+$/, "");
+  // e2e 自测模式（--export-selftest <dir>）：跳过原生对话框直接拼路径，与生产同代码路径
+  try {
+    const dir = await invoke<string | null>("export_selftest_dir");
+    if (dir) return dir.replace(/[\\/]+$/, "") + "/" + baseName + ext;
+  } catch { /* 正常启动 */ }
+  const sp = await saveDialog({
+    defaultPath: baseName + ext,
+    filters: [{ name: filterName, extensions: [ext.slice(1)] }],
+  });
+  return sp ? (sp as string) : null;
+}
+
+/** HTML 导出：带样式档=完整排版（与 PDF 同模板）；纯净档=裸 fragment 无 CSS */
+async function exportHtml(styled: boolean): Promise<void> {
+  const frag = exportFragment();
+  if (!frag) return;
+  const path = await pickExportPath(".html", "HTML");
+  if (!path) return;
+  const langAttr = currentLang === "en" ? "en" : currentLang === "zh-TW" ? "zh-TW" : "zh-CN";
+  const html = styled ? wrapExportHtml(frag)
+    : `<!DOCTYPE html>\n<html lang="${langAttr}">\n<head><meta charset="UTF-8"></head>\n<body>\n${frag}\n</body>\n</html>\n`;
+  try {
+    await invoke("write_export_file", { path, content: html });
+    alert(t("exportDone") + path);
+  } catch (e) { alert(t("exportFail") + e); }
+}
+
+/** 图片长图：离屏容器渲染 → html2canvas → PNG。超 canvas 上限自动分片（Typora 官方做不到的差异化点） */
+async function exportImagePng(): Promise<void> {
+  const frag = exportFragment();
+  if (!frag) return;
+  const path = await pickExportPath(".png", "PNG");
+  if (!path) return;
+  const overlay = document.getElementById("export-overlay");
+  const msg = document.getElementById("export-msg");
+  if (overlay) { (document.getElementById("export-pct") as HTMLElement).style.width = "10%"; msg!.textContent = "Rendering…"; overlay.hidden = false; }
+  try {
+    const { default: html2canvas } = await import("html2canvas");
+    const holder = document.createElement("div");
+    holder.className = "vditor-reset";
+    holder.style.cssText = "position:fixed;left:-20000px;top:0;width:820px;background:#fff;padding:24px 32px;";
+    holder.innerHTML = wrapExportHtml(frag)
+      .replace(/^[\s\S]*?<body[^>]*>/, "").replace(/<\/body>[\s\S]*$/, ""); // 取 body 内（样式已在 wrap 的 <style>，需带入）
+    const styleEl = document.createElement("style");
+    styleEl.textContent = wrapExportHtml("").match(/<style>([\s\S]*?)<\/style>/)?.[1] || "";
+    holder.prepend(styleEl);
+    document.body.appendChild(holder);
+    const canvas = await html2canvas(holder, { scale: 2, backgroundColor: "#ffffff", logging: false, useCORS: true });
+    holder.remove();
+    if (overlay) (document.getElementById("export-pct") as HTMLElement).style.width = "70%";
+    // canvas 单边上限 32767；超高分片导出 name_pageN.png
+    const MAXH = 30000;
+    const slices: string[] = [];
+    if (canvas.height <= MAXH) {
+      slices.push(canvas.toDataURL("image/png"));
+    } else {
+      const n = Math.ceil(canvas.height / MAXH);
+      for (let i = 0; i < n; i++) {
+        const c = document.createElement("canvas");
+        c.width = canvas.width; c.height = Math.min(MAXH, canvas.height - i * MAXH);
+        c.getContext("2d")!.drawImage(canvas, 0, -i * MAXH);
+        slices.push(c.toDataURL("image/png"));
+      }
+    }
+    const base = path.replace(/\.png$/i, "");
+    for (let i = 0; i < slices.length; i++) {
+      const p = slices.length === 1 ? path : `${base}_page${i + 1}.png`;
+      await invoke("save_binary_file", { path: p, dataB64: slices[i].split(",")[1] });
+    }
+    if (overlay) (document.getElementById("export-pct") as HTMLElement).style.width = "100%";
+    alert(slices.length === 1 ? t("exportDone") + path : t("exportImageSlices") + slices.length + " 张");
+  } catch (e) {
+    alert(t("exportFail") + e);
+  } finally {
+    if (overlay) overlay.hidden = true;
+  }
+}
+
+/** markdown-it token → docx 元素转换（MVP 覆盖：标题/段落/行内样式/链接/列表/引用/代码块/表格/图片/分隔线） */
+async function exportDocx(): Promise<void> {
+  const doc = activeDoc();
+  if (!doc || !vditor) { alert(t("exportNoDoc")); return; }
+  const md = vditor.getValue();
+  if (!md) { alert(t("exportNoDoc")); return; }
+  const path = await pickExportPath(".docx", "Word");
+  if (!path) return;
+  const overlay = document.getElementById("export-overlay");
+  if (overlay) { (document.getElementById("export-pct") as HTMLElement).style.width = "20%"; (document.getElementById("export-msg") as HTMLElement).textContent = "DOCX…"; overlay.hidden = false; }
+  try {
+    const MarkdownIt = (await import("markdown-it")).default;
+    const docx = await import("docx");
+    const mdit = new MarkdownIt({ html: false, linkify: true });
+    const tokens = mdit.parse(md, {});
+
+    const { Paragraph, TextRun, HeadingLevel, ExternalHyperlink, Table, TableRow, TableCell, WidthType } = docx;
+    const FONT = "Microsoft YaHei";
+    const MONO = "Consolas";
+
+    // 递归辅助：从 start 到匹配的 *_close，把行内结果并进 out，返回 close 下标（function 声明提升，inlineRuns 可前向引用）
+    function collectInline(toks: any[], start: number, style: any, out: any[]): number {
+      const close = `${toks[start - 1].type.replace("_open", "_close")}`;
+      let j = start;
+      for (; j < toks.length && toks[j].type !== close; j++) { /* 找 close */ }
+      out.push(...inlineRuns(toks.slice(start, j), style));
+      return j;
+    }
+    // 行内 token 递归 → TextRun/ExternalHyperlink 数组
+    const inlineRuns = (toks: any[], base: { bold?: boolean; italics?: boolean; strike?: boolean; code?: boolean } = {}): any[] => {
+      const out: any[] = [];
+      for (let i = 0; i < toks.length; i++) {
+        const tk = toks[i];
+        if (tk.type === "text") {
+          out.push(new TextRun({ text: tk.content, bold: base.bold, italics: base.italics, strike: base.strike, font: base.code ? MONO : FONT }));
+        } else if (tk.type === "code_inline") {
+          out.push(new TextRun({ text: tk.content, font: MONO, color: "C7254E", shading: { type: "clear", fill: "F9F2F4" } }));
+        } else if (tk.type === "softbreak" || tk.type === "hardbreak") {
+          out.push(new TextRun({ text: " ", font: FONT }));
+        } else if (tk.type === "strong_open") i = collectInline(toks, i + 1, { ...base, bold: true }, out);
+        else if (tk.type === "em_open") i = collectInline(toks, i + 1, { ...base, italics: true }, out);
+        else if (tk.type === "s_open") i = collectInline(toks, i + 1, { ...base, strike: true }, out);
+        else if (tk.type === "link_open") {
+          const href = tk.attrGet("href") || "";
+          let j = i + 1;
+          for (; j < toks.length && toks[j].type !== "link_close"; j++) { /* 收集 */ }
+          const inner = inlineRuns(toks.slice(i + 1, j), { ...base, bold: true });
+          out.push(new ExternalHyperlink({ link: href, children: inner }));
+          i = j;
+        } else if (tk.type === "image") {
+          out.push(new TextRun({ text: `[图片: ${tk.attrGet("src") || ""}]`, font: FONT, italics: true, color: "888888" }));
+        }
+      }
+      return out;
+    };
+
+    // 嵌套列表 → Paragraph（带层级缩进与项目符号字符；docx numbering 配置较繁，MVP 用符号+缩进近似）
+    const listMarker = (ordered: boolean, idx: number) => ordered ? `${idx}. ` : "• ";
+    const blocks: any[] = [];
+    let listIdx = 0; let listOrdered = false; let listDepth = 0;
+    const flushList = () => { listIdx = 0; listDepth = 0; };
+
+    for (let i = 0; i < tokens.length; i++) {
+      const tk = tokens[i];
+      if (tk.hidden) continue;
+      if (tk.type === "heading_open") {
+        const lvl = parseInt(tk.tag.slice(1), 10);
+        const inline = tokens[i + 1];
+        blocks.push(new Paragraph({
+          heading: ([HeadingLevel.HEADING_1, HeadingLevel.HEADING_2, HeadingLevel.HEADING_3, HeadingLevel.HEADING_4, HeadingLevel.HEADING_5, HeadingLevel.HEADING_6] as any[])[lvl - 1],
+          children: inlineRuns(inline.children || []),
+        }));
+        i += 2;
+      } else if (tk.type === "paragraph_open") {
+        const inline = tokens[i + 1];
+        blocks.push(new Paragraph({ children: inlineRuns(inline.children || []), spacing: { after: 120 } }));
+        i += 2;
+      } else if (tk.type === "bullet_list_open" || tk.type === "ordered_list_open") {
+        listOrdered = tk.type === "ordered_list_open"; listIdx = 0; listDepth++;
+      } else if (tk.type === "list_item_open") {
+        listIdx++;
+      } else if (tk.type === "paragraph_open_item" || (tk.type === "paragraph_open" && listDepth > 0)) {
+        const inline = tokens[i + 1];
+        const indent = { left: 360 * listDepth };
+        blocks.push(new Paragraph({
+          children: [new TextRun({ text: listMarker(listOrdered, listIdx), font: FONT }), ...inlineRuns(inline.children || [])],
+          indent, spacing: { after: 60 },
+        }));
+        i += 2;
+      } else if (tk.type === "bullet_list_close" || tk.type === "ordered_list_close") {
+        listDepth = Math.max(0, listDepth - 1); if (listDepth === 0) flushList();
+      } else if (tk.type === "blockquote_open") {
+        // 跳到对应 close，内部段落加引用样式（左缩进+灰边近似：缩进+斜体）
+        let depth = 1; let j = i + 1;
+        for (; j < tokens.length && depth > 0; j++) {
+          if (tokens[j].type === "blockquote_open") depth++;
+          else if (tokens[j].type === "blockquote_close") depth--;
+          else if (tokens[j].type === "paragraph_open" && depth === 1) {
+            const inline = tokens[j + 1];
+            blocks.push(new Paragraph({
+              children: inlineRuns(inline.children || [], { italics: true }),
+              indent: { left: 480 }, spacing: { after: 100 },
+            }));
+            j += 2;
+          }
+        }
+        i = j - 1;
+      } else if (tk.type === "fence" || tk.type === "code_block") {
+        const lines = (tk.content || "").split("\n");
+        blocks.push(new Paragraph({
+          children: lines.map((ln: string, k: number) => new TextRun({ text: (k ? "\n" : "") + ln, font: MONO, size: 18, color: "333333", shading: { type: "clear", fill: "F5F5F5" } })),
+          spacing: { before: 80, after: 80 },
+        }));
+      } else if (tk.type === "hr") {
+        blocks.push(new Paragraph({ text: "", border: { bottom: { style: docx.BorderStyle.SINGLE, size: 6, color: "CCCCCC" } }, spacing: { after: 120 } }));
+      } else if (tk.type === "table_open") {
+        // 收集到 table_close：thead/tbody 行
+        let j = i + 1;
+        const rows: any[] = []; let curCells: any[] = []; let curInline: any[] = [];
+        for (; j < tokens.length && tokens[j].type !== "table_close"; j++) {
+          const tt = tokens[j];
+          if (tt.type === "tr_open") { curCells = []; }
+          else if (tt.type === "th_open" || tt.type === "td_open") { curInline = []; }
+          else if (tt.type === "inline") curInline = tt.children || [];
+          else if (tt.type === "th_close" || tt.type === "td_close") {
+            curCells.push(new TableCell({
+              width: { size: Math.floor(9000 / Math.max(1, curCells.length + 1)), type: WidthType.DXA },
+              shading: tt.type === "th_close" ? { type: "clear", fill: "EEEEEE" } : undefined,
+              children: [new Paragraph({ children: inlineRuns(curInline, { bold: tt.type === "th_close" }) })],
+            }));
+          } else if (tt.type === "tr_close") rows.push(new TableRow({ children: curCells }));
+        }
+        blocks.push(new Table({ width: { size: 9000, type: WidthType.DXA }, rows }));
+        blocks.push(new Paragraph({ text: "" }));
+        i = j;
+      } else if (tk.type === "inline") {
+        // 顶层图片段落（paragraph 已覆盖；此处兜底顶层 inline）
+      }
+    }
+    if (overlay) (document.getElementById("export-pct") as HTMLElement).style.width = "80%";
+    const d = new docx.Document({ sections: [{ children: blocks }] });
+    const blob = await docx.Packer.toBlob(d);
+    const b64 = await new Promise<string>((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve((fr.result as string).split(",")[1]);
+      fr.onerror = reject;
+      fr.readAsDataURL(blob);
+    });
+    await invoke("save_binary_file", { path, dataB64: b64 });
+    if (overlay) (document.getElementById("export-pct") as HTMLElement).style.width = "100%";
+    alert(t("exportDone") + path);
+  } catch (e) {
+    alert(t("exportFail") + e);
+  } finally {
+    if (overlay) overlay.hidden = true;
+  }
+}
+
+/** 复制富文本（HTML+纯文本双格式）：公众号/知乎/Word 直接粘贴带格式 */
+async function copyRichText(): Promise<void> {
+  const frag = exportFragment();
+  if (!frag) return;
+  const html = wrapExportHtml(frag);
+  const plain = vditor ? vditor.getValue() : "";
+  try {
+    await navigator.clipboard.write([new ClipboardItem({
+      "text/html": new Blob([html], { type: "text/html" }),
+      "text/plain": new Blob([plain], { type: "text/plain" }),
+    })]);
+    alert(t("exportDone") + "clipboard");
+  } catch {
+    // WebView2 权限回退：临时 contenteditable + execCommand
+    const tmp = document.createElement("div");
+    tmp.contentEditable = "true";
+    tmp.style.cssText = "position:fixed;left:-99999px;top:0;";
+    tmp.innerHTML = frag;
+    document.body.appendChild(tmp);
+    const range = document.createRange();
+    range.selectNodeContents(tmp);
+    const sel = getSelection();
+    sel!.removeAllRanges(); sel!.addRange(range);
+    document.execCommand("copy");
+    sel!.removeAllRanges();
+    tmp.remove();
+    alert(t("exportDone") + "clipboard");
+  }
+}
+
+/** Pandoc 桥导出（EPUB/LaTeX/RTF） */
+async function exportViaPandoc(fmt: string, ext: string, filterName: string): Promise<void> {
+  if (!pandocPath) { alert(t("pandocMissing")); return; }
+  const doc = activeDoc();
+  if (!doc || !vditor) { alert(t("exportNoDoc")); return; }
+  const md = vditor.getValue();
+  const path = await pickExportPath(ext, filterName);
+  if (!path) return;
+  try {
+    await invoke("pandoc_export", { pandoc: pandocPath, md, outPath: path, fmt });
+    alert(t("exportDone") + path);
+  } catch (e) { alert(t("exportFail") + e); }
+}
+
+function bindExportMenu(): void {
+  const btn = document.getElementById("btn-export")!;
+  const menu = document.getElementById("export-menu")!;
+  btn.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    if (menu.hidden) { await refreshPandocMenu(); menu.hidden = false; }
+    else menu.hidden = true;
+  });
+  menu.addEventListener("click", async (e) => {
+    const target = e.target as HTMLElement;
+    const item = target.closest("button[data-export]") as HTMLButtonElement | null;
+    if (!item || item.disabled) return;
+    menu.hidden = true;
+    const kind = item.dataset.export;
+    if (kind === "pdf") exportPdf();
+    else if (kind === "html") exportHtml(true);
+    else if (kind === "html-plain") exportHtml(false);
+    else if (kind === "image") exportImagePng();
+    else if (kind === "docx") exportDocx();
+    else if (kind === "copy") copyRichText();
+    else if (kind === "epub") exportViaPandoc("epub", ".epub", "EPUB");
+    else if (kind === "latex") exportViaPandoc("latex", ".tex", "LaTeX");
+    else if (kind === "rtf") exportViaPandoc("rtf", ".rtf", "RTF");
+  });
+  // 点外部收起（capture，与查找条同模式；排除导出按钮自身）；Esc 同关（浮层统一交互）
+  document.addEventListener("pointerdown", (e) => {
+    if (menu.hidden) return;
+    if (e.target instanceof Node && (menu.contains(e.target) || btn.contains(e.target))) return;
+    menu.hidden = true;
+  }, true);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !menu.hidden) { e.preventDefault(); menu.hidden = true; }
+  });
+}
+
 // 导出当前文档为 PDF：取 Vditor 渲染 HTML → 解析相对图片 → 包装完整文档 → 交 Rust 端
 // msedge --headless --print-to-pdf 生成矢量 PDF（文本可选可搜、Chromium 原生分页、无 canvas 上限）。
 // 取代旧的 html2pdf.js（离屏容器 left:-99999px 致 html2canvas 渲染空白=白纸，且 ~32767px canvas 上限截断长文）。
@@ -1715,7 +2117,7 @@ async function boot() {
   });
 
   // 导出 PDF：点击按钮 或 Ctrl+P（拦截浏览器原生打印，改为打印渲染后的纯内容，排除工具栏/大纲）
-  document.getElementById("btn-export")!.addEventListener("click", exportPdf);
+  bindExportMenu(); // 导出中心下拉菜单（Ctrl+P 仍直达 PDF）
   window.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && (e.key === "p" || e.key === "P")) {
       e.preventDefault();

@@ -30,9 +30,14 @@
 - **查找替换**：`Ctrl+F` / `Ctrl+H`，全部匹配高亮 + 计数导航 + 逐个/全部替换（走编辑管线，可撤销）
 - **专注模式**：`F8` 淡化非当前段落（打字机模式已按需求移除；粘贴长文本后视口自动滚到光标处）
 - **自动保存**：已有路径的文档每 30 秒及窗口失焦时自动落盘
-- **中文排版**：导出 PDF/HTML 时中英文之间自动加空格（不改源文）
+- **显示比例**：Word 式右下角缩放滑杆（50%~200%），`Ctrl+滚轮` 缩放、`Ctrl+0` 复位——只缩正文内容区，工具栏/大纲不动，设置重启后记住
+- **导出中心**：顶部「导出 ▾」——PDF（矢量）、HTML（带样式 / 纯净两档）、PNG 长图（超画布上限自动分片，Typora 官方不支持）、Word .docx（标题/表格/代码/链接/图片）、复制富文本（粘贴到 Word/邮件带格式）；**Pandoc 桥**——把 `pandoc.exe` 放到软件旁即解锁 EPUB / LaTeX / RTF
+- **粘贴截图落地**：`Ctrl+V` 粘贴图片自动保存到文档旁 `assets/`，正文以**相对路径**引用——源码整个文件夹拷走图片不丢
+- **中文排版**：渲染与导出时中英文之间自动加空格（不改源文）
 - **字数统计**：右下角实时显示（简中「字」/ English "words"）
 - **隐私**：不请求麦克风（已禁用编辑器内核自带的录音模块）
+
+> ⚠️ 已知取舍：所见即所得模式下，本地相对路径图片在编辑器内**不显示缩略图**（源码保持相对路径以确保可移植；导出 PDF/HTML/PNG/Word/复制富文本时会自动嵌入图片）。
 
 <details>
 <summary>📸 界面截图</summary>
@@ -64,6 +69,9 @@
 | emoji | 输入 `:` 加关键词（如 `:smi`）弹出补全 |
 | 查找替换 | `Ctrl+F` 查找 / `Ctrl+H` 带替换；`Enter`/`Shift+Enter` 上下跳转，`Esc` 关闭 |
 | 专注模式 | `F8` 淡化其他段落 |
+| 缩放 | 右下角滑杆拖动 / `Ctrl+滚轮` / `Ctrl+0` 复位（50%~200%，只缩正文） |
+| 导出 | 顶部「导出 ▾」：PDF / HTML 两档 / PNG 长图 / Word / 复制富文本；EPUB/LaTeX/RTF 需在软件旁放 `pandoc.exe` |
+| 粘贴截图 | 直接 `Ctrl+V`，图片自动存到文档旁 `assets/`，正文引用相对路径 |
 | 粘贴跟随 | 粘贴长文本后视口自动滚到光标 |
 | 自动保存 | 已保存过的文档每 30s 及失焦时自动落盘（标题 ● 消失即已存） |
 | 快捷键 | `Ctrl+B` 加粗、`Ctrl+I` 斜体、`Ctrl+S` 保存、`Ctrl+Alt+M` 切模式 |
@@ -126,9 +134,14 @@ A lightweight WYSIWYG Markdown editor for Windows with **visual table editing**,
 - **Find & replace**: `Ctrl+F` / `Ctrl+H` — highlight all matches, count & navigate, replace one/all (undoable)
 - **Focus mode**: `F8` dims other paragraphs (typewriter mode removed on request; the view scrolls to the caret after pasting long text)
 - **Autosave**: files with a path are saved every 30s and on window blur
-- **CJK typography**: auto-spacing between CJK & Latin text on PDF/HTML export (source untouched)
+- **Zoom**: Word-style slider at the bottom-right (50%–200%), `Ctrl+wheel` to zoom, `Ctrl+0` to reset — zooms the content area only, toolbars/outline untouched; the level persists across restarts
+- **Export center**: top "Export ▾" — PDF (vector), HTML (styled / plain), PNG long image (auto-sliced past the canvas limit — Typora can't), Word .docx (headings/tables/code/links/images), copy-as-rich-text (paste into Word/email with formatting); **Pandoc bridge** — drop `pandoc.exe` next to the app to unlock EPUB / LaTeX / RTF
+- **Paste screenshots**: `Ctrl+V` an image and it is saved to `assets/` beside the document, referenced by a **relative path** — move the folder, keep the images
+- **CJK typography**: auto-spacing between CJK & Latin text on render & export (source untouched)
 - **Word count**: live counter at the bottom-right corner ("words" / 「字」)
 - **Privacy**: no microphone access (the editor core's built-in recording module is disabled)
+
+> ⚠️ Known trade-off: in WYSIWYG mode, local relative-path images show **no thumbnail** inside the editor (the source keeps relative paths for portability; images are embedded automatically on PDF/HTML/PNG/Word export and rich-text copy).
 
 <details>
 <summary>📸 Screenshots</summary>
@@ -160,6 +173,9 @@ Grab `md-editor.exe` from [Releases](https://github.com/frandy820/md-editor/rele
 | Emoji | Type `:` + keyword (e.g. `:smi`) for autocomplete |
 | Find & replace | `Ctrl+F` find / `Ctrl+H` with replace; `Enter`/`Shift+Enter` navigate, `Esc` close |
 | Focus | `F8` dim others |
+| Zoom | drag the bottom-right slider / `Ctrl+wheel` / `Ctrl+0` reset (50%–200%, content only) |
+| Export | top "Export ▾": PDF / HTML ×2 / PNG / Word / copy rich text; EPUB/LaTeX/RTF need `pandoc.exe` beside the app |
+| Paste image | just `Ctrl+V` — saved to `assets/` beside the doc, referenced relatively |
 | Paste follow | view scrolls to the caret after pasting |
 | Autosave | Documents with a path save every 30s & on blur (● in title disappears once saved) |
 | Shortcuts | `Ctrl+B` bold, `Ctrl+I` italic, `Ctrl+S` save, `Ctrl+Alt+M` toggle mode |

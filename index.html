@@ -11,7 +11,22 @@
     <div id="toolbar">
       <button id="btn-open" type="button">📂 打开</button>
       <button id="btn-save" type="button">💾 保存</button>
-      <button id="btn-export" type="button" title="导出为 PDF（Ctrl+P）">🖨 导出 PDF</button>
+      <span id="export-wrap">
+        <button id="btn-export" type="button" title="导出（Ctrl+P 导出 PDF）">💾 导出 ▾</button>
+        <div id="export-menu" hidden>
+          <button data-export="pdf" type="button">📄 PDF（矢量）</button>
+          <button data-export="html" type="button">🌐 HTML（带样式）</button>
+          <button data-export="html-plain" type="button">📝 HTML（纯净）</button>
+          <button data-export="image" type="button">🖼 图片 PNG（长图）</button>
+          <button data-export="docx" type="button">📄 Word (.docx)</button>
+          <button data-export="copy" type="button">📋 复制富文本</button>
+          <div class="menu-sep"></div>
+          <div class="menu-label" id="pandoc-label">Pandoc</div>
+          <button data-export="epub" data-pandoc="1" type="button" disabled>📚 EPUB</button>
+          <button data-export="latex" data-pandoc="1" type="button" disabled>∑ LaTeX</button>
+          <button data-export="rtf" data-pandoc="1" type="button" disabled>📃 RTF</button>
+        </div>
+      </span>
       <button id="btn-focus-mode" type="button" title="专注模式（F8）：淡化非当前段落">🎯 专注</button>
       <button id="btn-find" type="button" title="查找替换（Ctrl+F / Ctrl+H）">🔍 查找</button>
       <button id="btn-mode" type="button" title="切回即时渲染模式（Ctrl+Alt+M）">切回即时渲染</button>
@@ -24,7 +39,7 @@
       </select>
       <span id="file-title">（未命名）</span>
       <span id="encoding-badge"></span>
-      <span id="app-version" title="软件版本（报问题时先看这里）">v0.2.6</span>
+      <span id="app-version" title="软件版本（报问题时先看这里）">v0.3.0</span>
     </div>
     <div id="tabs"></div>
     <div id="main">

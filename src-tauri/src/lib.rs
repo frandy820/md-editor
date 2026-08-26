@@ -493,6 +493,15 @@ fn dnd_selftest_enabled() -> bool {
     std::env::args().any(|a| a == "--dnd-selftest")
 }
 
+/// 自测导出目录：启动参数 --export-selftest <dir> 时返回该目录（前端导出跳过原生保存对话框、
+/// 直接拼 dir/文档名.ext 落盘，供 e2e 全链路自动化；正常启动返回 None 走对话框）
+#[tauri::command]
+fn export_selftest_dir() -> Option<String> {
+    let args: Vec<String> = std::env::args().collect();
+    let r = args.iter().position(|a| a == "--export-selftest").and_then(|i| args.get(i + 1)).cloned();
+    r
+}
+
 // ===== UI 状态持久化（显示比例等）：写 %APPDATA%/<identifier>/ui-state.json =====
 // 不用 localStorage：WebView2 的 localStorage 磁盘刷盘异步，进程被强杀/崩溃即丢
 // （e2e 里 taskkill //F 复现），文件写入是同步可靠的。
@@ -511,6 +520,130 @@ fn save_ui_state(app: AppHandle, v: serde_json::Value) -> Result<(), String> {
     let p = ui_state_path(&app)?;
     fs::create_dir_all(p.parent().ok_or("no parent")?).map_err(|e| e.to_string())?;
     fs::write(&p, serde_json::to_string(&v).map_err(|e| e.to_string())?).map_err(|e| e.to_string())
+}
+
+// ===== v0.3.0 导出中心 + 粘贴截图落地 =====
+
+/// 写二进制文件（PNG/DOCX 等导出产物；前端传 base64）
+#[tauri::command]
+fn save_binary_file(path: String, data_b64: String) -> Result<(), String> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(data_b64.as_bytes())
+        .map_err(|e| format!("base64 decode: {e}"))?;
+    fs::write(&path, bytes).map_err(|e| e.to_string())
+}
+
+/// 读二进制文件（docx 导出嵌本地图片等；返回 base64）。失败返回 Err 由前端降级占位。
+#[tauri::command]
+fn read_binary_file(path: String) -> Result<String, String> {
+    use base64::Engine;
+    let bytes = fs::read(&path).map_err(|e| e.to_string())?;
+    Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
+}
+
+/// 写导出用文本文件（HTML 等）。与 save_file 分离：导出产物不受 md/txt 白名单限制，
+/// 也不做空内容覆盖防护（导出内容来自渲染管线而非编辑器取值）。
+#[tauri::command]
+fn write_export_file(path: String, content: String) -> Result<(), String> {
+    fs::write(&path, content).map_err(|e| e.to_string())
+}
+
+/// 粘贴截图落地：存到文档同目录 assets/ 子目录（未命名文档 doc_dir 为空 → 存
+/// %APPDATA%/<id>/pasted/ 并返回绝对路径）。文件名=截图_yyyyMMdd_HHmmss（同秒多个加序号）。
+/// 返回 (相对引用路径, 绝对路径)。中文文件名保留原文（md 引用按需编码由前端处理）。
+#[tauri::command]
+fn save_paste_image(app: AppHandle, doc_dir: String, ext: String, data_b64: String) -> Result<serde_json::Value, String> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(data_b64.as_bytes())
+        .map_err(|e| format!("base64 decode: {e}"))?;
+    let ext = ext.to_lowercase();
+    if !["png", "jpg", "jpeg", "gif", "webp", "bmp"].contains(&ext.as_str()) {
+        return Err(format!("unsupported image ext: {ext}"));
+    }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_secs();
+    // 本地时区 yyyyMMdd_HHmmss（无 chrono 依赖：用秒数换算 UTC+8，中国时区场景足够）
+    let local = now + 8 * 3600;
+    let days = local / 86400;
+    let (y, mo, d) = civil_from_days(days as i64);
+    let secs = local % 86400;
+    let base = format!("截图_{:04}{:02}{:02}_{:02}{:02}{:02}", y, mo, d, secs / 3600, secs % 3600 / 60, secs % 60);
+
+    let (dir, rel) = if doc_dir.is_empty() {
+        let d = app.path().app_data_dir().map_err(|e| e.to_string())?.join("pasted");
+        (d, String::new()) // 未命名文档：无相对基准，用绝对路径引用
+    } else {
+        let d = PathBuf::from(&doc_dir).join("assets");
+        (d, format!("assets/"))
+    };
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    // 同秒冲突加序号
+    let mut name = format!("{base}.{ext}");
+    let mut i = 1;
+    while dir.join(&name).exists() {
+        name = format!("{base}_{i}.{ext}");
+        i += 1;
+    }
+    let abs = dir.join(&name);
+    fs::write(&abs, &bytes).map_err(|e| e.to_string())?;
+    let abs_str = abs.to_string_lossy().replace('\\', "/");
+    let rel_str = if rel.is_empty() { abs_str.clone() } else { format!("{rel}{name}") };
+    Ok(serde_json::json!({ "rel": rel_str, "abs": abs_str }))
+}
+
+/// 公历换算（Howard Hinnant 算法，civil_from_days）
+fn civil_from_days(z: i64) -> (i64, u32, u32) {
+    let z = z + 719468;
+    let era = if z >= 0 { z } else { z - 146096 } / 146097;
+    let doe = (z - era * 146097) as u64;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = (doy - (153 * mp + 2) / 5 + 1) as u32;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
+    (if m <= 2 { y + 1 } else { y }, m, d)
+}
+
+/// 探测 pandoc：PATH → exe 同目录 → F:\software\PDF4QT 同款便携位思路（exe 旁 pandoc/ 目录）。
+/// 找到返回 exe 路径。检测到才在导出菜单点亮 EPUB/LaTeX/RTF 等格式（Typora 二分法：不内嵌）。
+#[tauri::command]
+fn detect_pandoc() -> Option<String> {
+    let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
+    let mut candidates: Vec<PathBuf> = vec![exe_dir.join("pandoc.exe"), exe_dir.join("pandoc").join("pandoc.exe")];
+    if let Ok(path) = std::env::var("PATH") {
+        for p in std::env::split_paths(&path) {
+            candidates.push(p.join("pandoc.exe"));
+        }
+    }
+    candidates.into_iter().find(|c| c.exists()).map(|c| c.to_string_lossy().into_owned())
+}
+
+/// 用 pandoc 导出：md 写临时文件 → pandoc -f gfm 转目标格式 → 清理临时文件。
+/// fmt: "epub" | "latex" | "rtf" | "odt"（扩展名由前端 saveDialog 决定，这里只传 pandoc -t）
+#[tauri::command]
+fn pandoc_export(pandoc: String, md: String, out_path: String, fmt: String) -> Result<(), String> {
+    if !["epub", "latex", "rtf", "odt"].contains(&fmt.as_str()) {
+        return Err(format!("unsupported pandoc fmt: {fmt}"));
+    }
+    let tmp = std::env::temp_dir().join(format!("md-editor-pandoc-{}.md", std::process::id()));
+    fs::write(&tmp, md).map_err(|e| e.to_string())?;
+    let out = std::process::Command::new(&pandoc)
+        .arg("-f").arg("gfm")
+        .arg("-t").arg(&fmt)
+        .arg(&tmp)
+        .arg("-o").arg(&out_path)
+        .output()
+        .map_err(|e| e.to_string())?;
+    let _ = fs::remove_file(&tmp);
+    if !out.status.success() {
+        return Err(format!("pandoc: {}", String::from_utf8_lossy(&out.stderr)));
+    }
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -563,6 +696,13 @@ pub fn run() {
             open_pdf_external,
             open_dropped_pdf,
             load_ui_state,
+            save_binary_file,
+            read_binary_file,
+            write_export_file,
+            save_paste_image,
+            detect_pandoc,
+            export_selftest_dir,
+            pandoc_export,
             save_ui_state,
             dnd_selftest_enabled
         ])
