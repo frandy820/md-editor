@@ -27,6 +27,9 @@
 - **多种打开方式**：双击 .md / 拖拽到窗口 / 命令行参数 / 单实例转发
 - **编码自动识别**：UTF-8 / UTF-8(BOM) / GBK
 - **内容增强**：数学公式（KaTeX 行内/块级即时渲染）、Mermaid/echarts 图表（mindmap、timeline、flowchart…）、代码块行号、emoji `:smile:` 自动补全（1500+）
+- **查找替换**：`Ctrl+F` / `Ctrl+H`，全部匹配高亮 + 计数导航 + 逐个/全部替换（走编辑管线，可撤销）
+- **专注模式 / 打字机模式**：`F8` 淡化非当前段落；`F9` 光标保持视线中部（Typora 对位）
+- **自动保存**：已有路径的文档每 30 秒及窗口失焦时自动落盘
 - **中文排版**：导出 PDF/HTML 时中英文之间自动加空格（不改源文）
 - **字数统计**：右下角实时显示（简中「字」/ English "words"）
 - **隐私**：不请求麦克风（已禁用编辑器内核自带的录音模块）
@@ -59,6 +62,9 @@
 | 数学公式 | 行内 `$x^2$`、块级 `$$…$$`，KaTeX 即时渲染 |
 | 图表 | mermaid 代码块（mindmap / timeline / flowchart…），光标移出代码块即渲染 |
 | emoji | 输入 `:` 加关键词（如 `:smi`）弹出补全 |
+| 查找替换 | `Ctrl+F` 查找 / `Ctrl+H` 带替换；`Enter`/`Shift+Enter` 上下跳转，`Esc` 关闭 |
+| 专注 / 打字机 | `F8` 淡化其他段落；`F9` 打字机滚动跟随 |
+| 自动保存 | 已保存过的文档每 30s 及失焦时自动落盘（标题 ● 消失即已存） |
 | 快捷键 | `Ctrl+B` 加粗、`Ctrl+I` 斜体、`Ctrl+S` 保存、`Ctrl+Alt+M` 切模式 |
 | 保存 | 统一写 UTF-8 无 BOM；拖入打开的文件保留原路径，可直接保存 |
 
@@ -116,6 +122,9 @@ A lightweight WYSIWYG Markdown editor for Windows with **visual table editing**,
 - **Multiple ways to open**: double-click .md / drag into window / command-line arg / single-instance forwarding
 - **Encoding auto-detection**: UTF-8 / UTF-8(BOM) / GBK
 - **Rich content**: math formulas (KaTeX inline & block, live rendering), Mermaid/echarts diagrams (mindmap, timeline, flowchart…), code line numbers, emoji `:smile:` autocomplete (1500+)
+- **Find & replace**: `Ctrl+F` / `Ctrl+H` — highlight all matches, count & navigate, replace one/all (undoable)
+- **Focus / typewriter modes**: `F8` dims other paragraphs; `F9` keeps the caret mid-screen (Typora-parity)
+- **Autosave**: files with a path are saved every 30s and on window blur
 - **CJK typography**: auto-spacing between CJK & Latin text on PDF/HTML export (source untouched)
 - **Word count**: live counter at the bottom-right corner ("words" / 「字」)
 - **Privacy**: no microphone access (the editor core's built-in recording module is disabled)
@@ -148,6 +157,9 @@ Grab `md-editor.exe` from [Releases](https://github.com/frandy820/md-editor/rele
 | Math | Inline `$x^2$`, block `$$…$$` — rendered live via KaTeX |
 | Diagrams | mermaid code blocks (mindmap / timeline / flowchart…) render on blur |
 | Emoji | Type `:` + keyword (e.g. `:smi`) for autocomplete |
+| Find & replace | `Ctrl+F` find / `Ctrl+H` with replace; `Enter`/`Shift+Enter` navigate, `Esc` close |
+| Focus / typewriter | `F8` dim others; `F9` typewriter scrolling |
+| Autosave | Documents with a path save every 30s & on blur (● in title disappears once saved) |
 | Shortcuts | `Ctrl+B` bold, `Ctrl+I` italic, `Ctrl+S` save, `Ctrl+Alt+M` toggle mode |
 | Save | Always writes UTF-8 without BOM; dragged-in files keep their path for direct save |
 
