@@ -1736,12 +1736,44 @@ async function boot() {
     if (localStorage.getItem(FOCUS_KEY) === "1") setFocusMode(true);
     localStorage.removeItem("md-editor-typewriter");
   } catch { /* 存储禁用 */ }
-  // 禁页面缩放（Ctrl+滚轮 / Ctrl+加减0）：编辑器 UI 不应被缩放，
-  // zoom 会引发浮层命中与视口坐标错位（查找条按钮"点不动"的候选根因之一）
-  window.addEventListener("wheel", (e) => { if (e.ctrlKey || e.metaKey) e.preventDefault(); }, { passive: false });
+  // Word 式显示比例：Ctrl+滚轮 / Ctrl+加减 / Ctrl+0 复位——只缩放编辑区正文，
+  // 工具栏/大纲/标签页不随缩放（Word 的 Ribbon 不缩，仅文档区缩）。
+  // 实现=编辑区容器 CSS zoom（参与布局，rect/选区/高亮层坐标自洽；文档内容不变）。
+  // 整页 Tauri setZoom 会连周围 UI 一起缩（Typora 行为），不符合需求，已弃。
+  // 范围 0.5~2.0、步进 10%、持久化；v0.2.3 曾整体禁缩放属误诊产物已撤销。
+  const ZOOM_KEY = "md-editor-zoom";
+  let zoomLevel = 1.0;
+  try {
+    const saved = parseFloat(localStorage.getItem(ZOOM_KEY) || "1");
+    if (saved >= 0.5 && saved <= 2.0) zoomLevel = saved;
+  } catch { /* 存储禁用 */ }
+  const applyZoom = () => {
+    try { localStorage.setItem(ZOOM_KEY, String(zoomLevel)); } catch { /* 存储禁用 */ }
+    const ed = document.getElementById("editor");
+    if (ed) ed.style.zoom = String(zoomLevel);
+    const zb = document.getElementById("zoom-badge");
+    if (zb) zb.textContent = Math.round(zoomLevel * 100) + "%";
+  };
+  const zoomBy = (d: number) => {
+    zoomLevel = Math.min(2.0, Math.max(0.5, Math.round((zoomLevel + d) * 100) / 100));
+    applyZoom();
+  };
+  let lastWheelZoom = 0;
+  window.addEventListener("wheel", (e) => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    e.preventDefault();
+    const now = Date.now();
+    if (now - lastWheelZoom < 90) return; // 触控板捏合连续 delta 合并为 10% 档
+    lastWheelZoom = now;
+    zoomBy(e.deltaY < 0 ? 0.1 : -0.1);
+  }, { passive: false });
   window.addEventListener("keydown", (e) => {
-    if ((e.ctrlKey || e.metaKey) && ["+", "-", "=", "0"].includes(e.key)) e.preventDefault();
+    if (!(e.ctrlKey || e.metaKey)) return;
+    if (e.key === "+" || e.key === "=") { e.preventDefault(); zoomBy(0.1); }
+    else if (e.key === "-" || e.key === "_") { e.preventDefault(); zoomBy(-0.1); }
+    else if (e.key === "0") { e.preventDefault(); zoomLevel = 1.0; applyZoom(); }
   });
+  applyZoom();
 }
 
 window.addEventListener("DOMContentLoaded", boot);

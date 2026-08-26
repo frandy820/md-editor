@@ -20,6 +20,7 @@ body { display: flex; flex-direction: column; overflow: hidden; }
 #file-title { margin-left: 8px; font-size: 13px; color: #333; }
 #encoding-badge { color: #999; font-size: 12px; }
 #app-version { color: #bbb; font-size: 11px; margin-left: 2px; white-space: nowrap; }
+#zoom-badge { color: #999; font-size: 11px; margin-left: 6px; white-space: nowrap; }
 .mode-badge { font-size: 12px; padding: 2px 8px; border-radius: 10px; border: 1px solid #ddd; white-space: nowrap; line-height: 18px; }
 .mode-badge.ir { color: #666; background: #f3f3f3; }
 .mode-badge.wysiwyg { color: #fff; background: #4470e0; border-color: #4470e0; }
