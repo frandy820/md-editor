@@ -129,9 +129,13 @@ body.focus-mode .vditor-reset > .fw-current { opacity: 1; }
 .find-count { font-size: 12px; color: #888; min-width: 38px; text-align: center; }
 .find-row button {
   padding: 2px 8px; cursor: pointer; font-size: 12px;
+  min-height: 26px; min-width: 26px; /* 热区加大：命中偏移数像素也在按钮上 */
+  user-select: none; -webkit-user-select: none; /* 防双击连点选中按钮文字 */
   border: 1px solid #ccc; background: #f6f6f6; border-radius: 4px;
 }
 .find-row button:hover { background: #e8eefc; }
+/* 按下即时变色：用户肉眼可见"系统收到了点击"（排查"点不动"的反馈通道） */
+.find-row button:active { background: #4470e0; color: #fff; border-color: #4470e0; }
 /* 查找高亮层：fixed 视口坐标（Range 的 getClientRects 即视口系），不进 contenteditable DOM */
 #find-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 300; }
 .find-mark { position: fixed; background: rgba(255, 213, 0, 0.35); border-radius: 2px; }

@@ -46,8 +46,8 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     fontSizeTip: "字号：先框选文字，再选字号",
     selectFirstTip: "请先在编辑区框选要改字号的文字，再选字号",
     wordCount: "字",
-    focusMode: "🎯 专注", typewriter: "⌨ 打字机", findBtn: "🔍 查找",
-    focusTip: "专注模式（F8）：淡化非当前段落", typewriterTip: "打字机模式（F9）：光标保持视线中部",
+    focusMode: "🎯 专注", findBtn: "🔍 查找",
+    focusTip: "专注模式（F8）：淡化非当前段落",
     findTip: "查找替换（Ctrl+F / Ctrl+H）",
     findPlaceholder: "查找…", replacePlaceholder: "替换为…",
     replaceOne: "替换", replaceAll: "全部替换",
@@ -73,8 +73,8 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     fontSizeTip: "字號：先框選文字，再選字號",
     selectFirstTip: "請先在編輯區框選要改字號的文字，再選字號",
     wordCount: "字",
-    focusMode: "🎯 專注", typewriter: "⌨ 打字機", findBtn: "🔍 尋找",
-    focusTip: "專注模式（F8）：淡化非當前段落", typewriterTip: "打字機模式（F9）：游標保持視線中部",
+    focusMode: "🎯 專注", findBtn: "🔍 尋找",
+    focusTip: "專注模式（F8）：淡化非當前段落",
     findTip: "尋找替換（Ctrl+F / Ctrl+H）",
     findPlaceholder: "尋找…", replacePlaceholder: "替換為…",
     replaceOne: "替換", replaceAll: "全部替換",
@@ -100,8 +100,8 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     fontSizeTip: "Font size: select text first, then pick a size",
     selectFirstTip: "Select the text in the editor first, then pick a size",
     wordCount: "words",
-    focusMode: "🎯 Focus", typewriter: "⌨ Typewriter", findBtn: "🔍 Find",
-    focusTip: "Focus mode (F8): dim other paragraphs", typewriterTip: "Typewriter mode (F9): keep caret mid-screen",
+    focusMode: "🎯 Focus", findBtn: "🔍 Find",
+    focusTip: "Focus mode (F8): dim other paragraphs",
     findTip: "Find & replace (Ctrl+F / Ctrl+H)",
     findPlaceholder: "Find…", replacePlaceholder: "Replace with…",
     replaceOne: "Replace", replaceAll: "Replace all",
@@ -810,7 +810,6 @@ function applyAllText() {
   document.getElementById("btn-save")!.textContent = t("save");
   document.getElementById("btn-export")!.textContent = t("export");
   const bfw = document.getElementById("btn-focus-mode"); if (bfw) { bfw.textContent = t("focusMode"); bfw.title = t("focusTip"); }
-  const btw = document.getElementById("btn-typewriter"); if (btw) { btw.textContent = t("typewriter"); btw.title = t("typewriterTip"); }
   const bfd = document.getElementById("btn-find"); if (bfd) { bfd.textContent = t("findBtn"); bfd.title = t("findTip"); }
   const fi = document.getElementById("find-input") as HTMLInputElement | null; if (fi) fi.placeholder = t("findPlaceholder");
   const ri = document.getElementById("replace-input") as HTMLInputElement | null; if (ri) ri.placeholder = t("replacePlaceholder");
@@ -1024,9 +1023,7 @@ function startAutosave() {
 
 // ---- 专注模式 + 打字机模式（第二批，Typora 对位 F8/F9）----
 const FOCUS_KEY = "md-editor-focus-mode";
-const TYPEWRITER_KEY = "md-editor-typewriter";
 let focusModeOn = false;
-let typewriterOn = false;
 
 // 编辑区滚动容器：从 pre.vditor-reset 自身起向上找第一个可滚动元素（实测滚动就发生在 pre 自身，overflowY:auto）
 function editorScrollEl(): HTMLElement | null {
@@ -1057,8 +1054,8 @@ function markCurrentBlock() {
   if (blk) blk.classList.add("fw-current");
 }
 
-// 打字机模式：光标锁定滚动区 40% 线（Typora 行为）。偏离超过约两行(~56px)即平滑补偿；
-// 阈值过宽(曾用1/4视高)时普通打字永远触发不了，用户感知"无效果"——已修
+// 光标滚入视线带（40% 线）：供粘贴跟随复用（打字机模式本身已按用户要求移除）。
+// 偏离超过约一行(~28px)即平滑补偿
 function typewriterScroll() {
   const sel = getSelection();
   if (!sel || sel.rangeCount === 0) return;
@@ -1081,29 +1078,18 @@ function setFocusMode(on: boolean) {
   else document.querySelectorAll(".fw-current").forEach((e) => e.classList.remove("fw-current"));
 }
 
-function setTypewriter(on: boolean) {
-  typewriterOn = on;
-  try { localStorage.setItem(TYPEWRITER_KEY, on ? "1" : "0"); } catch { /* 同上 */ }
-  document.getElementById("btn-typewriter")?.classList.toggle("active", on);
-}
-
-// selectionchange 防抖驱动（仅模式开启时干活）
+// selectionchange 防抖驱动（专注模式开启时干活）
 let fwSelDebounce: number | undefined;
 function bindFocusTypewriter() {
   document.addEventListener("selectionchange", () => {
-    if (!focusModeOn && !typewriterOn) return;
+    if (!focusModeOn) return;
     window.clearTimeout(fwSelDebounce);
-    fwSelDebounce = window.setTimeout(() => {
-      if (focusModeOn) markCurrentBlock();
-      if (typewriterOn) typewriterScroll();
-    }, 120);
+    fwSelDebounce = window.setTimeout(() => { if (focusModeOn) markCurrentBlock(); }, 120);
   });
   window.addEventListener("keydown", (e) => {
     if (e.key === "F8") { e.preventDefault(); setFocusMode(!focusModeOn); }
-    else if (e.key === "F9") { e.preventDefault(); setTypewriter(!typewriterOn); }
   });
   document.getElementById("btn-focus-mode")?.addEventListener("click", () => setFocusMode(!focusModeOn));
-  document.getElementById("btn-typewriter")?.addEventListener("click", () => setTypewriter(!typewriterOn));
   // 粘贴跟随光标（与打字机无关，普适 UX）：粘贴长文本后光标落在视口外，
   // 视口必须滚过去（用户实测"要手动翻页找光标"）。
   // 监听必须 capture 阶段：Vditor 元素级粘贴处理会 stopPropagation，冒泡到不了 document。
@@ -1289,19 +1275,25 @@ function bindFindBar() {
     if (e.key === "Enter") { e.preventDefault(); gotoMatch(e.shiftKey ? findIndex - 1 : findIndex + 1); }
     else if (e.key === "Escape") { e.preventDefault(); closeFind(); }
   });
-  document.getElementById("find-next")!.addEventListener("click", () => gotoMatch(findIndex + 1));
-  document.getElementById("find-prev")!.addEventListener("click", () => gotoMatch(findIndex - 1));
+  // 查找条所有按钮统一 pointerdown（按下即触发）：click 需 down+up 落在同一元素，
+  // 微拖/浮层闪现/输入法状态切换都会吃掉事件且无任何报错——用户三次报告"点不动"。
+  // pointerdown 物理级可靠；各处理函数幂等，后续 click 重入无害。
+  const onDown = (id: string, fn: () => void) => {
+    document.getElementById(id)!.addEventListener("pointerdown", (e) => { e.preventDefault(); fn(); });
+  };
+  onDown("find-next", () => gotoMatch(findIndex + 1));
+  onDown("find-prev", () => gotoMatch(findIndex - 1));
   // ✕ 用 pointerdown 而非 click：click 需 down+up 落在同一元素，任何扰动（微小拖动、
   // 浮层闪现、IME 状态切换）都会吃掉事件且无任何报错——用户两次报告"点✕无反应"。
   // pointerdown 按下即触发；closeFind 幂等（bar.hidden 直接 return），后续 click 重入无害。
   document.getElementById("find-close")!.addEventListener("pointerdown", (e) => { e.preventDefault(); closeFind(); });
-  document.getElementById("find-toggle-replace")!.addEventListener("click", () => {
+  onDown("find-toggle-replace", () => {
     const row = document.getElementById("replace-row")!;
     row.hidden = !row.hidden;
     if (!row.hidden) (document.getElementById("replace-input") as HTMLInputElement).focus();
   });
-  document.getElementById("replace-one")!.addEventListener("click", replaceCurrent);
-  document.getElementById("replace-all")!.addEventListener("click", () => {
+  onDown("replace-one", replaceCurrent);
+  onDown("replace-all", () => {
     if (findMatches.length > 500 && !confirm(t("replaceManyConfirm"))) return;
     replaceAllMatches();
   });
@@ -1738,11 +1730,17 @@ async function boot() {
     const v = await getVersion();
     if (v) document.getElementById("app-version")!.textContent = "v" + v;
   } catch { /* dev 浏览器态无 Tauri，保回落值 */ }
-  // 恢复上次会话的专注/打字机状态
+  // 恢复上次会话的专注状态（打字机模式已按用户要求移除，遗留键清理）
   try {
     if (localStorage.getItem(FOCUS_KEY) === "1") setFocusMode(true);
-    if (localStorage.getItem(TYPEWRITER_KEY) === "1") setTypewriter(true);
+    localStorage.removeItem("md-editor-typewriter");
   } catch { /* 存储禁用 */ }
+  // 禁页面缩放（Ctrl+滚轮 / Ctrl+加减0）：编辑器 UI 不应被缩放，
+  // zoom 会引发浮层命中与视口坐标错位（查找条按钮"点不动"的候选根因之一）
+  window.addEventListener("wheel", (e) => { if (e.ctrlKey || e.metaKey) e.preventDefault(); }, { passive: false });
+  window.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && ["+", "-", "=", "0"].includes(e.key)) e.preventDefault();
+  });
 }
 
 window.addEventListener("DOMContentLoaded", boot);
