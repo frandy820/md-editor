@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getVersion } from "@tauri-apps/api/app";
 import { listen } from "@tauri-apps/api/event";
 import { open as openDialog, save as saveDialog, confirm } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
@@ -1056,7 +1057,8 @@ function markCurrentBlock() {
   if (blk) blk.classList.add("fw-current");
 }
 
-// 打字机模式：光标偏离视口中带较远时滚动补偿（幅度小于 1/4 视高不滚，避免每次微调跳动）
+// 打字机模式：光标锁定滚动区 40% 线（Typora 行为）。偏离超过约两行(~56px)即平滑补偿；
+// 阈值过宽(曾用1/4视高)时普通打字永远触发不了，用户感知"无效果"——已修
 function typewriterScroll() {
   const sel = getSelection();
   if (!sel || sel.rangeCount === 0) return;
@@ -1067,7 +1069,7 @@ function typewriterScroll() {
   const cur = r.top - sc.getBoundingClientRect().top;
   const target = sc.clientHeight * 0.4;
   const delta = cur - target;
-  if (Math.abs(delta) > sc.clientHeight * 0.25) sc.scrollTop += delta;
+  if (Math.abs(delta) > 28) sc.scrollTo({ top: sc.scrollTop + delta, behavior: "smooth" });
 }
 
 function setFocusMode(on: boolean) {
@@ -1102,6 +1104,32 @@ function bindFocusTypewriter() {
   });
   document.getElementById("btn-focus-mode")?.addEventListener("click", () => setFocusMode(!focusModeOn));
   document.getElementById("btn-typewriter")?.addEventListener("click", () => setTypewriter(!typewriterOn));
+  // 粘贴跟随光标（与打字机无关，普适 UX）：粘贴长文本后光标落在视口外，
+  // 视口必须滚过去（用户实测"要手动翻页找光标"）。
+  // 监听必须 capture 阶段：Vditor 元素级粘贴处理会 stopPropagation，冒泡到不了 document。
+  // anchor 判定放在 350ms 后：粘贴瞬间 anchor 在 Vditor 临时接收节点（不在编辑区），
+  // 插入完成后才落到粘贴尾部（探针实证 anchorIn=True）。双时点重试防重渲染竞态。
+  let pasteAt = 0;
+  document.addEventListener("paste", () => {
+    pasteAt = Date.now();
+    window.setTimeout(() => { if (Date.now() - pasteAt < 4000) scrollCaretIntoBand(); }, 350);
+    window.setTimeout(() => { if (Date.now() - pasteAt < 4000) scrollCaretIntoBand(); }, 900);
+  }, true);
+}
+
+// 光标入带：非编辑区选区直接忽略；可见则不动；视口外则滚到 40% 带；rect 无效（渲染竞态）则原生兜底
+function scrollCaretIntoBand() {
+  const sel = getSelection();
+  const root = document.querySelector(".vditor-wysiwyg pre.vditor-reset, .vditor-ir pre.vditor-reset");
+  if (!sel || sel.rangeCount === 0 || !root || !root.contains(sel.anchorNode ?? null)) return;
+  const sc = editorScrollEl();
+  if (!sc) return;
+  const r = sel.getRangeAt(0).getBoundingClientRect();
+  const scRect = sc.getBoundingClientRect();
+  if (r.height > 0 && r.top >= scRect.top - 5 && r.bottom <= scRect.bottom + 5) return; // 已可见
+  if (r.height > 0) { typewriterScroll(); return; }
+  const el = sel.getRangeAt(0).startContainer.parentElement as HTMLElement | null;
+  el?.scrollIntoView({ block: "center", behavior: "smooth" });
 }
 
 // ---- 查找替换（第二批）：overlay 高亮层方案 ----
@@ -1263,7 +1291,10 @@ function bindFindBar() {
   });
   document.getElementById("find-next")!.addEventListener("click", () => gotoMatch(findIndex + 1));
   document.getElementById("find-prev")!.addEventListener("click", () => gotoMatch(findIndex - 1));
-  document.getElementById("find-close")!.addEventListener("click", closeFind);
+  // ✕ 用 pointerdown 而非 click：click 需 down+up 落在同一元素，任何扰动（微小拖动、
+  // 浮层闪现、IME 状态切换）都会吃掉事件且无任何报错——用户两次报告"点✕无反应"。
+  // pointerdown 按下即触发；closeFind 幂等（bar.hidden 直接 return），后续 click 重入无害。
+  document.getElementById("find-close")!.addEventListener("pointerdown", (e) => { e.preventDefault(); closeFind(); });
   document.getElementById("find-toggle-replace")!.addEventListener("click", () => {
     const row = document.getElementById("replace-row")!;
     row.hidden = !row.hidden;
@@ -1702,6 +1733,11 @@ async function boot() {
   startAutosave();
   bindFocusTypewriter();
   bindFindBar();
+  // 版本号：优先 Tauri 运行时真实版本（与构建产物一致），失败回落 index.html 硬编码
+  try {
+    const v = await getVersion();
+    if (v) document.getElementById("app-version")!.textContent = "v" + v;
+  } catch { /* dev 浏览器态无 Tauri，保回落值 */ }
   // 恢复上次会话的专注/打字机状态
   try {
     if (localStorage.getItem(FOCUS_KEY) === "1") setFocusMode(true);
