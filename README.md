@@ -26,6 +26,9 @@
 - **左侧大纲**：点击定位、✕ 删除章节（联动正文）、拖动重排
 - **多种打开方式**：双击 .md / 拖拽到窗口 / 命令行参数 / 单实例转发
 - **编码自动识别**：UTF-8 / UTF-8(BOM) / GBK
+- **内容增强**：数学公式（KaTeX 行内/块级即时渲染）、Mermaid/echarts 图表（mindmap、timeline、flowchart…）、代码块行号、emoji `:smile:` 自动补全（1500+）
+- **中文排版**：导出 PDF/HTML 时中英文之间自动加空格（不改源文）
+- **字数统计**：右下角实时显示（简中「字」/ English "words"）
 - **隐私**：不请求麦克风（已禁用编辑器内核自带的录音模块）
 
 <details>
@@ -53,18 +56,21 @@
 | 切换语言 | 右上角下拉：简体中文 / 繁體中文 / English |
 | 切换模式 | 默认所见即所得；需要看 markdown 源码时点顶部「即时渲染」或 `Ctrl+Alt+M` |
 | 大纲 | 左侧：点章节定位 / ✕ 删章节 / 拖动重排 |
+| 数学公式 | 行内 `$x^2$`、块级 `$$…$$`，KaTeX 即时渲染 |
+| 图表 | mermaid 代码块（mindmap / timeline / flowchart…），光标移出代码块即渲染 |
+| emoji | 输入 `:` 加关键词（如 `:smi`）弹出补全 |
 | 快捷键 | `Ctrl+B` 加粗、`Ctrl+I` 斜体、`Ctrl+S` 保存、`Ctrl+Alt+M` 切模式 |
 | 保存 | 统一写 UTF-8 无 BOM；拖入打开的文件保留原路径，可直接保存 |
 
 ### 🆚 竞品对比
 
-| 项目 | 免费 | 便携免安装 | 表格可视化编辑 | 中英双语 | 开源 |
-|---|---|---|---|---|---|
-| **md-editor** | ✅ | ✅ 单文件 exe | ✅ 浮层 + 数字框批量 | ✅ | ✅ |
-| Typora | ⚠️ 收费 | ❌ 需安装 | ⚠️ 基础 | ✅ | ❌ |
-| MarkText | ✅ | ❌ 需安装 | ⚠️ 基础 | ⚠️ | ✅ |
-| Obsidian | ✅ | ❌ 需安装 | ⚠️ 需插件 | ✅ | ❌ |
-| Easy MD | ✅ | ❌ | ⚠️ 弱 | ❌ | ✅ |
+| 项目 | 免费 | 便携免安装 | 表格可视化编辑 | 多标签 | 中英双语 | 开源 |
+|---|---|---|---|---|---|---|
+| **md-editor** | ✅ | ✅ 单文件 exe | ✅ 浮层 + 数字框批量 | ✅ | ✅ | ✅ |
+| Typora | ⚠️ 收费 | ❌ 需安装 | ⚠️ 基础 | ❌ 仅 macOS | ✅ | ❌ |
+| MarkText | ✅ | ❌ 需安装 | ⚠️ 基础 | ✅ | ⚠️ | ✅ |
+| Obsidian | ✅ | ❌ 需安装 | ⚠️ 需插件 | ✅ | ✅ | ❌ |
+| Easy MD | ✅ | ❌ | ⚠️ 弱 | ⚠️ | ❌ | ✅ |
 
 ### 🛠️ 从源码构建
 
@@ -109,6 +115,9 @@ A lightweight WYSIWYG Markdown editor for Windows with **visual table editing**,
 - **Left outline**: click to navigate, ✕ to delete a section (updates body too), drag to reorder
 - **Multiple ways to open**: double-click .md / drag into window / command-line arg / single-instance forwarding
 - **Encoding auto-detection**: UTF-8 / UTF-8(BOM) / GBK
+- **Rich content**: math formulas (KaTeX inline & block, live rendering), Mermaid/echarts diagrams (mindmap, timeline, flowchart…), code line numbers, emoji `:smile:` autocomplete (1500+)
+- **CJK typography**: auto-spacing between CJK & Latin text on PDF/HTML export (source untouched)
+- **Word count**: live counter at the bottom-right corner ("words" / 「字」)
 - **Privacy**: no microphone access (the editor core's built-in recording module is disabled)
 
 <details>
@@ -136,18 +145,21 @@ Grab `md-editor.exe` from [Releases](https://github.com/frandy820/md-editor/rele
 | Switch language | Top-right dropdown: 简体中文 / 繁體中文 / English |
 | Switch mode | WYSIWYG by default; click top "Instant Rendering" or `Ctrl+Alt+M` to view markdown source |
 | Outline | Left panel: click a heading to navigate / ✕ to delete / drag to reorder |
+| Math | Inline `$x^2$`, block `$$…$$` — rendered live via KaTeX |
+| Diagrams | mermaid code blocks (mindmap / timeline / flowchart…) render on blur |
+| Emoji | Type `:` + keyword (e.g. `:smi`) for autocomplete |
 | Shortcuts | `Ctrl+B` bold, `Ctrl+I` italic, `Ctrl+S` save, `Ctrl+Alt+M` toggle mode |
 | Save | Always writes UTF-8 without BOM; dragged-in files keep their path for direct save |
 
 ### 🆚 Comparison
 
-| Project | Free | Portable (no install) | Visual table editing | Bilingual (EN/中) | Open source |
-|---|---|---|---|---|---|
-| **md-editor** | ✅ | ✅ single .exe | ✅ toolbar + batch | ✅ | ✅ |
-| Typora | ⚠️ paid | ❌ install | ⚠️ basic | ✅ | ❌ |
-| MarkText | ✅ | ❌ install | ⚠️ basic | ⚠️ | ✅ |
-| Obsidian | ✅ | ❌ install | ⚠️ plugin | ✅ | ❌ |
-| Easy MD | ✅ | ❌ | ⚠️ weak | ❌ | ✅ |
+| Project | Free | Portable (no install) | Visual table editing | Tabs | Bilingual (EN/中) | Open source |
+|---|---|---|---|---|---|---|
+| **md-editor** | ✅ | ✅ single .exe | ✅ toolbar + batch | ✅ | ✅ | ✅ |
+| Typora | ⚠️ paid | ❌ install | ⚠️ basic | ❌ macOS only | ✅ | ❌ |
+| MarkText | ✅ | ❌ install | ⚠️ basic | ✅ | ⚠️ | ✅ |
+| Obsidian | ✅ | ❌ install | ⚠️ plugin | ✅ | ✅ | ❌ |
+| Easy MD | ✅ | ❌ | ⚠️ weak | ⚠️ | ❌ | ✅ |
 
 ### 🛠️ Build from source
 
