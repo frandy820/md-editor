@@ -24,8 +24,7 @@
       </select>
       <span id="file-title">（未命名）</span>
       <span id="encoding-badge"></span>
-      <span id="zoom-badge" title="显示比例：Ctrl+滚轮缩放，Ctrl+0 复位（50%~200%）">100%</span>
-      <span id="app-version" title="软件版本（报问题时先看这里）">v0.2.5</span>
+      <span id="app-version" title="软件版本（报问题时先看这里）">v0.2.6</span>
     </div>
     <div id="tabs"></div>
     <div id="main">
@@ -48,6 +47,12 @@
             <button id="replace-one" type="button">替换</button>
             <button id="replace-all" type="button">全部替换</button>
           </div>
+        </div>
+        <div id="zoom-bar" title="显示比例：Ctrl+滚轮缩放，Ctrl+0 复位（50%~200%）">
+          <button id="zoom-out" type="button" title="缩小">−</button>
+          <input id="zoom-slider" type="range" min="50" max="200" step="10" value="100" title="拖动调整显示比例" />
+          <button id="zoom-in" type="button" title="放大">+</button>
+          <span id="zoom-badge">100%</span>
         </div>
         <div id="find-overlay"></div>
         <div id="empty-state" hidden><div class="empty-hint" id="empty-hint">📋 点击顶部「📂 打开」，或把 .md 文件拖入窗口，开始编辑</div></div>

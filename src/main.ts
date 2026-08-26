@@ -1736,28 +1736,41 @@ async function boot() {
     if (localStorage.getItem(FOCUS_KEY) === "1") setFocusMode(true);
     localStorage.removeItem("md-editor-typewriter");
   } catch { /* 存储禁用 */ }
-  // Word 式显示比例：Ctrl+滚轮 / Ctrl+加减 / Ctrl+0 复位——只缩放编辑区正文，
-  // 工具栏/大纲/标签页不随缩放（Word 的 Ribbon 不缩，仅文档区缩）。
-  // 实现=编辑区容器 CSS zoom（参与布局，rect/选区/高亮层坐标自洽；文档内容不变）。
-  // 整页 Tauri setZoom 会连周围 UI 一起缩（Typora 行为），不符合需求，已弃。
-  // 范围 0.5~2.0、步进 10%、持久化；v0.2.3 曾整体禁缩放属误诊产物已撤销。
-  const ZOOM_KEY = "md-editor-zoom";
+  // Word 式显示比例：Ctrl+滚轮 / Ctrl+加减 / Ctrl+0 复位 / 右下角拉杆——只缩正文内容区
+  // （.vditor-content），格式工具条(.vditor-toolbar)/应用工具栏/大纲/标签页都不缩。
+  // 实现=挂载点 CSS 变量 --doc-zoom（Vditor 模式/语言重建子树不丢）；zoom 参与布局，
+  // rect/选区/查找高亮层坐标自洽，文档内容不变。范围 0.5~2.0、10% 档。
+  // 持久化=Rust 侧 ui-state.json（%APPDATA%）：localStorage 磁盘刷盘异步，强杀即丢。
   let zoomLevel = 1.0;
-  try {
-    const saved = parseFloat(localStorage.getItem(ZOOM_KEY) || "1");
-    if (saved >= 0.5 && saved <= 2.0) zoomLevel = saved;
-  } catch { /* 存储禁用 */ }
+  let zoomSaveTimer = 0;
+  const persistZoom = () => {
+    window.clearTimeout(zoomSaveTimer);
+    zoomSaveTimer = window.setTimeout(() => {
+      invoke("save_ui_state", { v: { zoom: zoomLevel } }).catch(() => { /* 保存失败不阻塞 UI */ });
+    }, 150);
+  };
   const applyZoom = () => {
-    try { localStorage.setItem(ZOOM_KEY, String(zoomLevel)); } catch { /* 存储禁用 */ }
-    const ed = document.getElementById("editor");
-    if (ed) ed.style.zoom = String(zoomLevel);
+    document.getElementById("editor")?.style.setProperty("--doc-zoom", String(zoomLevel));
     const zb = document.getElementById("zoom-badge");
     if (zb) zb.textContent = Math.round(zoomLevel * 100) + "%";
+    const zs = document.getElementById("zoom-slider") as HTMLInputElement | null;
+    if (zs) zs.value = String(Math.round(zoomLevel * 100));
+    persistZoom();
   };
+  invoke<Record<string, unknown> | null>("load_ui_state").then((s) => {
+    const z = s && typeof s.zoom === "number" ? s.zoom : NaN;
+    if (z >= 0.5 && z <= 2.0) { zoomLevel = z; applyZoom(); }
+  }).catch(() => { /* 读失败默认 100% */ });
   const zoomBy = (d: number) => {
     zoomLevel = Math.min(2.0, Math.max(0.5, Math.round((zoomLevel + d) * 100) / 100));
     applyZoom();
   };
+  document.getElementById("zoom-slider")?.addEventListener("input", (e) => {
+    const v = parseInt((e.target as HTMLInputElement).value, 10) / 100;
+    if (v >= 0.5 && v <= 2.0) { zoomLevel = v; applyZoom(); }
+  });
+  document.getElementById("zoom-out")?.addEventListener("click", () => zoomBy(-0.1));
+  document.getElementById("zoom-in")?.addEventListener("click", () => zoomBy(0.1));
   let lastWheelZoom = 0;
   window.addEventListener("wheel", (e) => {
     if (!(e.ctrlKey || e.metaKey)) return;

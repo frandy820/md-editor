@@ -493,6 +493,26 @@ fn dnd_selftest_enabled() -> bool {
     std::env::args().any(|a| a == "--dnd-selftest")
 }
 
+// ===== UI 状态持久化（显示比例等）：写 %APPDATA%/<identifier>/ui-state.json =====
+// 不用 localStorage：WebView2 的 localStorage 磁盘刷盘异步，进程被强杀/崩溃即丢
+// （e2e 里 taskkill //F 复现），文件写入是同步可靠的。
+fn ui_state_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    Ok(dir.join("ui-state.json"))
+}
+
+#[tauri::command]
+fn load_ui_state(app: AppHandle) -> Option<serde_json::Value> {
+    fs::read_to_string(ui_state_path(&app).ok()?).ok().and_then(|s| serde_json::from_str(&s).ok())
+}
+
+#[tauri::command]
+fn save_ui_state(app: AppHandle, v: serde_json::Value) -> Result<(), String> {
+    let p = ui_state_path(&app)?;
+    fs::create_dir_all(p.parent().ok_or("no parent")?).map_err(|e| e.to_string())?;
+    fs::write(&p, serde_json::to_string(&v).map_err(|e| e.to_string())?).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // --self-test-pdf <out.pdf>：无 GUI 端到端验证 msedge 管线（部署机预检 / 自动化测试）
@@ -542,6 +562,8 @@ pub fn run() {
             find_pdf_source,
             open_pdf_external,
             open_dropped_pdf,
+            load_ui_state,
+            save_ui_state,
             dnd_selftest_enabled
         ])
         .run(tauri::generate_context!())
