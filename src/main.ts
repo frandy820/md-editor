@@ -1,9 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open as openDialog, save as saveDialog, confirm } from "@tauri-apps/plugin-dialog";
+import { openPath } from "@tauri-apps/plugin-opener";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+// 拖放改用 HTML5（dragDropEnabled:false），不再用 Tauri 原生 getCurrentWebview 监听
 import Vditor from "vditor";
 import "vditor/dist/index.css";
+import vditorCssText from "vditor/dist/index.css?raw";
 // 本地中文 i18n（从 vditor zh_CN.js 转成 ESM 值导入）：作为 options.i18n 注入，
 // Vditor 走 else 分支直接使用，不再从 unpkg CDN 动态加载 zh_CN.js（国内 404），且符合 CSP
 import zhCNI18n from "./i18n-zh-CN";
@@ -37,6 +40,10 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     modeWYSIWYGTip: "当前：所见即所得模式（可直接编辑表格）", modeIRTip: "当前：即时渲染模式",
     switchToIRTip: "切回即时渲染模式（Ctrl+Alt+M）", switchToWYSIWYGTip: "切到所见即所得模式以编辑表格（Ctrl+Alt+M）",
     panelTitle: "大纲 · 点击定位 · ✕删除 · 拖动重排",
+    export: "🖨 导出 PDF", exportNoDoc: "（请先打开或新建文档再导出）", exportFail: "导出失败：", exporting: "正在导出 PDF，请稍候…",
+    exportStagePage: "正在生成页面…", exportStagePrint: "正在打印为 PDF…", exportStageSave: "正在保存文件…",
+    fontSizeTip: "字号：先框选文字，再选字号",
+    selectFirstTip: "请先在编辑区框选要改字号的文字，再选字号",
     appName: "MD 编辑器",
   },
   "zh-TW": {
@@ -53,6 +60,10 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     modeWYSIWYGTip: "當前：所見即所得模式（可直接編輯表格）", modeIRTip: "當前：即時渲染模式",
     switchToIRTip: "切回即時渲染模式（Ctrl+Alt+M）", switchToWYSIWYGTip: "切到所見即所得模式以編輯表格（Ctrl+Alt+M）",
     panelTitle: "大綱 · 點擊定位 · ✕刪除 · 拖曳重排",
+    export: "🖨 匯出 PDF", exportNoDoc: "（請先開啟或新增文件再匯出）", exportFail: "匯出失敗：", exporting: "正在匯出 PDF，請稍候…",
+    exportStagePage: "正在產生頁面…", exportStagePrint: "正在列印為 PDF…", exportStageSave: "正在儲存檔案…",
+    fontSizeTip: "字號：先框選文字，再選字號",
+    selectFirstTip: "請先在編輯區框選要改字號的文字，再選字號",
     appName: "MD 編輯器",
   },
   "en": {
@@ -69,6 +80,10 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     modeWYSIWYGTip: "Current: WYSIWYG mode (visual table editing)", modeIRTip: "Current: Markdown (IR) mode",
     switchToIRTip: "Switch to Markdown (IR) (Ctrl+Alt+M)", switchToWYSIWYGTip: "Switch to WYSIWYG to edit tables (Ctrl+Alt+M)",
     panelTitle: "Outline · click to navigate · ✕ delete · drag to reorder",
+    export: "🖨 Export PDF", exportNoDoc: "(Open or create a document first)", exportFail: "Export failed: ", exporting: "Exporting PDF, please wait…",
+    exportStagePage: "Generating pages…", exportStagePrint: "Printing to PDF…", exportStageSave: "Saving file…",
+    fontSizeTip: "Font size: select text first, then pick a size",
+    selectFirstTip: "Select the text in the editor first, then pick a size",
     appName: "MD Editor",
   },
 };
@@ -115,6 +130,114 @@ function detectLang(): Lang {
 let currentLang: Lang = detectLang();
 function t(key: string): string { return UI_TEXT[currentLang][key] ?? UI_TEXT["en"][key] ?? key; }
 function welcomeMd(): string { return WELCOME_TEXT[currentLang]; }
+
+// ---- 编辑区字号（基于选区，独立于 PDF：PRINT_CSS 的 14px 固定不动）----
+// Markdown 无原生字号语法 → 用内联 HTML：把选区文字包进 <span style="font-size:Npx">。
+// WYSIWYG/即时渲染(contenteditable)直接渲染该 span；lute 回写 md 时保留它（.md 里会出现 <span>，正常）。
+// 源码(SV)模式是 textarea 原始文本 → 把 span 标签原样插入文本。
+const FONT_SIZE_KEY = "md-editor-fontsize";
+const DEFAULT_FONT_SIZE = 16; // 下拉默认值（仅记忆上次用过，不应用于全文）
+// 点下拉会抢走 contenteditable 焦点、使 Selection 折叠：在 mousedown(capture) 时快照选区，change 时再应用。
+let savedRange: Range | null = null;            // 富文本选区快照（克隆，不受后续 Selection 变化影响）
+let savedTa: HTMLTextAreaElement | null = null; // 源码模式 textarea
+let savedStart = 0, savedEnd = 0;               // textarea 选区起止
+let fontInputInteracting = false;               // 用户正与字号框交互(mousedown→blur)：期间冻结光标字号同步，避免回写覆盖输入
+let exporting = false;                          // PDF 导出重入锁：msedge 打印 1-3s 期间 Ctrl+P/重复点击不二次进入，避免遮罩叠加与并发 invoke
+let fontSelHlEls: HTMLElement[] = [];           // 需求3 自定义选区高亮层：input 获焦致 contenteditable 失焦(Chromium 高亮透明)，用 div 模拟框选全程可见
+function loadFontSize(): number {
+  // 仿 detectLang：隐私模式/存储禁用时 getItem 抛错，try/catch 否则整页白屏
+  try {
+    const v = parseInt(localStorage.getItem(FONT_SIZE_KEY) || "", 10);
+    if (v >= 8 && v <= 72) return v;
+  } catch { /* 存储禁用/损坏 → 用默认 */ }
+  return DEFAULT_FONT_SIZE;
+}
+// 当前激活的 contenteditable 编辑区（所见即所得 / 即时渲染）；源码模式返回 null
+function activeEditableArea(): HTMLElement | null {
+  return document.querySelector<HTMLElement>("#editor .vditor-wysiwyg, #editor .vditor-ir");
+}
+// 当前激活的源码 textarea（仅 SV 模式存在）
+function activeSourceTextarea(): HTMLTextAreaElement | null {
+  return document.querySelector<HTMLTextAreaElement>("#editor .vditor-sv__textarea");
+}
+// 在下拉抢走焦点前快照选区：源码模式存 selectionStart/End，富文本模式存克隆 Range
+function captureFontSizeSelection() {
+  const ta = activeSourceTextarea();
+  if (ta) { savedTa = ta; savedStart = ta.selectionStart; savedEnd = ta.selectionEnd; return; }
+  savedTa = null;
+  const editable = activeEditableArea();
+  const sel = window.getSelection();
+  // 仅当选区落在编辑区内才快照（避免把工具栏/别处的选区误当编辑区选区）
+  if (sel && sel.rangeCount > 0 && editable) {
+    const r = sel.getRangeAt(0);
+    if (editable.contains(r.commonAncestorContainer)) savedRange = r.cloneRange();
+    else savedRange = null;
+  } else {
+    savedRange = null;
+  }
+}
+// 需求3：number input 获焦后 contenteditable 失焦，Chromium 选区高亮默认透明（不似 textarea 变灰可见）。
+// 用 savedRange 的视口矩形在选区位置覆盖半透明蓝层模拟高亮，使框选在「点字号框→输入→应用」全程可见。
+function paintFontSelHl() {
+  clearFontSelHl();
+  if (!savedRange || savedRange.collapsed) return;       // 仅富文本选区：源码模式 textarea 失焦自变灰，无需模拟
+  const editable = activeEditableArea();
+  if (!editable) return;
+  const rects = savedRange.getClientRects();             // 多行选区返回多个矩形，逐个覆盖
+  for (let i = 0; i < rects.length; i++) {
+    const r = rects[i];
+    const div = document.createElement("div");
+    div.className = "fontsel-hl";
+    div.style.left = r.left + "px";
+    div.style.top = r.top + "px";
+    div.style.width = r.width + "px";
+    div.style.height = r.height + "px";
+    document.body.appendChild(div);
+    fontSelHlEls.push(div);
+  }
+}
+function clearFontSelHl() {
+  for (const el of fontSelHlEls) el.remove();            // 幂等：重复调用安全（change 与 blur 都会调）
+  fontSelHlEls = [];
+}
+// 把字号应用到选区：源码 → setRangeText 包 span 标签；富文本 → surroundContents 包 span 元素
+function applyFontSizeToSelection(px: number) {
+  // 源码模式：textarea 原始文本，直接插入 <span> 标签
+  if (savedTa) {
+    if (savedStart === savedEnd) { alert(t("selectFirstTip")); return; }
+    const selTxt = savedTa.value.substring(savedStart, savedEnd);
+    const wrapped = `<span style="font-size:${px}px">${selTxt}</span>`;
+    savedTa.focus();
+    savedTa.setRangeText(wrapped, savedStart, savedEnd, "end"); // 光标移到插入后末尾
+    savedTa.dispatchEvent(new Event("input", { bubbles: true })); // 让 Vditor 同步 doc.content/dirty/大纲
+    return;
+  }
+  // 富文本模式：contenteditable 选区
+  if (!savedRange || savedRange.collapsed) { alert(t("selectFirstTip")); return; }
+  const editable = activeEditableArea();
+  if (!editable) { alert(t("selectFirstTip")); return; }
+  editable.focus();
+  const span = document.createElement("span");
+  span.style.fontSize = px + "px";
+  try {
+    savedRange.surroundContents(span); // 选区未跨元素边界时直接包裹
+  } catch {
+    // 选区跨越元素边界（部分选中某节点）时 surroundContents 抛错 → 抽出文档片段再包裹
+    const frag = savedRange.extractContents();
+    span.appendChild(frag);
+    savedRange.insertNode(span);
+  }
+  // 重选包裹内容，便于连续对多段文字应用不同字号
+  const nr = document.createRange();
+  nr.selectNodeContents(span);
+  const sel = window.getSelection();
+  if (!sel) return;
+  sel.removeAllRanges();
+  sel.addRange(nr);
+  savedRange = nr.cloneRange();
+  // Range API 改 DOM 不触发 input：手动派发，让 Vditor 同步 doc.content/dirty/大纲
+  editable.dispatchEvent(new Event("input", { bubbles: true }));
+}
 
 // ---- 多标签页：每个打开的文档一个 Doc ----
 interface Doc {
@@ -378,8 +501,10 @@ function switchDoc(id: string) {
   if (!doc) return;
   activeId = id;
   if (vditor) {
+    // 切换文档时清空 undo/redo 栈并以新文档为唯一基线：Vditor 栈是 per-instance(非 per-doc)，
+    // 不清栈会让新旧文档全文 diff 污染栈，导致一次 undo 回退整篇内容（"撤销一次撤多步"根因）。
     suppressInput = true;
-    vditor.setValue(doc.content);
+    vditor.setValue(doc.content, true);
     suppressInput = false;
   }
   rebuildOutline();
@@ -390,7 +515,7 @@ function switchDoc(id: string) {
 // 全部标签关闭后的空状态（允许关闭欢迎页）：遮住编辑区，提示打开文件
 function showEmptyState() {
   document.getElementById("empty-state")!.hidden = false;
-  if (vditor) { suppressInput = true; vditor.setValue(""); suppressInput = false; }
+  if (vditor) { suppressInput = true; vditor.setValue("", true); suppressInput = false; }
   const ul = document.getElementById("outline");
   if (ul) ul.innerHTML = '<li class="empty">' + esc(t("noOpenFile")) + "</li>";
   updateTitle(); // 兜底：确保空状态下标题显示「（无）」而非残留旧文档名
@@ -459,6 +584,54 @@ async function loadFile(path: string) {
   }
 }
 
+// 打开 PDF：智能分流。不走 open_file（白名单只读文本类，PDF 会被拒）。
+// find_pdf_source 查同名 .md/.html 源：有源 → 打开源编辑（改完可重导出覆盖 PDF）；
+// 无源 → open_pdf_external 调 PDF4QT，探测不到（PDF4QT_NOT_FOUND）回落系统默认 PDF 程序。
+async function handleOpenPdf(pdfPath: string) {
+  let src: string | null = null;
+  try {
+    src = await invoke<string | null>("find_pdf_source", { pdfPath });
+  } catch (e) {
+    alert(t("openFail") + e);
+    return;
+  }
+  if (src) {
+    const srcName = src.split(/[\\/]/).pop()!;
+    const msg = currentLang === "en"
+      ? `Found source "${srcName}". Open it to edit? (Re-export to overwrite this PDF after changes.)`
+      : `发现同名源文件「${srcName}」，是否打开源文件编辑？（改完可重新导出覆盖此 PDF）`;
+    const ok = await confirm(msg, {
+      title: currentLang === "en" ? "Open Source" : "打开源文件",
+      kind: "info",
+    }).catch(() => false);
+    if (ok) loadFile(src);
+    return;
+  }
+  // 无源：调 PDF4QT 编辑
+  const msg2 = currentLang === "en"
+    ? "No source file found. Open this PDF in PDF4QT to edit?"
+    : "未找到同名源文件，是否用 PDF4QT 打开编辑？";
+  const ok2 = await confirm(msg2, {
+    title: currentLang === "en" ? "Open in PDF4QT" : "用 PDF4QT 编辑",
+    kind: "info",
+  }).catch(() => false);
+  if (!ok2) return;
+  try {
+    await invoke("open_pdf_external", { path: pdfPath });
+  } catch (e) {
+    if (String(e).includes("PDF4QT_NOT_FOUND")) {
+      // 回落：系统默认 PDF 程序（用户把 .pdf 默认程序设为 PDF4QT 即等同）
+      try {
+        await openPath(pdfPath);
+      } catch (e2) {
+        alert(t("openFail") + e2);
+      }
+    } else {
+      alert(t("openFail") + e);
+    }
+  }
+}
+
 let pendingFile: string | null = null;
 
 // 构造 Vditor options：toolbar/input/after 统一在此，mode 由参数决定（销毁重建切换模式时复用）
@@ -506,8 +679,9 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
         // 模式切换后重建：把当前文档内容恢复进新编辑器
         const doc = activeDoc();
         if (doc && vditor) {
+          // 模式/语言切换销毁重建实例后同样清栈建基线（与 switchDoc 一致，防 diff 串台）
           suppressInput = true;
-          vditor.setValue(doc.content);
+          vditor.setValue(doc.content, true);
           suppressInput = false;
         }
         rebuildOutline();
@@ -522,6 +696,21 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
 
 function initVditor() {
   vditor = new Vditor("editor", vditorOptions(currentMode));
+  if ((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV) {
+    (window as unknown as { __vd?: unknown }).__vd = vditor;
+  }
+}
+
+// 触发 Vditor 撤销/重做：点击工具栏 undo/redo 按钮（走 Vditor 原生 toolbar→undo 路径）。
+// 直接调 internal.undo.undo 会因缺少 toolbar handler 收尾、renderDiff 触发 afterRender 连锁，导致一次按键
+// pop 两步；按钮点击与用户点工具栏按钮完全等价，单步行为已验证正确。供 Ctrl+Z/Y/Shift+Z 快捷键复用。
+function doUndo() {
+  if (!vditor) return;
+  document.querySelector<HTMLElement>('#editor .vditor-toolbar [data-type="undo"]')?.click();
+}
+function doRedo() {
+  if (!vditor) return;
+  document.querySelector<HTMLElement>('#editor .vditor-toolbar [data-type="redo"]')?.click();
 }
 
 // 切换编辑模式：Vditor 3.11.2 没有运行时 changeMode，唯一可靠方式 = 销毁实例 + 以目标 mode 重建。
@@ -532,6 +721,9 @@ function switchMode(mode: "ir" | "wysiwyg") {
   // vditor=null 窗口期二次进入，并发触发 destroy/new 导致 DOM 残留、重复实例或内容丢失。重建中直接忽略。
   if (!vditor || currentMode === mode || switchInFlight) return;
   switchInFlight = true;
+  // 清场字号交互态：重建后 savedRange/savedTa 指向已销毁旧 DOM，fontInputInteracting 卡 true 会冻结需求2 同步
+  fontInputInteracting = false; savedRange = null; savedTa = null; savedStart = 0; savedEnd = 0;
+  clearFontSelHl();
   // 销毁前先把当前编辑器内容回写 doc（getValue 空读守卫：空值不覆盖）
   const cur = activeDoc();
   if (cur) {
@@ -576,6 +768,7 @@ function updateModeUI() {
 function applyAllText() {
   document.getElementById("btn-open")!.textContent = t("open");
   document.getElementById("btn-save")!.textContent = t("save");
+  document.getElementById("btn-export")!.textContent = t("export");
   const pt = document.getElementById("panel-title"); if (pt) pt.textContent = t("panelTitle");
   const eh = document.getElementById("empty-hint"); if (eh) eh.textContent = t("emptyHint");
   const cmsg = document.getElementById("cc-msg"); if (cmsg) cmsg.textContent = t("closeSaveMsg");
@@ -584,6 +777,8 @@ function applyAllText() {
   const ccan = document.getElementById("cc-cancel"); if (ccan) ccan.textContent = t("closeCancel");
   const sel = document.getElementById("lang-select") as HTMLSelectElement | null;
   if (sel) sel.value = currentLang;
+  const fss = document.getElementById("font-size-select") as HTMLInputElement | null;
+  if (fss) fss.title = t("fontSizeTip");
   document.documentElement.lang = currentLang; // a11y：屏幕阅读器发音/CSS :lang/繁体字体回退随语言
   document.title = t("appName"); // 浏览器标签/Tauri 窗口/任务栏标题随语言
   updateModeUI();
@@ -594,6 +789,9 @@ function setLang(lang: Lang) {
   // 重入锁：模式切换(switchMode)重建中(switchInFlight)不重入，避免并发 destroy/new 致双实例/DOM 残留/内容丢失
   if (lang === currentLang || switchInFlight) return;
   currentLang = lang;
+  // 清场字号交互态（同 switchMode）：重建后 savedRange/savedTa 悬空、fontInputInteracting 需复位
+  fontInputInteracting = false; savedRange = null; savedTa = null; savedStart = 0; savedEnd = 0;
+  clearFontSelHl();
   try { localStorage.setItem("md-editor-lang", lang); } catch { /* 存储禁用，仅本次会话生效 */ }
   applyAllText();
   if (vditor) {
@@ -750,14 +948,167 @@ async function saveAllDirty() {
   }
 }
 
-async function boot() {
-  // md-editor 是 Markdown 编辑器，不需要麦克风；Vditor 自带 RecordMedia 录音模块会调
-  // getUserMedia({audio:true}) 触发系统麦克风权限弹窗。启动即禁用，杜绝无谓的麦克风请求。
-  if (navigator.mediaDevices) {
-    (navigator.mediaDevices as unknown as { getUserMedia: unknown }).getUserMedia = () =>
-      Promise.reject(new DOMException("microphone disabled in md-editor", "NotAllowedError"));
-  }
+// 把相对图片 src 解析为绝对 file:// 路径：Rust 端把完整 HTML 写临时文件交 msedge 渲染，
+// msedge 进程工作目录非文档目录，相对路径 ./x.png 会指向 temp 目录而解析失败。
+// 仅处理相对路径（./ 或不带协议的），远程(http/https)与 data: base64 原样不动。
+// doc 未保存（path=null）时无法解析目录 → 照原样（非回归，与历史行为一致）。
+function resolveImageSources(fragment: HTMLElement, docPath: string | null) {
+  if (!docPath) return;
+  // 取文档所在目录作为 base（Windows 反斜杠统一为正斜杠）
+  const dir = docPath.replace(/\\/g, "/").replace(/\/[^/]*$/, "");
+  fragment.querySelectorAll<HTMLImageElement>("img[src]").forEach((img) => {
+    const src = img.getAttribute("src");
+    if (!src) return;
+    // 已带协议（http/https/file）或 data: base64 的绝对资源不动
+    if (/^([a-z][a-z0-9+.-]*:)?\/\//i.test(src) || src.startsWith("data:")) return;
+    const clean = src.replace(/^\.\//, "");
+    if (/^[a-zA-Z]:[\\/]/.test(clean)) return; // 已是 Windows 绝对路径
+    const abs = dir + "/" + clean;
+    // 转 file:/// URL：反斜杠→正斜杠，encodeURI 处理中文与空格
+    img.setAttribute("src", "file:///" + encodeURI(abs.replace(/\\/g, "/")));
+  });
+}
 
+// 把渲染好的 HTML 片段包装成可独立渲染的完整文档，交 Rust 端 msedge headless 导出。
+// 内联整份 Vditor CSS（构建期 ?raw 编为字符串常量），保证导出渲染规则（.vditor-reset/代码高亮/表格/引用）
+// 与编辑区一致；@page 控制纸张 A4 与页边距；打印样式防分页断裂与图片缩放。
+// 该 HTML 由独立 msedge 进程从 file:// 加载，不经过 Tauri webview，应用 CSP（script-src 'self'）不适用。
+function wrapExportHtml(fragmentHtml: string): string {
+  const langAttr = currentLang === "en" ? "en" : currentLang === "zh-TW" ? "zh-TW" : "zh-CN";
+  return `<!DOCTYPE html>
+<html lang="${langAttr}">
+<head>
+<meta charset="UTF-8">
+<style>
+${vditorCssText}
+@page { size: A4; margin: 15mm; }
+html, body {
+  margin: 0; padding: 0; background: #fff; color: #000;
+  font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", "Source Han Sans SC", "Segoe UI", system-ui, sans-serif;
+  font-size: 14px; line-height: 1.75;
+}
+.vditor-reset { max-width: none; margin: 0; padding: 0; }
+pre { white-space: pre-wrap; word-break: break-word; }
+pre, table, tr, blockquote, img { break-inside: avoid; }
+img { max-width: 100%; }
+table { border-collapse: collapse; }
+</style>
+</head>
+<body class="vditor-reset"><div class="vditor-reset">${fragmentHtml}</div></body>
+</html>`;
+}
+
+// 导出当前文档为 PDF：取 Vditor 渲染 HTML → 解析相对图片 → 包装完整文档 → 交 Rust 端
+// msedge --headless --print-to-pdf 生成矢量 PDF（文本可选可搜、Chromium 原生分页、无 canvas 上限）。
+// 取代旧的 html2pdf.js（离屏容器 left:-99999px 致 html2canvas 渲染空白=白纸，且 ~32767px canvas 上限截断长文）。
+async function exportPdf() {
+  if (!vditor || exporting) return;   // 重入锁：导出进行中(msedge 打印 1-3s)的 Ctrl+P/重复点击直接忽略
+  const doc = activeDoc();
+  if (!doc) { alert(t("exportNoDoc")); return; }
+  // 先把当前编辑器实时内容回写 doc（与保存一致，getValue 空读守卫：空值不覆盖）
+  const v = vditor.getValue();
+  if (v !== "" || doc.content === "") doc.content = v;
+
+  // 取渲染后 HTML 片段（getHTML 在某些异常态可能抛错，try/catch 兜底）
+  let fragmentHtml = "";
+  try { fragmentHtml = vditor.getHTML(); } catch (e) { alert(t("exportFail") + e); return; }
+  if (!fragmentHtml) { alert(t("exportNoDoc")); return; }
+
+  // 在临时容器里解析片段为 DOM，解析相对图片后再序列化回 HTML 字符串
+  const tmp = document.createElement("div");
+  tmp.innerHTML = fragmentHtml;
+  resolveImageSources(tmp, doc.path);
+  const fullHtml = wrapExportHtml(tmp.innerHTML);
+
+  // 选保存路径（默认文件名 = 文档名.pdf）。重入锁覆盖 saveDialog→导出完成全程：saveDialog
+  // 关闭到设锁之间存在极小时间窗，连点导出可能在窗口内二次进入，提前上锁闭合。exporting 的
+  // 释放统一在 finally（取消/成功/异常三路必经 finally），杜绝锁泄漏。finally 引用的
+  // overlay/unlisten/est 必须先于 try 声明——取消分支会在赋值前 return（此时 unlisten=null、
+  // overlay=hidden、est=null），故均按 null-safe 处理。
+
+  // 进度遮罩：Rust 在可观测步骤(page/printing/saving)推真百分比；引擎打印为黑盒子段，
+  // 由前端估算曲线平滑逼近 90%（永不超 90），真完成 invoke resolve 时才跳 100%——诚实，不伪造完成。
+  const overlay = document.getElementById("export-overlay");
+  const exportMsg = document.getElementById("export-msg");
+  const bar = document.getElementById("export-progress-bar");
+  const pctEl = document.getElementById("export-pct");
+  const setPct = (p: number) => {
+    if (bar) (bar as HTMLElement).style.width = p + "%";
+    if (pctEl) pctEl.textContent = Math.round(p) + "%";
+  };
+
+  // 估算曲线：仅 printing 黑盒段启用，每 120ms 按 cur += (90-cur)*0.12 指数衰减逼近 90。
+  let est: number | null = null;
+  let cur = 0;
+  const stopEst = () => { if (est !== null) { clearInterval(est); est = null; } };
+  const startEst = (from: number) => {
+    stopEst();
+    cur = from;
+    est = window.setInterval(() => { cur += (90 - cur) * 0.12; setPct(cur); }, 120);
+  };
+
+  let unlisten: (() => void) | null = null;
+  let done = false; // 完成标志：invoke resolve 后置 true，阻止迟到的 saving 事件把 100% 倒退回 95%
+  let resultMsg = "";
+  try {
+    exporting = true;
+    const baseName = (doc.name || t("untitled")).replace(/\.[^.]+$/, "");
+    const sp = await saveDialog({
+      defaultPath: baseName + ".pdf",
+      filters: [{ name: "PDF", extensions: ["pdf"] }],
+    });
+    if (!sp) { return; } // 用户取消：exporting 由 finally 释放（overlay 仍 hidden、unlisten 仍 null）
+    const savePath = sp as string;
+
+    if (overlay) overlay.hidden = false;
+    setPct(5);
+    if (exportMsg) exportMsg.textContent = t("exportStagePage");
+
+    unlisten = await listen<[string, number]>("export-pdf-progress", (e) => {
+      if (done) return; // 已完成：忽略迟到的 saving 事件，避免 100→95 倒退
+      const [stage, pct] = e.payload;
+      stopEst();
+      setPct(pct);
+      if (stage === "printing") {
+        if (exportMsg) exportMsg.textContent = t("exportStagePrint");
+        startEst(pct);                     // 黑盒段：估算逼近 90，真完成由 resolve 接管
+      } else if (stage === "page") {
+        if (exportMsg) exportMsg.textContent = t("exportStagePage");
+      } else if (stage === "saving") {
+        if (exportMsg) exportMsg.textContent = t("exportStageSave");
+      }
+    });
+    await invoke("export_pdf", { html: fullHtml, path: savePath });
+    done = true;
+    // P1 关联源：把当前 md 源复制到 PDF 同目录同名 .md，使以后打开此 PDF 时 find_pdf_source 能命中回到源
+    if (doc.path) {
+      const pdfDir = savePath.replace(/\\/g, "/").replace(/\/[^/]*$/, "");
+      const stem = (doc.name || t("untitled")).replace(/\.[^.]+$/, "");
+      const srcCopy = pdfDir + "/" + stem + ".md";
+      const norm = (s: string) => s.replace(/\\/g, "/").toLowerCase();
+      if (norm(doc.path) !== norm(srcCopy) && doc.content) {
+        try { await invoke("save_file", { path: srcCopy, content: doc.content }); }
+        catch { /* 关联源副本失败不阻断导出（目标可能被占用等） */ }
+      }
+    }
+    stopEst();
+    setPct(100);
+    if (exportMsg) exportMsg.textContent = currentLang === "en" ? "Exported." : currentLang === "zh-TW" ? "匯出完成。" : "导出完成。";
+    await new Promise<void>(r => setTimeout(r, 350)); // 让 100% 短暂停留再收尾，避免进度条一闪而过
+    const doneLabel = currentLang === "en" ? "Exported:\n" : currentLang === "zh-TW" ? "匯出完成：\n" : "导出完成：\n";
+    resultMsg = "✅ " + doneLabel + savePath;
+  } catch (e) {
+    resultMsg = t("exportFail") + e;
+  } finally {
+    stopEst();
+    if (unlisten) unlisten();              // 移除事件监听，防止泄漏（成功/异常/取消三路都执行）
+    exporting = false;                     // 释放重入锁（统一释放点，杜绝锁泄漏）
+    if (overlay) overlay.hidden = true;    // 先关遮罩再弹结果，避免进度条与结果框并存
+  }
+  alert(resultMsg);
+}
+
+async function boot() {
   try {
     const sf = await invoke<string | null>("get_startup_file");
     if (sf) pendingFile = sf;
@@ -775,10 +1126,92 @@ async function boot() {
       switchMode(currentMode === "wysiwyg" ? "ir" : "wysiwyg");
     }
   });
+  // 撤销/重做快捷键接管：Vditor 工具栏配了 undo/redo 按钮后，其内部 keydown 会在
+  // `!toolbar.elements.undo`(恒 false) 时跳过 Ctrl+Z(vditor index.js:8915)，把它交给浏览器原生
+  // contenteditable undo——而原生 undo 在 Vditor 复杂渲染 DOM 上频繁失效("Ctrl+Z 有时没反应")。
+  // 此处 capture 阶段直接调 Vditor undo 栈并 preventDefault，与工具栏按钮、Ctrl+Alt+M 互不冲突。
+  window.addEventListener("keydown", (e) => {
+    if (!vditor) return;
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return; // 仅 Ctrl/Meta，避开 Ctrl+Alt+M
+    // 焦点必须在编辑区内，避免劫持对话框/输入框的原生撤销
+    const editorEl = document.querySelector("#editor .vditor-wysiwyg, #editor .vditor-ir, #editor .vditor-sv");
+    const ae = document.activeElement;
+    if (!editorEl || !ae || !editorEl.contains(ae)) return;
+    const k = e.key.toLowerCase();
+    // stopImmediatePropagation：阻止事件继续传到编辑区 pre 元素上 Vditor 自带的 Ctrl+Z handler
+    // （vditor 会模拟点击 undo 按钮再 undo 一次），否则与 doUndo 叠加导致一次按键撤销两步。
+    if (k === "z" && e.shiftKey) { e.preventDefault(); e.stopImmediatePropagation(); doRedo(); }       // Ctrl+Shift+Z = 重做
+    else if (k === "z") { e.preventDefault(); e.stopImmediatePropagation(); doUndo(); }                // Ctrl+Z = 撤销
+    else if (k === "y") { e.preventDefault(); e.stopImmediatePropagation(); doRedo(); }                // Ctrl+Y = 重做
+  }, true);
+  // 阻断浏览器原生 contenteditable undo/redo：上面的 keydown listener 已通过 doUndo 接管
+  // （走 Vditor undo 栈）。但 keydown 的 preventDefault 拦不住 Chromium 的原生 undo——它经
+  // beforeinput(inputType=historyUndo) 通道执行，会与 Vditor 栈不同步，表现为一次 Ctrl+Z
+  // 撤销两步。capture 阶段拦截 historyUndo/historyRedo 并 preventDefault，确保只有 Vditor 栈响应。
+  document.addEventListener("beforeinput", (e: Event) => {
+    const it = (e as InputEvent).inputType;
+    if (it === "historyUndo" || it === "historyRedo") {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+  }, true);
   updateModeUI();
   applyAllText(); // 初始化静态文案到当前语言
   const langSel = document.getElementById("lang-select") as HTMLSelectElement | null;
   if (langSel) langSel.addEventListener("change", () => setLang(langSel.value as Lang));
+  // 编辑区字号（基于选区）：先在编辑区框选文字，再点下拉选字号 → 选区文字被包进内联 <span style="font-size:Npx">。
+  // 点下拉会抢走 contenteditable 焦点并使选区折叠：在 mousedown(capture) 先快照选区，change 时再对快照应用。
+  const fssInit = document.getElementById("font-size-select") as HTMLInputElement | null;
+  if (fssInit) {
+    fssInit.value = String(loadFontSize()); // 仅恢复"上次用过"的字号值，不应用于全文
+    fssInit.title = t("fontSizeTip");
+    // mousedown(capture) + preventDefault：阻止 input 默认抢焦折叠编辑区选区，先把选区快照(savedRange)存下；
+    // 但异步 focus(input) 仍会让 contenteditable 失焦——Chromium 下失焦选区高亮默认透明（不似 textarea 变灰可见），
+    // 故 focus 前 paintFontSelHl() 用 savedRange 矩形覆盖一层半透明蓝，模拟框选全程可见(需求3)。程序化 focus 不折叠选区，Range 保留作 apply 兜底。
+    fssInit.addEventListener("mousedown", (e: MouseEvent) => {
+      e.preventDefault();
+      fontInputInteracting = true;        // 冻结光标字号同步，避免回写覆盖用户即将输入的数值
+      captureFontSizeSelection();         // 抢焦前快照选区（兜底，防 selection 变化）
+      paintFontSelHl();                   // input 获焦将致 contenteditable 失焦(高亮透明)→ 先绘自定义高亮层保框选可见
+      setTimeout(() => fssInit.focus({ preventScroll: true }), 0);
+    }, true);
+    fssInit.addEventListener("blur", () => { fontInputInteracting = false; clearFontSelHl(); });
+    fssInit.addEventListener("change", () => {
+      // change 提交语义（而非 input）：避免逐字符把"12"拆成 px=1 再 px=12 反复套用
+      let px = parseInt(fssInit.value, 10);
+      if (isNaN(px)) {
+        // 空值/非法输入：回写上次用的字号，给用户明确反馈而非静默无反应
+        fssInit.value = String(loadFontSize());
+        return;
+      }
+      if (px < 8) px = 8;   // 钳制到合法区间并回写，超界输入直接纠正显示
+      if (px > 72) px = 72;
+      fssInit.value = String(px);
+      applyFontSizeToSelection(px);
+      clearFontSelHl();                   // apply 后真实选区已重选恢复高亮(富文本) → 移除自定义层
+      try { localStorage.setItem(FONT_SIZE_KEY, String(px)); } catch { /* 存储禁用，仅本次会话生效 */ }
+    });
+    // 光标定位到某文字时，把工具栏字号显示同步为该文字实际渲染字号（仅显示，绝不触发 apply）。
+    // 仅富文本模式（contenteditable）：源码模式 textarea 是原始文本、无内联字号概念，跳过。
+    document.addEventListener("selectionchange", () => {
+      if (fontInputInteracting) return;                  // 用户正操作字号框：不回写，避免覆盖其输入
+      if (activeSourceTextarea()) return;                // 源码模式不同步
+      const editable = activeEditableArea();
+      if (!editable) return;
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      const node = sel.anchorNode;
+      if (!node || !editable.contains(node)) return;     // 选区不在编辑区：不动
+      const el = node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as HTMLElement);
+      if (!el) return;
+      const px = parseInt(getComputedStyle(el).fontSize, 10);
+      if (px >= 8 && px <= 72) fssInit.value = String(px); // 仅更新显示，不触发 applyFontSizeToSelection
+    });
+    // 高亮层固定于视口(fixed)：编辑区滚动/窗口缩放使 savedRange 矩形位移 → 重绘防错位（仅交互期间，开销可控）
+    const repaintHl = () => { if (fontInputInteracting) paintFontSelHl(); };
+    document.addEventListener("scroll", repaintHl, true); // 捕获：scroll 不冒泡，捕获阶段接住 vditor 内部滚动容器
+    window.addEventListener("resize", repaintHl);
+  }
   bindTablePopoverVisibility(); // WYSIWYG 表格浮层显示（补 Vditor 重建后不自动触发的缺陷）
   bindTableInputConfirm(); // 表格行列数字框：确认（回车/失焦）后才增删，避免逐字符删数据
 
@@ -805,15 +1238,44 @@ async function boot() {
   } catch {
     // 非 tauri 环境忽略
   }
-  // 拖拽打开：用 Tauri 原生拖放事件（dragDropEnabled=true 时 OS 文件拖放由 Tauri 拦截，
-  // HTML5 drop 拿不到文件 → 实测无反应）。原生事件能拿到真实路径，用 open_file 读取，保留路径可直存。
+  // 拖拽打开：Windows/WebView2 上 wry 原生拖放存在时序竞态（注册早于 WebView2 子窗口 drop target
+  // 就绪 → 拦截失败 → 不产生 tauri://drag-drop 事件，实测完全无反应）。
+  // 改用 HTML5 拖放：dragDropEnabled:false 后 WebView2 原生 HTML5 drop 可靠触发。
+  // 代价：HTML5 拿不到原始路径（浏览器安全限制）→ PDF 经 IPC 读字节写临时文件再交 PDF4QT；
+  // md/txt 直接读文本进编辑器。需原路径/源文件联动时用「打开」按钮（已可用）。
   try {
-    await getCurrentWindow().onDragDropEvent((event) => {
-      if (event.payload.type === "drop" && event.payload.paths && event.payload.paths.length > 0) {
-        const p = event.payload.paths[0];
-        if (/\.(md|markdown|mdown|txt)$/i.test(p)) loadFile(p);
+    const DRAG_PDF_MAX = 5 * 1024 * 1024; // IPC 传字节，限 5MB，更大请用「打开」按钮
+    window.addEventListener("dragover", (e) => {
+      e.preventDefault(); // 不阻止则 drop 不触发
+    });
+    window.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      const f = e.dataTransfer?.files?.[0];
+      if (!f) return;
+      if (/\.pdf$/i.test(f.name)) {
+        if (f.size > DRAG_PDF_MAX) {
+          alert(currentLang === "en" ? "PDF > 5MB, please use the Open button." : "PDF 超过 5MB，请改用「打开」按钮选择文件。");
+          return;
+        }
+        try {
+          const buf = new Uint8Array(await f.arrayBuffer());
+          await invoke("open_dropped_pdf", { content: Array.from(buf), name: f.name });
+        } catch (err) {
+          alert((currentLang === "en" ? "Open failed: " : "打开失败：") + err);
+        }
+      } else if (/\.(md|markdown|mdown|txt)$/i.test(f.name)) {
+        const text = await f.text();
+        openDoc(null, text, f.name, "UTF-8");
       }
     });
+    // 自测：--dnd-selftest 启动时合成一次 drop，验证 HTML5 拖放→IPC→临时文件全链路（常驻、正常启动不触发）
+    if (await invoke<boolean>("dnd_selftest_enabled").catch(() => false)) {
+      const blob = new Blob(["%PDF-1.4\n%selftest\n"], { type: "application/pdf" });
+      const file = new File([blob], "__dnd_selftest__.pdf", { type: "application/pdf" });
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      window.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true }));
+    }
   } catch {
     // 非 tauri 环境忽略
   }
@@ -821,9 +1283,15 @@ async function boot() {
   document.getElementById("btn-open")!.addEventListener("click", async () => {
     const p = await openDialog({
       multiple: false,
-      filters: [{ name: "Markdown", extensions: ["md", "markdown", "mdown", "txt"] }],
+      filters: [
+        { name: "Markdown", extensions: ["md", "markdown", "mdown", "txt"] },
+        { name: "PDF", extensions: ["pdf"] },
+      ],
     });
-    if (p) loadFile(p as string);
+    if (!p) return;
+    const ps = p as string;
+    if (/\.pdf$/i.test(ps)) handleOpenPdf(ps);
+    else loadFile(ps);
   });
 
   document.getElementById("btn-save")!.addEventListener("click", async () => {
@@ -848,6 +1316,15 @@ async function boot() {
       renderTabs();
     } catch (e) {
       alert(t("saveFail") + e);
+    }
+  });
+
+  // 导出 PDF：点击按钮 或 Ctrl+P（拦截浏览器原生打印，改为打印渲染后的纯内容，排除工具栏/大纲）
+  document.getElementById("btn-export")!.addEventListener("click", exportPdf);
+  window.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === "p" || e.key === "P")) {
+      e.preventDefault();
+      exportPdf();
     }
   });
 }
