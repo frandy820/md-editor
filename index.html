@@ -12,6 +12,9 @@
       <button id="btn-open" type="button">📂 打开</button>
       <button id="btn-save" type="button">💾 保存</button>
       <button id="btn-export" type="button" title="导出为 PDF（Ctrl+P）">🖨 导出 PDF</button>
+      <button id="btn-focus-mode" type="button" title="专注模式（F8）：淡化非当前段落">🎯 专注</button>
+      <button id="btn-typewriter" type="button" title="打字机模式（F9）：光标保持视线中部">⌨ 打字机</button>
+      <button id="btn-find" type="button" title="查找替换（Ctrl+F / Ctrl+H）">🔍 查找</button>
       <button id="btn-mode" type="button" title="切回即时渲染模式（Ctrl+Alt+M）">切回即时渲染</button>
       <span id="mode-badge" class="mode-badge wysiwyg" title="当前：所见即所得模式（可直接编辑表格）">所见即所得</span>
       <input id="font-size-select" type="number" min="8" max="72" step="1" value="16" title="编辑区字号" style="width: 4em" />
@@ -31,6 +34,22 @@
       </aside>
       <main id="editor-wrap">
         <div id="editor"></div>
+        <div id="find-bar" hidden>
+          <div class="find-row">
+            <input id="find-input" type="text" placeholder="查找…" autocomplete="off" spellcheck="false" />
+            <span id="find-count" class="find-count">0/0</span>
+            <button id="find-prev" type="button" title="上一个（Shift+Enter）">↑</button>
+            <button id="find-next" type="button" title="下一个（Enter）">↓</button>
+            <button id="find-toggle-replace" type="button" title="展开/收起替换">⇄</button>
+            <button id="find-close" type="button" title="关闭（Esc）">✕</button>
+          </div>
+          <div class="find-row" id="replace-row" hidden>
+            <input id="replace-input" type="text" placeholder="替换为…" autocomplete="off" spellcheck="false" />
+            <button id="replace-one" type="button">替换</button>
+            <button id="replace-all" type="button">全部替换</button>
+          </div>
+        </div>
+        <div id="find-overlay"></div>
         <div id="empty-state" hidden><div class="empty-hint" id="empty-hint">📋 点击顶部「📂 打开」，或把 .md 文件拖入窗口，开始编辑</div></div>
       </main>
     </div>

@@ -45,6 +45,12 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     fontSizeTip: "字号：先框选文字，再选字号",
     selectFirstTip: "请先在编辑区框选要改字号的文字，再选字号",
     wordCount: "字",
+    focusMode: "🎯 专注", typewriter: "⌨ 打字机", findBtn: "🔍 查找",
+    focusTip: "专注模式（F8）：淡化非当前段落", typewriterTip: "打字机模式（F9）：光标保持视线中部",
+    findTip: "查找替换（Ctrl+F / Ctrl+H）",
+    findPlaceholder: "查找…", replacePlaceholder: "替换为…",
+    replaceOne: "替换", replaceAll: "全部替换",
+    replaceManyConfirm: "匹配超过 500 处，仍要全部替换吗？",
     appName: "MD 编辑器",
   },
   "zh-TW": {
@@ -66,6 +72,12 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     fontSizeTip: "字號：先框選文字，再選字號",
     selectFirstTip: "請先在編輯區框選要改字號的文字，再選字號",
     wordCount: "字",
+    focusMode: "🎯 專注", typewriter: "⌨ 打字機", findBtn: "🔍 尋找",
+    focusTip: "專注模式（F8）：淡化非當前段落", typewriterTip: "打字機模式（F9）：游標保持視線中部",
+    findTip: "尋找替換（Ctrl+F / Ctrl+H）",
+    findPlaceholder: "尋找…", replacePlaceholder: "替換為…",
+    replaceOne: "替換", replaceAll: "全部替換",
+    replaceManyConfirm: "符合超過 500 處，仍要全部替換嗎？",
     appName: "MD 編輯器",
   },
   "en": {
@@ -87,6 +99,12 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     fontSizeTip: "Font size: select text first, then pick a size",
     selectFirstTip: "Select the text in the editor first, then pick a size",
     wordCount: "words",
+    focusMode: "🎯 Focus", typewriter: "⌨ Typewriter", findBtn: "🔍 Find",
+    focusTip: "Focus mode (F8): dim other paragraphs", typewriterTip: "Typewriter mode (F9): keep caret mid-screen",
+    findTip: "Find & replace (Ctrl+F / Ctrl+H)",
+    findPlaceholder: "Find…", replacePlaceholder: "Replace with…",
+    replaceOne: "Replace", replaceAll: "Replace all",
+    replaceManyConfirm: "More than 500 matches. Replace all anyway?",
     appName: "MD Editor",
   },
 };
@@ -551,6 +569,7 @@ async function closeDoc(id: string) {
 
 function openDoc(path: string | null, content: string, name?: string, encoding?: string) {
   hideEmptyState(); // 打开文档时隐藏空状态
+  closeFind(); // 文档切换后旧匹配节点失效，收起查找条
   // 同路径已打开 → 直接切换过去，不重复开
   if (path) {
     const existing = docs.find((d) => d.path === path);
@@ -685,6 +704,7 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
     },
     after: () => {
       fixToolbarTooltipDirection();
+      closeFind(); // 模式/语言切换销毁重建：旧匹配节点全部失效
       if (!vditorInited) {
         // 首次初始化：打开欢迎文档、处理命令行传入的文件
         vditorInited = true;
@@ -788,6 +808,13 @@ function applyAllText() {
   document.getElementById("btn-open")!.textContent = t("open");
   document.getElementById("btn-save")!.textContent = t("save");
   document.getElementById("btn-export")!.textContent = t("export");
+  const bfw = document.getElementById("btn-focus-mode"); if (bfw) { bfw.textContent = t("focusMode"); bfw.title = t("focusTip"); }
+  const btw = document.getElementById("btn-typewriter"); if (btw) { btw.textContent = t("typewriter"); btw.title = t("typewriterTip"); }
+  const bfd = document.getElementById("btn-find"); if (bfd) { bfd.textContent = t("findBtn"); bfd.title = t("findTip"); }
+  const fi = document.getElementById("find-input") as HTMLInputElement | null; if (fi) fi.placeholder = t("findPlaceholder");
+  const ri = document.getElementById("replace-input") as HTMLInputElement | null; if (ri) ri.placeholder = t("replacePlaceholder");
+  const ro = document.getElementById("replace-one"); if (ro) ro.textContent = t("replaceOne");
+  const ra = document.getElementById("replace-all"); if (ra) ra.textContent = t("replaceAll");
   const pt = document.getElementById("panel-title"); if (pt) pt.textContent = t("panelTitle");
   const eh = document.getElementById("empty-hint"); if (eh) eh.textContent = t("emptyHint");
   const cmsg = document.getElementById("cc-msg"); if (cmsg) cmsg.textContent = t("closeSaveMsg");
@@ -965,6 +992,309 @@ async function saveAllDirty() {
   for (const doc of docs) {
     if (doc.dirty) await saveDoc(doc);
   }
+}
+
+// ---- 自动保存（第二批）：仅对 dirty 且已有路径的文档静默落盘 ----
+// 未命名文档跳过（无落点）；失败静默但 dirty 保留（标题 * 不消失=可感知未存成），周期 30s + 窗口失焦即存
+const AUTOSAVE_INTERVAL_MS = 30_000;
+let autosaveTimer: number | undefined;
+async function autosaveDirty(): Promise<void> {
+  if (!vditor) return;
+  for (const doc of docs) {
+    if (!doc.dirty || !doc.path) continue;
+    if (activeDoc()?.id === doc.id) {
+      const v = vditor.getValue();
+      if (v !== "" || doc.content === "") doc.content = v; // 守卫：空值不覆盖（同 saveDoc）
+    }
+    if (doc.content === "") continue;
+    try {
+      await invoke("save_file", { path: doc.path, content: doc.content });
+      doc.dirty = false;
+      doc.encoding = "UTF-8"; // 统一写 UTF-8 无 BOM（同手动保存）
+      if (activeDoc()?.id === doc.id) { updateTitle(); renderTabs(); }
+    } catch { /* 静默失败：dirty 保留，下轮重试 */ }
+  }
+}
+function startAutosave() {
+  if (autosaveTimer !== undefined) return;
+  autosaveTimer = window.setInterval(() => { void autosaveDirty(); }, AUTOSAVE_INTERVAL_MS);
+  window.addEventListener("blur", () => { window.setTimeout(() => { void autosaveDirty(); }, 200); });
+}
+
+// ---- 专注模式 + 打字机模式（第二批，Typora 对位 F8/F9）----
+const FOCUS_KEY = "md-editor-focus-mode";
+const TYPEWRITER_KEY = "md-editor-typewriter";
+let focusModeOn = false;
+let typewriterOn = false;
+
+// 编辑区滚动容器：从 .vditor-wysiwyg/.vditor-ir 向上找第一个可滚动祖先（Vditor 结构不保证层级，运行时探测）
+function editorScrollEl(): HTMLElement | null {
+  const root = document.querySelector(".vditor-wysiwyg, .vditor-ir") as HTMLElement | null;
+  let el: HTMLElement | null = root;
+  while (el) {
+    const st = getComputedStyle(el);
+    if (/(auto|scroll)/.test(st.overflowY) && el.scrollHeight > el.clientHeight) return el;
+    el = el.parentElement;
+  }
+  return null;
+}
+
+// 专注模式：光标所在顶层块（编辑区根的直接子元素）标 .fw-current，CSS 淡化其余
+function markCurrentBlock() {
+  const root = document.querySelector(".vditor-wysiwyg pre.vditor-reset, .vditor-ir pre.vditor-reset");
+  if (!root) return;
+  const sel = getSelection();
+  let blk: Element | null = null;
+  if (sel && sel.focusNode) {
+    let n: Node | null = sel.focusNode;
+    while (n && n !== root) {
+      if (n.parentElement === root) { blk = n instanceof Element ? n : n.parentElement; break; }
+      n = n.parentElement;
+    }
+  }
+  root.querySelectorAll(":scope > .fw-current").forEach((e) => e.classList.remove("fw-current"));
+  if (blk) blk.classList.add("fw-current");
+}
+
+// 打字机模式：光标偏离视口中带较远时滚动补偿（幅度小于 1/4 视高不滚，避免每次微调跳动）
+function typewriterScroll() {
+  const sel = getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  const r = sel.getRangeAt(0).getBoundingClientRect();
+  if (r.width === 0 && r.height === 0) return; // 无可视光标（如焦点在输入框）
+  const sc = editorScrollEl();
+  if (!sc) return;
+  const cur = r.top - sc.getBoundingClientRect().top;
+  const target = sc.clientHeight * 0.4;
+  const delta = cur - target;
+  if (Math.abs(delta) > sc.clientHeight * 0.25) sc.scrollTop += delta;
+}
+
+function setFocusMode(on: boolean) {
+  focusModeOn = on;
+  document.body.classList.toggle("focus-mode", on);
+  try { localStorage.setItem(FOCUS_KEY, on ? "1" : "0"); } catch { /* 存储禁用，仅本次会话生效 */ }
+  document.getElementById("btn-focus-mode")?.classList.toggle("active", on);
+  if (on) markCurrentBlock();
+  else document.querySelectorAll(".fw-current").forEach((e) => e.classList.remove("fw-current"));
+}
+
+function setTypewriter(on: boolean) {
+  typewriterOn = on;
+  try { localStorage.setItem(TYPEWRITER_KEY, on ? "1" : "0"); } catch { /* 同上 */ }
+  document.getElementById("btn-typewriter")?.classList.toggle("active", on);
+}
+
+// selectionchange 防抖驱动（仅模式开启时干活）
+let fwSelDebounce: number | undefined;
+function bindFocusTypewriter() {
+  document.addEventListener("selectionchange", () => {
+    if (!focusModeOn && !typewriterOn) return;
+    window.clearTimeout(fwSelDebounce);
+    fwSelDebounce = window.setTimeout(() => {
+      if (focusModeOn) markCurrentBlock();
+      if (typewriterOn) typewriterScroll();
+    }, 120);
+  });
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "F8") { e.preventDefault(); setFocusMode(!focusModeOn); }
+    else if (e.key === "F9") { e.preventDefault(); setTypewriter(!typewriterOn); }
+  });
+  document.getElementById("btn-focus-mode")?.addEventListener("click", () => setFocusMode(!focusModeOn));
+  document.getElementById("btn-typewriter")?.addEventListener("click", () => setTypewriter(!typewriterOn));
+}
+
+// ---- 查找替换（第二批）：overlay 高亮层方案 ----
+// 高亮画在 fixed 覆盖层（不进 contenteditable DOM → 不污染 md 源码/undo 栈）；
+// 替换单个走 execCommand（键入管线，undo 完整）；全部替换走源码级（快照节点会被 Vditor 重渲染失效，源码级绝对可靠）
+interface FindMatch { node: Text; start: number; end: number; }
+let findMatches: FindMatch[] = [];
+let findIndex = -1;
+
+function scanMatches(query: string): FindMatch[] {
+  const out: FindMatch[] = [];
+  const root = document.querySelector(".vditor-wysiwyg pre.vditor-reset, .vditor-ir pre.vditor-reset");
+  if (!root || !query) return out;
+  const q = query.toLowerCase();
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode: (n) => {
+      const p = n.parentElement;
+      // 1=FILTER_ACCEPT 2=FILTER_REJECT（TS lib 的 filter 类型缺 FILTER 常量表，用数值）
+      return (!p || p.closest(".vditor-hint, .vditor-panel")) ? 2 : 1; // 编辑器自身 UI 不搜
+    },
+  });
+  let n: Node | null;
+  while ((n = walker.nextNode())) {
+    const t = n as Text;
+    const hay = t.data.toLowerCase();
+    let i = hay.indexOf(q);
+    while (i !== -1) {
+      out.push({ node: t, start: i, end: i + q.length });
+      i = hay.indexOf(q, i + q.length);
+    }
+  }
+  return out;
+}
+
+function renderFindOverlay() {
+  const ov = document.getElementById("find-overlay");
+  const cnt = document.getElementById("find-count");
+  if (!ov) return;
+  ov.innerHTML = "";
+  findMatches.forEach((m, i) => {
+    try {
+      const r = document.createRange();
+      r.setStart(m.node, m.start); r.setEnd(m.node, m.end);
+      for (const rect of r.getClientRects()) {
+        const d = document.createElement("div");
+        d.className = "find-mark" + (i === findIndex ? " current" : "");
+        d.style.left = rect.left + "px";
+        d.style.top = rect.top + "px";
+        d.style.width = Math.max(rect.width, 4) + "px";
+        d.style.height = rect.height + "px";
+        ov.appendChild(d);
+      }
+    } catch { /* 节点已被 Vditor 重渲染移除：跳过该匹配 */ }
+  });
+  if (cnt) cnt.textContent = findMatches.length === 0 ? "0/0" : `${findIndex + 1}/${findMatches.length}`;
+}
+
+function gotoMatch(idx: number) {
+  if (findMatches.length === 0) { findIndex = -1; renderFindOverlay(); return; }
+  findIndex = ((idx % findMatches.length) + findMatches.length) % findMatches.length;
+  const m = findMatches[findIndex];
+  try {
+    const r = document.createRange();
+    r.setStart(m.node, m.start); r.setEnd(m.node, m.end);
+    const rect = r.getBoundingClientRect();
+    if (rect.top < 90 || rect.bottom > innerHeight - 60) m.node.parentElement?.scrollIntoView({ block: "center" });
+  } catch { /* 同上 */ }
+  renderFindOverlay();
+}
+
+function refreshFind(resetIndex: boolean) {
+  if (document.getElementById("find-bar")?.hidden) return;
+  const q = (document.getElementById("find-input") as HTMLInputElement).value;
+  findMatches = scanMatches(q);
+  if (resetIndex || findIndex >= findMatches.length) findIndex = findMatches.length > 0 ? 0 : -1;
+  renderFindOverlay();
+}
+
+function openFind(withReplace: boolean) {
+  const bar = document.getElementById("find-bar")!;
+  bar.hidden = false;
+  if (withReplace) document.getElementById("replace-row")!.hidden = false;
+  const inp = document.getElementById("find-input") as HTMLInputElement;
+  // 选区文本预填（≤200 字符），无选区保留上次关键词
+  const selText = getSelection()?.toString() ?? "";
+  if (selText && selText.length <= 200 && selText.includes("\n") === false) {
+    inp.value = selText;
+    refreshFind(true);
+  }
+  inp.focus();
+  inp.select();
+}
+
+function closeFind() {
+  const bar = document.getElementById("find-bar");
+  if (!bar || bar.hidden) return;
+  bar.hidden = true;
+  document.getElementById("replace-row")!.hidden = true;
+  findMatches = [];
+  findIndex = -1;
+  document.getElementById("find-overlay")!.innerHTML = "";
+  (document.querySelector(".vditor-wysiwyg pre.vditor-reset, .vditor-ir pre.vditor-reset") as HTMLElement | null)?.focus?.();
+}
+
+// 单个替换：DOM Range 选中 → execCommand 插入（走 Vditor 键入管线：内容/undo/大纲联动）
+function replaceCurrent() {
+  const m = findMatches[findIndex];
+  if (!m || !vditor) return;
+  const rep = (document.getElementById("replace-input") as HTMLInputElement).value;
+  try {
+    const r = document.createRange();
+    r.setStart(m.node, m.start); r.setEnd(m.node, m.end);
+    const sel = getSelection(); sel!.removeAllRanges(); sel!.addRange(r);
+    if (!document.execCommand("insertText", false, rep)) return;
+  } catch { return; }
+  refreshFind(false);
+}
+
+// 全部替换：源码级（getValue→字面替换→setValue）。
+// 不用 DOM 快照逐个替换：每次 execCommand 后 Vditor 重渲染会使快照节点失效（部分替换中断）。
+// 语义注记：单个替换作用于渲染文本，全部替换作用于 md 源码——含 md 标记的关键词在两路径下命中可能不同，可靠优先。
+function replaceAllMatches() {
+  if (!vditor) return;
+  const q = (document.getElementById("find-input") as HTMLInputElement).value;
+  if (!q) return;
+  const rep = (document.getElementById("replace-input") as HTMLInputElement).value;
+  const src = vditor.getValue();
+  const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+  const newSrc = src.replace(re, rep);
+  if (newSrc === src) return;
+  const doc = activeDoc();
+  if (doc) {
+    suppressInput = true;
+    vditor.setValue(newSrc, true);
+    suppressInput = false;
+    doc.content = newSrc;
+    doc.dirty = true;
+    scheduleOutline();
+    updateTitle();
+  }
+  refreshFind(true);
+}
+
+let findInputDebounce: number | undefined;
+function bindFindBar() {
+  const inp = document.getElementById("find-input") as HTMLInputElement;
+  inp.addEventListener("input", () => {
+    window.clearTimeout(findInputDebounce);
+    findInputDebounce = window.setTimeout(() => refreshFind(true), 250);
+  });
+  inp.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); gotoMatch(e.shiftKey ? findIndex - 1 : findIndex + 1); }
+    else if (e.key === "Escape") { e.preventDefault(); closeFind(); }
+  });
+  document.getElementById("find-next")!.addEventListener("click", () => gotoMatch(findIndex + 1));
+  document.getElementById("find-prev")!.addEventListener("click", () => gotoMatch(findIndex - 1));
+  document.getElementById("find-close")!.addEventListener("click", closeFind);
+  document.getElementById("find-toggle-replace")!.addEventListener("click", () => {
+    const row = document.getElementById("replace-row")!;
+    row.hidden = !row.hidden;
+    if (!row.hidden) (document.getElementById("replace-input") as HTMLInputElement).focus();
+  });
+  document.getElementById("replace-one")!.addEventListener("click", replaceCurrent);
+  document.getElementById("replace-all")!.addEventListener("click", () => {
+    if (findMatches.length > 500 && !confirm(t("replaceManyConfirm"))) return;
+    replaceAllMatches();
+  });
+  (document.getElementById("replace-input") as HTMLInputElement).addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { e.preventDefault(); closeFind(); }
+  });
+  document.getElementById("btn-find")!.addEventListener("click", () => openFind(false));
+  // Ctrl+F / Ctrl+H（WebView2 无原生查找 UI，无冲突）
+  window.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "f" || e.key === "F")) {
+      e.preventDefault(); openFind(false);
+    } else if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "h" || e.key === "H")) {
+      e.preventDefault(); openFind(true);
+    }
+  });
+  // 编辑内容变化 → 高亮同步（document input 捕获 contenteditable 键入，避免动 vditor 共用 input 回调链）
+  document.addEventListener("input", () => {
+    if (document.getElementById("find-bar")?.hidden) return;
+    window.clearTimeout(findInputDebounce);
+    findInputDebounce = window.setTimeout(() => refreshFind(false), 400);
+  });
+  // 滚动 → 重绘高亮（Range 跟随 DOM，rect 视口坐标需重取）
+  let findScrollRaf = false;
+  document.addEventListener("scroll", () => {
+    if (document.getElementById("find-bar")?.hidden || findScrollRaf) return;
+    findScrollRaf = true;
+    requestAnimationFrame(() => { findScrollRaf = false; renderFindOverlay(); });
+  }, true);
+  window.addEventListener("resize", () => { if (!document.getElementById("find-bar")?.hidden) renderFindOverlay(); });
 }
 
 // 把相对图片 src 解析为绝对 file:// 路径：Rust 端把完整 HTML 写临时文件交 msedge 渲染，
@@ -1346,6 +1676,15 @@ async function boot() {
       exportPdf();
     }
   });
+
+  startAutosave();
+  bindFocusTypewriter();
+  bindFindBar();
+  // 恢复上次会话的专注/打字机状态
+  try {
+    if (localStorage.getItem(FOCUS_KEY) === "1") setFocusMode(true);
+    if (localStorage.getItem(TYPEWRITER_KEY) === "1") setTypewriter(true);
+  } catch { /* 存储禁用 */ }
 }
 
 window.addEventListener("DOMContentLoaded", boot);

@@ -106,3 +106,31 @@ body { display: flex; flex-direction: column; overflow: hidden; }
   position: absolute; right: 12px; bottom: 8px; z-index: 19;
   font-size: 12px; color: #999; opacity: 0.7; pointer-events: none;
 }
+/* 工具栏按钮激活态（专注/打字机开关） */
+#toolbar button.active { background: #dbe6ff; border-color: #4470e0; }
+/* 专注模式：当前块之外的顶层块淡化（F8） */
+body.focus-mode .vditor-reset > :not(.fw-current) { opacity: 0.22; transition: opacity 0.25s; }
+body.focus-mode .vditor-reset > .fw-current { opacity: 1; }
+/* 查找替换浮条（编辑区右上角） */
+#find-bar {
+  position: absolute; top: 6px; right: 14px; z-index: 400;
+  background: #fff; border: 1px solid #ccc; border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.15); padding: 6px 8px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.find-row { display: flex; align-items: center; gap: 5px; }
+#find-input, #replace-input {
+  width: 200px; padding: 3px 8px; font-size: 13px;
+  border: 1px solid #ccc; border-radius: 4px;
+}
+#find-input:focus, #replace-input:focus { outline: none; border-color: #4470e0; }
+.find-count { font-size: 12px; color: #888; min-width: 38px; text-align: center; }
+.find-row button {
+  padding: 2px 8px; cursor: pointer; font-size: 12px;
+  border: 1px solid #ccc; background: #f6f6f6; border-radius: 4px;
+}
+.find-row button:hover { background: #e8eefc; }
+/* 查找高亮层：fixed 视口坐标（Range 的 getClientRects 即视口系），不进 contenteditable DOM */
+#find-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 300; }
+.find-mark { position: fixed; background: rgba(255, 213, 0, 0.35); border-radius: 2px; }
+.find-mark.current { background: rgba(255, 140, 0, 0.5); outline: 1px solid #e80; }
