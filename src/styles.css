@@ -95,6 +95,10 @@ body { display: flex; flex-direction: column; overflow: hidden; }
    （options.outline.position 已设 "right" 仍残留 188+5px 旧计算）。我们用自建左侧大纲面板，
    Vditor outline 永不启用，!important 压掉内联值（作者 !important > 内联非 important） */
 #editor .vditor-toolbar { padding-left: 5px !important; }
+/* 正文与顶格工具条对齐：Vditor 默认 .vditor-reset 左右 padding 35px，工具栏顶格后它成了
+   左侧一列孤立空白（用户报"左边一列空白要干啥"）。⚠ Vditor JS 会给元素写内联
+   padding:10px 35px（与 toolbar 的 193px 同族动态逻辑），普通选择器打不过内联——必须 !important */
+#editor .vditor-reset { padding-left: 8px !important; padding-right: 8px !important; }
 
 /* 关闭确认对话框（保存并关闭 / 不保存关闭 / 取消）—— z-index 必须高于 Vditor 浮层(1000005) */
 .modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 2147483647 !important; }
