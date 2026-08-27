@@ -683,6 +683,10 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
     },
     // :emoji: 补全的表情图片走本地资源（默认 unpkg CDN，CSP 禁外联且离线不可用）
     hint: { emojiPath: "/vditor-assets/dist/images/emoji" },
+    // 大纲用自建左侧面板，Vditor 内置 outline 不启用；position 必须给 "right"——
+    // Vditor 工具栏 padding-left 计算式只看 position=="left" 就加上 outline 宽(188px)，
+    // enable=false 也照加，表现为格式工具条左侧一大段空白（用户报"顶格才好看"的根因）
+    outline: { enable: false, position: "right" },
     preview: {
       hljs: { lineNumber: true, style: "github" },
       // 数学公式 KaTeX（引擎资源已本地化；inlineDigit 允许行内 $ 后跟数字，兼容中文排版场景）
@@ -785,9 +789,12 @@ function switchMode(mode: "ir" | "wysiwyg") {
     if (v !== "" || cur.content === "") cur.content = v;
   }
   currentMode = mode;
+  // destroy 会清掉挂载点内联样式（含 --doc-zoom）：先存后恢复，否则切模式后显示比例静默回 100%
+  const savedZoom = document.getElementById("editor")?.style.getPropertyValue("--doc-zoom") || "";
   vditor.destroy();
   vditor = null;
   vditor = new Vditor("editor", vditorOptions(mode));
+  if (savedZoom) document.getElementById("editor")?.style.setProperty("--doc-zoom", savedZoom);
   updateModeUI(); // after 回调就绪后还会再更新一次
 }
 
@@ -863,9 +870,13 @@ function setLang(lang: Lang) {
       // 欢迎页(无 path)随语言切换更新欢迎内容；用户文档(有 path)保留原内容不动
       if (!cur.path) { cur.content = welcomeMd(); cur.name = t("welcomeName"); cur.dirty = false; }
     }
+    // 同 switchMode：语言切换重建也须保住 --doc-zoom（用户报"切繁体后正文变大"的真因——
+    // 字号没变，是 80% 显示比例被 destroy 清掉、视觉回到 100%）
+    const savedZoom = document.getElementById("editor")?.style.getPropertyValue("--doc-zoom") || "";
     vditor.destroy();
     vditor = null;
     vditor = new Vditor("editor", vditorOptions(currentMode));
+    if (savedZoom) document.getElementById("editor")?.style.setProperty("--doc-zoom", savedZoom);
   }
 }
 
