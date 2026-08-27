@@ -102,6 +102,10 @@ npm run tauri build -- --no-bundle
 开发模式：`npm run tauri dev`
 
 > 打包必须用 `tauri build`（不要用 `cargo build --release`，否则 exe 会连 localhost dev server）。
+> **v0.3.3 起静态 CRT 构建法**（tauri-cli 调 cargo 会绕过 rustflags 配置且 target 缓存混合时会静默回退动态链接）：
+> `npm run build` 之后 `cd src-tauri && cargo build --release --bins --features tauri/custom-protocol`
+> （`custom-protocol` 是 dist 嵌入开关，漏掉它 exe 就连 devUrl；改 rustflags 后必须 `cargo clean`）。
+> 交付前用 PE 导入表验证：无 `vcruntime140/msvcp/api-ms-win-crt-*` 依赖。
 > 国内 Rust 依赖拉取慢，建议配 [rsproxy](https://rsproxy.cn) 镜像（`~/.cargo/config.toml`）。
 
 ### 🧱 技术栈
@@ -109,6 +113,21 @@ npm run tauri build -- --no-bundle
 - [Tauri 2](https://tauri.app/) — Rust 后端 + WebView2 前端
 - [Vditor](https://github.com/Vanessa219/vditor) 3.11 — Markdown 编辑器内核
 - TypeScript + Vite
+
+### 📦 依赖与分发（v0.3.3 起）
+
+**exe 已自含**：C/VC++ 运行库（`+crt-static` 静态链接，不依赖 vcruntime140/UCRT DLL）、
+WebView2 Loader、前端全部 JS/CSS 资源。
+
+**依赖系统（无法融入 exe 的边界）**：
+
+| 组件 | 缺失后果 | 说明 |
+|---|---|---|
+| WebView2 Runtime | 启动弹中文指引（v0.3.3 预检） | Win10 1803+/Win11 自带；[离线包下载](https://developer.microsoft.com/microsoft-edge/webview2/) |
+| Microsoft Edge | 仅 PDF 导出不可用（有报错提示） | Win10/11 必带 |
+| pandoc.exe（可选） | 仅 EPUB/LaTeX/RTF 置灰 | 放 md-editor.exe 同目录即解锁，[便携版下载](https://pandoc.org/installing.html) |
+
+**分发给他人**：把 `md-editor.exe + pandoc.exe（如需三格式）` 打成一个 zip 拷走即可，免安装、免 VC++ 运行库。
 
 ### 📄 协议
 

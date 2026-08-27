@@ -2214,6 +2214,15 @@ async function boot() {
     }
   });
 
+  // Ctrl+S 保存（编辑器标配；此前只有保存按钮+30s 自动保存，真实用户测试发现的缺口）
+  window.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "s" || e.key === "S")) {
+      e.preventDefault();
+      const doc = activeDoc();
+      if (doc) void saveDoc(doc);
+    }
+  });
+
   startAutosave();
   bindFocusTypewriter();
   bindFindBar();

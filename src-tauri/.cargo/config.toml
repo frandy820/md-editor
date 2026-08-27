@@ -1,0 +1,5 @@
+# 静态链接 C 运行库（UCRT/CRT）：消除 api-ms-win-crt-*.dll 外部依赖，
+# 精简系统/Win7 用户机缺 UCRT 时 exe 照样能跑（前车之鉴：明算工具缺 VC++ DLL 用户机起不来）。
+# 代价：exe 体积略增；换来单文件自含。
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

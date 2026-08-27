@@ -680,8 +680,65 @@ fn pandoc_export(pandoc: String, md: String, out_path: String, fmt: String, doc_
     Ok(())
 }
 
+/// WebView2 Runtime 缺失检测：任一注册表位置有 pv 值即视为已装。
+/// WEBVIEW2_BROWSER_EXECUTABLE_FOLDER 显式指定固定版本时跳过（企业离线分发场景）。
+fn webview2_missing() -> bool {
+    if std::env::var_os("WEBVIEW2_BROWSER_EXECUTABLE_FOLDER").is_some() {
+        return false;
+    }
+    const KEY: &str = r"Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}";
+    for hive in ["HKLM", "HKCU"] {
+        for sub in [format!(r"SOFTWARE\WOW6432Node\{KEY}"), format!(r"SOFTWARE\{KEY}")] {
+            let mut cmd = Command::new("reg");
+            cmd.args(["query", &format!(r"{hive}\{sub}"), "/v", "pv"]);
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+                cmd.creation_flags(CREATE_NO_WINDOW);
+            }
+            if let Ok(o) = cmd.output() {
+                if o.status.success() {
+                    return false;
+                }
+            }
+        }
+    }
+    true
+}
+
+// 零依赖弹窗（不依赖 WebView2，user32 直调）：缺失 WebView2 时给用户可读指引，
+// 替代"双击无反应/白屏"的不可诊断失败。
+#[cfg(windows)]
+#[link(name = "user32")]
+extern "system" {
+    fn MessageBoxW(hwnd: isize, text: *const u16, caption: *const u16, utype: u32) -> i32;
+}
+
+#[cfg(windows)]
+fn fatal_msgbox(text: &str, caption: &str) {
+    let t: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+    let c: Vec<u16> = caption.encode_utf16().chain(std::iter::once(0)).collect();
+    unsafe { MessageBoxW(0, t.as_ptr(), c.as_ptr(), 0x10); } // MB_ICONERROR
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // 启动预检：WebView2 Runtime 缺失（极老/精简系统）时 Tauri 会静默失败或白屏，
+    // 先给出可读指引再退出（明算工具缺 VC++ DLL 用户机起不来的同类教训）。
+    #[cfg(windows)]
+    {
+        if webview2_missing() {
+            fatal_msgbox(
+                "缺少 Microsoft WebView2 运行库（Windows 10/11 一般自带）。\n\n\
+                 请安装 WebView2 Runtime 后重试：\n\
+                 https://developer.microsoft.com/microsoft-edge/webview2/\n\
+                 （选 Evergreen Standalone 离线包；内网机器可在有网机器下载后拷入安装）",
+                "无法启动 MD 编辑器",
+            );
+            std::process::exit(1);
+        }
+    }
     // --self-test-pdf <out.pdf>：无 GUI 端到端验证 msedge 管线（部署机预检 / 自动化测试）
     // 命中即用固定 HTML 走完整 export_pdf 管线后退出，不启动 GUI。
     let args_vec: Vec<String> = std::env::args().collect();
