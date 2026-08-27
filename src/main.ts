@@ -8,6 +8,8 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import Vditor from "vditor";
 import "vditor/dist/index.css";
 import vditorCssText from "vditor/dist/index.css?raw";
+// 导出侧公式排版（KaTeX HTML 输出需要；与 Vditor 编辑器同源同版本，构建期内联）
+import katexCssText from "vditor/dist/js/katex/katex.min.css?raw";
 // 本地中文 i18n（从 vditor zh_CN.js 转成 ESM 值导入）：作为 options.i18n 注入，
 // Vditor 走 else 分支直接使用，不再从 unpkg CDN 动态加载 zh_CN.js（国内 404），且符合 CSP
 import zhCNI18n from "./i18n-zh-CN";
@@ -41,7 +43,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     modeWYSIWYGTip: "当前：所见即所得模式（可直接编辑表格）", modeIRTip: "当前：即时渲染模式",
     switchToIRTip: "切回即时渲染模式（Ctrl+Alt+M）", switchToWYSIWYGTip: "切到所见即所得模式以编辑表格（Ctrl+Alt+M）",
     panelTitle: "大纲 · 点击定位 · ✕删除 · 拖动重排",
-    export: "💾 导出 ▾", exportNoDoc: "（请先打开或新建文档再导出）", exportFail: "导出失败：", exporting: "正在导出 PDF，请稍候…",
+    export: "💾 导出 ▾", exportNoDoc: "（请先打开或新建文档再导出）", exportEmptyConfirm: "文档内容为空，仍要导出吗？", exportFail: "导出失败：", exporting: "正在导出 PDF，请稍候…",
     exportDone: "导出完成：",
     exportImageSlices: "文档较长，已分片导出多张 PNG：", pasteImgUntitledHint: "（提示：文档尚未保存，截图存到了应用目录，保存文档后建议用「另存为」整理）",
     exportStagePage: "正在生成页面…", exportStagePrint: "正在打印为 PDF…", exportStageSave: "正在保存文件…",
@@ -70,7 +72,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     modeWYSIWYGTip: "當前：所見即所得模式（可直接編輯表格）", modeIRTip: "當前：即時渲染模式",
     switchToIRTip: "切回即時渲染模式（Ctrl+Alt+M）", switchToWYSIWYGTip: "切到所見即所得模式以編輯表格（Ctrl+Alt+M）",
     panelTitle: "大綱 · 點擊定位 · ✕刪除 · 拖曳重排",
-    export: "💾 匯出 ▾", exportNoDoc: "（請先開啟或新增文件再匯出）", exportFail: "匯出失敗：", exporting: "正在匯出 PDF，請稍候…",
+    export: "💾 匯出 ▾", exportNoDoc: "（請先開啟或新增文件再匯出）", exportEmptyConfirm: "文件內容為空，仍要匯出嗎？", exportFail: "匯出失敗：", exporting: "正在匯出 PDF，請稍候…",
     exportDone: "匯出完成：",
     exportImageSlices: "文件較長，已分片匯出多張 PNG：", pasteImgUntitledHint: "（提示：文件尚未儲存，截圖存到了應用目錄，儲存文件後建議整理）",
     exportStagePage: "正在產生頁面…", exportStagePrint: "正在列印為 PDF…", exportStageSave: "正在儲存檔案…",
@@ -99,7 +101,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     modeWYSIWYGTip: "Current: WYSIWYG mode (visual table editing)", modeIRTip: "Current: Markdown (IR) mode",
     switchToIRTip: "Switch to Markdown (IR) (Ctrl+Alt+M)", switchToWYSIWYGTip: "Switch to WYSIWYG to edit tables (Ctrl+Alt+M)",
     panelTitle: "Outline · click to navigate · ✕ delete · drag to reorder",
-    export: "💾 Export ▾", exportNoDoc: "(Open or create a document first)", exportFail: "Export failed: ", exporting: "Exporting PDF, please wait…",
+    export: "💾 Export ▾", exportNoDoc: "(Open or create a document first)", exportEmptyConfirm: "The document is empty. Export anyway?", exportFail: "Export failed: ", exporting: "Exporting PDF, please wait…",
     exportDone: "Exported: ",
     exportImageSlices: "Long document, exported as multiple PNG slices: ", pasteImgUntitledHint: "(Tip: document not saved yet; screenshot stored in app folder)",
     exportStagePage: "Generating pages…", exportStagePrint: "Printing to PDF…", exportStageSave: "Saving file…",
@@ -1389,6 +1391,10 @@ function resolveImageSources(fragment: HTMLElement, docPath: string | null) {
 // 内联整份 Vditor CSS（构建期 ?raw 编为字符串常量），保证导出渲染规则（.vditor-reset/代码高亮/表格/引用）
 // 与编辑区一致；@page 控制纸张 A4 与页边距；打印样式防分页断裂与图片缩放。
 // 该 HTML 由独立 msedge 进程从 file:// 加载，不经过 Tauri webview，应用 CSP（script-src 'self'）不适用。
+// v0.3.8 修正：katex css 的 @font-face 以相对路径引 fonts/*.woff2，临时 html 里必 404，
+// Chromium print-to-pdf 等 document.fonts.ready 直接挂死（D1 后 overlay 永不消失挡住一切输入的根因）——
+// 构建期剥掉字体声明，公式字形回退系统字体（上下标等排版结构由 css 类控制不受影响），导出物零外链资源。
+const katexCssNoFonts = katexCssText.replace(/@font-face\s*\{[^}]*\}/g, "");
 function wrapExportHtml(fragmentHtml: string): string {
   const langAttr = currentLang === "en" ? "en" : currentLang === "zh-TW" ? "zh-TW" : "zh-CN";
   return `<!DOCTYPE html>
@@ -1397,6 +1403,7 @@ function wrapExportHtml(fragmentHtml: string): string {
 <meta charset="UTF-8">
 <style>
 ${vditorCssText}
+${katexCssNoFonts}
 @page { size: A4; margin: 15mm; }
 html, body {
   margin: 0; padding: 0; background: #fff; color: #000;
@@ -1460,8 +1467,66 @@ function resolvePreviewImages(html: string): string {
   });
 }
 
-/** 导出片段（与 PDF 同管线：getHTML + 相对图片解析），失败返回 null */
-function exportFragment(): string | null {
+/** 本地脚本按需加载（/vditor-assets 同源，符合 CSP；去重缓存）。导出渲染 math/mermaid 用 */
+const _loadedScripts = new Map<string, Promise<void>>();
+function loadLocalScript(src: string): Promise<void> {
+  let p = _loadedScripts.get(src);
+  if (!p) {
+    p = new Promise((res, rej) => {
+      const s = document.createElement("script");
+      s.src = src; s.onload = () => res(); s.onerror = () => rej(new Error("load " + src));
+      document.head.appendChild(s);
+    });
+    _loadedScripts.set(src, p);
+  }
+  return p;
+}
+
+/** v0.3.8（P1#1 修复）：导出片段内 math/mermaid 块就地渲染。
+ * 背景：getHTML 对 $$..$$/```mermaid 块保留源码语义（<div class="language-math">tex</div>），
+ * 导出的 HTML/PDF/PNG 里公式是纯文本、图表是代码块——编辑器里正常、交付物里丢了。
+ * 这里在导出前把块渲染掉：math 走 KaTeX（与 Vditor 同源本地库），mermaid 走 mermaid.render。
+ * mathOutput: "html"=HTML+MathML 双输出（带样式档/PDF/PNG，katex css 已入导出模板）；
+ *             "mathml"=纯 MathML（纯净档无 CSS，浏览器原生渲染零依赖）。
+ * 任一环节失败降级保源文本，不阻断导出。 */
+async function renderSpecialBlocks(root: HTMLElement, mathOutput: "html" | "mathml"): Promise<void> {
+  const maths = [...root.querySelectorAll<HTMLElement>(".language-math")];
+  if (maths.length) {
+    try {
+      await loadLocalScript("/vditor-assets/dist/js/katex/katex.min.js");
+      const katex = (window as unknown as { katex?: { render: (tex: string, el: HTMLElement, o: object) => void } }).katex;
+      if (katex) {
+        for (const el of maths) {
+          const tex = (el.textContent || "").trim();
+          if (!tex) continue;
+          const out = document.createElement("div");
+          out.className = "export-math";
+          try { katex.render(tex, out, { displayMode: true, throwOnError: false, output: mathOutput }); el.replaceWith(out); }
+          catch { /* 单块语法错保源文本 */ }
+        }
+      }
+    } catch { /* 库加载失败保源文本（降级不阻断导出） */ }
+  }
+  const mms = [...root.querySelectorAll<HTMLElement>(".language-mermaid")];
+  if (mms.length) {
+    try {
+      await loadLocalScript("/vditor-assets/dist/js/mermaid/mermaid.min.js");
+      const mermaid = (window as unknown as { mermaid?: { initialize: (o: object) => void; render: (id: string, code: string) => Promise<{ svg: string }> } }).mermaid;
+      if (mermaid) {
+        mermaid.initialize({ startOnLoad: false, securityLevel: "loose" });
+        for (let i = 0; i < mms.length; i++) {
+          const code = (mms[i].textContent || "").trim();
+          if (!code) continue;
+          try { const { svg } = await mermaid.render("export-mm-" + Date.now() + "-" + i, code); mms[i].innerHTML = svg; }
+          catch { /* 单图渲染错保源码 */ }
+        }
+      }
+    } catch { /* 同上 */ }
+  }
+}
+
+/** 导出片段（HTML 两档/PNG/PDF 公共管线：getHTML + 相对图片解析 + math/mermaid 渲染），失败返回 null */
+async function exportFragment(mathOutput: "html" | "mathml" = "html"): Promise<string | null> {
   const doc = activeDoc();
   if (!doc || !vditor) { alert(t("exportNoDoc")); return null; }
   let fragmentHtml = "";
@@ -1470,6 +1535,7 @@ function exportFragment(): string | null {
   const tmp = document.createElement("div");
   tmp.innerHTML = fragmentHtml;
   resolveImageSources(tmp, doc.path);
+  await renderSpecialBlocks(tmp, mathOutput);
   return tmp.innerHTML;
 }
 
@@ -1488,9 +1554,9 @@ async function pickExportPath(ext: string, filterName: string): Promise<string |
   return sp ? (sp as string) : null;
 }
 
-/** HTML 导出：带样式档=完整排版（与 PDF 同模板）；纯净档=裸 fragment 无 CSS */
+/** HTML 导出：带样式档=完整排版（与 PDF 同模板）；纯净档=裸 fragment 无 CSS（公式用 MathML 零依赖渲染） */
 async function exportHtml(styled: boolean): Promise<void> {
-  const frag = exportFragment();
+  const frag = await exportFragment(styled ? "html" : "mathml");
   if (!frag) return;
   const path = await pickExportPath(".html", "HTML");
   if (!path) return;
@@ -1505,7 +1571,7 @@ async function exportHtml(styled: boolean): Promise<void> {
 
 /** 图片长图：离屏容器渲染 → html2canvas → PNG。超 canvas 上限自动分片（Typora 官方做不到的差异化点） */
 async function exportImagePng(): Promise<void> {
-  const frag = exportFragment();
+  const frag = await exportFragment("html");
   if (!frag) return;
   const path = await pickExportPath(".png", "PNG");
   if (!path) return;
@@ -1627,8 +1693,13 @@ async function exportDocx(): Promise<void> {
       for (const c of tk.children) {
         if (c.type !== "image") continue;
         const src = String(c.attrGet("src") || "").split("?")[0];
-        if (!src || /^(https?:|asset:|data:)/i.test(src) || imgCache.has(src)) continue;
-        const abs = /^[a-zA-Z]:[\\/]/.test(src) ? src : (docDir ? docDir + "/" + src : "");
+        // v0.3.8（P1#3 修复）：markdown-it 的 normalizeLink 会把非 ASCII 的 src URL 编码
+        // （assets/截图_x.png → assets/%E6%88%AA...），磁盘上是中文名 → fs 找不到 → 降级占位丢图。
+        // 拼路径前先解码还原原名（编码态与原名都可能出现在 src 里，decode 失败保原样）。
+        let srcDec = src;
+        try { if (/%[0-9a-f]{2}/i.test(src)) srcDec = decodeURIComponent(src); } catch { srcDec = src; }
+        if (!src || /^(https?:|asset:|data:)/i.test(srcDec) || imgCache.has(src)) continue;
+        const abs = /^[a-zA-Z]:[\\/]/.test(srcDec) ? srcDec : (docDir ? docDir + "/" + srcDec : "");
         if (!abs) continue;
         try {
           const b64 = await invoke<string>("read_binary_file", { path: abs.replace(/\//g, "\\") });
@@ -1843,6 +1914,10 @@ function bindExportMenu(): void {
     const item = target.closest("button[data-export]") as HTMLButtonElement | null;
     if (!item || item.disabled) return;
     menu.hidden = true;
+    // v0.3.8（P2 修复）：空文档导出前确认——原行为静默产出空白 PDF，用户可能误发空文件。
+    // 欢迎文档/清空未写状态都是空；确认后才继续（e2e dialog handler accept 同样覆盖）。
+    const curVal = vditor?.getValue()?.trim();
+    if (!curVal && !confirm(t("exportEmptyConfirm"))) return;
     const kind = item.dataset.export;
     if (kind === "pdf") exportPdf();
     else if (kind === "html") exportHtml(true);
@@ -1872,16 +1947,10 @@ async function exportPdf() {
   const v = vditor.getValue();
   if (v !== "" || doc.content === "") doc.content = v;
 
-  // 取渲染后 HTML 片段（getHTML 在某些异常态可能抛错，try/catch 兜底）
-  let fragmentHtml = "";
-  try { fragmentHtml = vditor.getHTML(); } catch (e) { alert(t("exportFail") + e); return; }
-  if (!fragmentHtml) { alert(t("exportNoDoc")); return; }
-
-  // 在临时容器里解析片段为 DOM，解析相对图片后再序列化回 HTML 字符串
-  const tmp = document.createElement("div");
-  tmp.innerHTML = fragmentHtml;
-  resolveImageSources(tmp, doc.path);
-  const fullHtml = wrapExportHtml(tmp.innerHTML);
+  // 取渲染后 HTML 片段（getHTML 在某些异常态可能抛错，try/catch 兜底）；v0.3.8 起含 math/mermaid 渲染
+  const fragHtml = await exportFragment("html");
+  if (!fragHtml) return;
+  const fullHtml = wrapExportHtml(fragHtml);
 
   // 选保存路径（默认文件名 = 文档名.pdf）。重入锁覆盖 saveDialog→导出完成全程：saveDialog
   // 关闭到设锁之间存在极小时间窗，连点导出可能在窗口内二次进入，提前上锁闭合。exporting 的

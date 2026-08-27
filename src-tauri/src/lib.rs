@@ -319,7 +319,10 @@ fn pdf_attempt<F: Fn(&str, u8)>(
     // 打印引擎（msedge headless）是黑盒子：父进程无法读取其逐页/字节进度，
     // 只能在启动前发 "printing"；前端据此启动估算曲线平滑逼近 90%，真完成才跳 100%。
     emit("printing", 50);
-    run_with_timeout(cmd, Duration::from_secs(30))?;
+    // v0.3.8：30s→120s。实测 Edge 150 起 headless print-to-pdf 在本机从 ~3s 恶化到 45-60s
+    // （1KB 极简页同慢=引擎级回归，与导出内容无关），30s 必超时→重试连环更久。外部引擎耗时
+    // 不可控，上限放宽到 120s 兜底慢环境；正常环境 2-3s 完成不受影响。
+    run_with_timeout(cmd, Duration::from_secs(120))?;
     // 白纸校验：文件存在 + %PDF 魔数 + size > 2000（空白壳通常 < 2KB）。
     // 同 profile 被 Chromium 单实例转发的场景 msedge 仍退出码 0 但不产文件——必须在此拦下。
     if !tmp_pdf.is_file() {

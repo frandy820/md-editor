@@ -26,7 +26,7 @@
 - **左侧大纲**：点击定位、✕ 删除章节（联动正文）、拖动重排
 - **多种打开方式**：双击 .md / 拖拽到窗口 / 命令行参数 / 单实例转发
 - **编码自动识别**：UTF-8 / UTF-8(BOM) / GBK
-- **内容增强**：数学公式（KaTeX 行内/块级即时渲染）、Mermaid/echarts 图表（mindmap、timeline、flowchart…）、代码块行号、emoji `:smile:` 自动补全（1500+）
+- **内容增强**：数学公式（KaTeX 行内/块级即时渲染）、Mermaid 图表（mindmap、timeline、flowchart…）、代码块行号、emoji `:smile:` 自动补全（1500+）
 - **查找替换**：`Ctrl+F` / `Ctrl+H`，全部匹配高亮 + 计数导航 + 逐个/全部替换（走编辑管线，可撤销）
 - **专注模式**：`F8` 淡化非当前段落（打字机模式已按需求移除；粘贴长文本后视口自动滚到光标处）
 - **自动保存**：已有路径的文档每 30 秒及窗口失焦时自动落盘
@@ -148,7 +148,7 @@ A lightweight WYSIWYG Markdown editor for Windows with **visual table editing**,
 - **Left outline**: click to navigate, ✕ to delete a section (updates body too), drag to reorder
 - **Multiple ways to open**: double-click .md / drag into window / command-line arg / single-instance forwarding
 - **Encoding auto-detection**: UTF-8 / UTF-8(BOM) / GBK
-- **Rich content**: math formulas (KaTeX inline & block, live rendering), Mermaid/echarts diagrams (mindmap, timeline, flowchart…), code line numbers, emoji `:smile:` autocomplete (1500+)
+- **Rich content**: math formulas (KaTeX inline & block, live rendering), Mermaid diagrams (mindmap, timeline, flowchart…), code line numbers, emoji `:smile:` autocomplete (1500+)
 - **Find & replace**: `Ctrl+F` / `Ctrl+H` — highlight all matches, count & navigate, replace one/all (undoable)
 - **Focus mode**: `F8` dims other paragraphs (typewriter mode removed on request; the view scrolls to the caret after pasting long text)
 - **Autosave**: files with a path are saved every 30s and on window blur
