@@ -625,16 +625,24 @@ fn detect_pandoc() -> Option<String> {
 
 /// 用 pandoc 导出：md 写临时文件 → pandoc -f gfm 转目标格式 → 清理临时文件。
 /// fmt: "epub" | "latex" | "rtf" | "odt"（扩展名由前端 saveDialog 决定，这里只传 pandoc -t）
+/// doc_dir：文档所在目录——md 里的相对路径图片（assets/x.png）按它解析（temp md 在 %TEMP%，
+/// 不给 resource-path 时 pandoc 找不到图，EPUB 静默缺图）。
 #[tauri::command]
-fn pandoc_export(pandoc: String, md: String, out_path: String, fmt: String) -> Result<(), String> {
+fn pandoc_export(pandoc: String, md: String, out_path: String, fmt: String, doc_dir: Option<String>) -> Result<(), String> {
     if !["epub", "latex", "rtf", "odt"].contains(&fmt.as_str()) {
         return Err(format!("unsupported pandoc fmt: {fmt}"));
     }
     let tmp = std::env::temp_dir().join(format!("md-editor-pandoc-{}.md", std::process::id()));
     fs::write(&tmp, md).map_err(|e| e.to_string())?;
-    let out = std::process::Command::new(&pandoc)
-        .arg("-f").arg("gfm")
-        .arg("-t").arg(&fmt)
+    let mut cmd = std::process::Command::new(&pandoc);
+    cmd.arg("-f").arg("gfm")
+        .arg("-t").arg(&fmt);
+    if let Some(d) = doc_dir.as_ref() {
+        if !d.is_empty() {
+            cmd.arg(format!("--resource-path={}", d));
+        }
+    }
+    let out = cmd
         .arg(&tmp)
         .arg("-o").arg(&out_path)
         .output()

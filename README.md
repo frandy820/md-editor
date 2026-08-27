@@ -31,7 +31,7 @@
 - **专注模式**：`F8` 淡化非当前段落（打字机模式已按需求移除；粘贴长文本后视口自动滚到光标处）
 - **自动保存**：已有路径的文档每 30 秒及窗口失焦时自动落盘
 - **显示比例**：Word 式右下角缩放滑杆（50%~200%），`Ctrl+滚轮` 缩放、`Ctrl+0` 复位——只缩正文内容区，工具栏/大纲不动，设置重启后记住
-- **导出中心**：顶部「导出 ▾」——PDF（矢量）、HTML（带样式 / 纯净两档）、PNG 长图（超画布上限自动分片，Typora 官方不支持）、Word .docx（标题/表格/代码/链接/图片）、复制富文本（粘贴到 Word/邮件带格式）；**Pandoc 桥**——把 `pandoc.exe` 放到软件旁即解锁 EPUB / LaTeX / RTF
+- **导出中心**：顶部「导出 ▾」——PDF（矢量）、HTML（带样式 / 纯净两档）、PNG 长图（超画布上限自动分片，Typora 官方不支持）、Word .docx（标题/嵌套列表(Word原生编号)/表格/代码/链接/图片真嵌入/脚注）、复制富文本（粘贴到 Word/邮件带格式）；**Pandoc 桥**——把 `pandoc.exe` 放到软件旁即解锁 EPUB / LaTeX / RTF
 - **粘贴截图落地**：`Ctrl+V` 粘贴图片自动保存到文档旁 `assets/`，正文以**相对路径**引用——源码整个文件夹拷走图片不丢
 - **中文排版**：渲染与导出时中英文之间自动加空格（不改源文）
 - **字数统计**：右下角实时显示（简中「字」/ English "words"）
@@ -135,7 +135,7 @@ A lightweight WYSIWYG Markdown editor for Windows with **visual table editing**,
 - **Focus mode**: `F8` dims other paragraphs (typewriter mode removed on request; the view scrolls to the caret after pasting long text)
 - **Autosave**: files with a path are saved every 30s and on window blur
 - **Zoom**: Word-style slider at the bottom-right (50%–200%), `Ctrl+wheel` to zoom, `Ctrl+0` to reset — zooms the content area only, toolbars/outline untouched; the level persists across restarts
-- **Export center**: top "Export ▾" — PDF (vector), HTML (styled / plain), PNG long image (auto-sliced past the canvas limit — Typora can't), Word .docx (headings/tables/code/links/images), copy-as-rich-text (paste into Word/email with formatting); **Pandoc bridge** — drop `pandoc.exe` next to the app to unlock EPUB / LaTeX / RTF
+- **Export center**: top "Export ▾" — PDF (vector), HTML (styled / plain), PNG long image (auto-sliced past the canvas limit — Typora can't), Word .docx (headings/nested lists w/ native numbering/tables/code/links/embedded images/footnotes), copy-as-rich-text (paste into Word/email with formatting); **Pandoc bridge** — drop `pandoc.exe` next to the app to unlock EPUB / LaTeX / RTF
 - **Paste screenshots**: `Ctrl+V` an image and it is saved to `assets/` beside the document, referenced by a **relative path** — move the folder, keep the images
 - **CJK typography**: auto-spacing between CJK & Latin text on render & export (source untouched)
 - **Word count**: live counter at the bottom-right corner ("words" / 「字」)

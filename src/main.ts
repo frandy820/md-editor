@@ -1558,11 +1558,54 @@ async function exportImagePng(): Promise<void> {
   }
 }
 
-/** markdown-it token → docx 元素转换（MVP 覆盖：标题/段落/行内样式/链接/列表/引用/代码块/表格/图片/分隔线） */
+/** 脚注定义抢救：Vditor 所见即所得对复杂文档的 DOM 渲染会丢脚注定义区（内核限制，
+ * DOM 即源码架构下 getValue 随之丢失）。导出前从磁盘原文件把缺失的定义拼回 md 尾部——
+ * 只读原文件、不回写，导出物脚注完整；未保存的新文档无原文件则尽力。 */
+async function rescueFootnoteDefs(md: string, docPath: string | null | undefined): Promise<string> {
+  const refs = new Set((md.match(/\[\^([^\]\s]+)\](?!:)/g) || []).map((s) => s.slice(2, -1)));
+  const defs = new Set((md.match(/^\[\^([^\]\s]+)\]:/gm) || []).map((s) => s.slice(2, -2)));
+  const missing = [...refs].filter((l) => !defs.has(l));
+  if (!missing.length || !docPath) return md;
+  try {
+    const [orig] = await invoke<[string, string]>("open_file", { path: docPath });
+    const defLines: string[] = [];
+    for (const ln of orig.split("\n")) {
+      const m = ln.match(/^\[\^([^\]\s]+)\]:/);
+      if (m && missing.includes(m[1])) defLines.push(ln);
+    }
+    if (defLines.length) return md.replace(/\s*$/, "\n\n") + defLines.join("\n") + "\n";
+  } catch { /* 原文件读不到→尽力 */ }
+  return md;
+}
+
+/** 从图片字节解析宽高+类型（PNG IHDR / JPEG SOF / GIF / BMP 魔数），非图片返回 null */
+function imageSize(b: Uint8Array): { w: number; h: number; type: "png" | "jpg" | "gif" | "bmp" } | null {
+  if (b.length < 12) return null;
+  const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  try {
+    if (dv.getUint32(0) === 0x89504e47) return { w: dv.getUint32(16), h: dv.getUint32(20), type: "png" };
+    if (dv.getUint32(0) === 0x47494638) return { w: dv.getUint16(6, true), h: dv.getUint16(8, true), type: "gif" };
+    if (dv.getUint16(0) === 0x424d && b.length > 26) return { w: Math.abs(dv.getInt32(18, true)), h: Math.abs(dv.getInt32(22, true)), type: "bmp" };
+    if (dv.getUint16(0) === 0xffd8) { // JPEG：扫 SOF0-15 段（DHT/DAC/JPG 除外）
+      let i = 2;
+      while (i + 9 < b.length) {
+        if (b[i] !== 0xff) { i++; continue; }
+        const m = b[i + 1];
+        if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) {
+          return { w: dv.getUint16(i + 7), h: dv.getUint16(i + 5), type: "jpg" };
+        }
+        i += 2 + dv.getUint16(i + 2);
+      }
+    }
+  } catch { /* 非法头 → null */ }
+  return null;
+}
+
+/** markdown-it token → docx 元素转换（覆盖：标题/段落/行内样式/链接/嵌套列表(原生numbering)/引用(含嵌套与内嵌列表)/代码块/表格/图片(真嵌入)/脚注/分隔线） */
 async function exportDocx(): Promise<void> {
   const doc = activeDoc();
   if (!doc || !vditor) { alert(t("exportNoDoc")); return; }
-  const md = vditor.getValue();
+  const md = await rescueFootnoteDefs(vditor.getValue(), doc.path);
   if (!md) { alert(t("exportNoDoc")); return; }
   const path = await pickExportPath(".docx", "Word");
   if (!path) return;
@@ -1572,11 +1615,33 @@ async function exportDocx(): Promise<void> {
     const MarkdownIt = (await import("markdown-it")).default;
     const docx = await import("docx");
     const mdit = new MarkdownIt({ html: false, linkify: true });
+    mdit.use((await import("markdown-it-footnote")).default);
     const tokens = mdit.parse(md, {});
 
     const { Paragraph, TextRun, HeadingLevel, ExternalHyperlink, Table, TableRow, TableCell, WidthType } = docx;
     const FONT = "Microsoft YaHei";
     const MONO = "Consolas";
+
+    // 预取文档内本地图片（相对路径按文档目录解析）→ 字节+宽高，供 ImageRun 真嵌入；
+    // 读不到/非本地 → 降级 [图片:] 占位文本
+    const imgCache = new Map<string, { data: Uint8Array; w: number; h: number; type: "png" | "jpg" | "gif" | "bmp" }>();
+    const docDir = doc.path ? doc.path.replace(/\\/g, "/").replace(/\/[^/]*$/, "") : "";
+    for (const tk of tokens) {
+      if (tk.type !== "inline" || !tk.children) continue;
+      for (const c of tk.children) {
+        if (c.type !== "image") continue;
+        const src = String(c.attrGet("src") || "").split("?")[0];
+        if (!src || /^(https?:|asset:|data:)/i.test(src) || imgCache.has(src)) continue;
+        const abs = /^[a-zA-Z]:[\\/]/.test(src) ? src : (docDir ? docDir + "/" + src : "");
+        if (!abs) continue;
+        try {
+          const b64 = await invoke<string>("read_binary_file", { path: abs.replace(/\//g, "\\") });
+          const bin = Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0));
+          const size = imageSize(bin);
+          if (size) imgCache.set(src, { data: bin, w: size.w, h: size.h, type: size.type });
+        } catch { /* 降级占位 */ }
+      }
+    }
 
     // 递归辅助：从 start 到匹配的 *_close，把行内结果并进 out，返回 close 下标（function 声明提升，inlineRuns 可前向引用）
     function collectInline(toks: any[], start: number, style: any, out: any[]): number {
@@ -1608,21 +1673,38 @@ async function exportDocx(): Promise<void> {
           out.push(new ExternalHyperlink({ link: href, children: inner }));
           i = j;
         } else if (tk.type === "image") {
-          out.push(new TextRun({ text: `[图片: ${tk.attrGet("src") || ""}]`, font: FONT, italics: true, color: "888888" }));
+          const src = String(tk.attrGet("src") || "").split("?")[0];
+          const img = imgCache.get(src);
+          if (img) {
+            const MAXW = 550; // A4 可用宽 ~15cm ≈ 550px@96dpi，超出等比缩
+            const scale = img.w > MAXW ? MAXW / img.w : 1;
+            out.push(new docx.ImageRun({ type: img.type, data: img.data, transformation: { width: Math.round(img.w * scale), height: Math.round(img.h * scale) } }));
+          } else {
+            out.push(new TextRun({ text: `[图片: ${String(tk.attrGet("src") || "")}]`, font: FONT, italics: true, color: "888888" }));
+          }
+        } else if (tk.type === "footnote_ref") {
+          out.push(new docx.FootnoteReferenceRun(Number(tk.meta?.id ?? 0) + 1));
         }
       }
       return out;
     };
 
-    // 嵌套列表 → Paragraph（带层级缩进与项目符号字符；docx numbering 配置较繁，MVP 用符号+缩进近似）
-    const listMarker = (ordered: boolean, idx: number) => ordered ? `${idx}. ` : "• ";
+    // 列表 → Word 原生 numbering（导航/继续编号正确；嵌套=独立 reference 各自层级，
+    // 修掉旧版"内层列表重置外层 ordered 状态"与符号近似）。每列表一个 reference，
+    // start>1 的有序列表把起始号写进 level 定义。
     const blocks: any[] = [];
-    let listIdx = 0; let listOrdered = false; let listDepth = 0;
-    const flushList = () => { listIdx = 0; listDepth = 0; };
+    const { LevelFormat, AlignmentType } = docx;
+    const numberingConfigs: any[] = [];
+    let listSeq = 0;
+    const listStack: { reference: string; level: number }[] = [];
+    // 脚注（markdown-it-footnote）：正文 FootnoteReferenceRun(id+1)，块尾收集定义；
+    // docx 要求 key≥1，markdown-it 的 meta.id 从 0 起
+    const footnotesMap: Record<string, { children: any[] }> = {};
 
+    // 主循环 inline 驱动：段落内容以 inline token 为真身（markdown-it 对紧凑列表的
+    // paragraph_open/close 标 hidden，逐 token 分支会漏——看 open 不看 hidden，见 token 流实测）
     for (let i = 0; i < tokens.length; i++) {
       const tk = tokens[i];
-      if (tk.hidden) continue;
       if (tk.type === "heading_open") {
         const lvl = parseInt(tk.tag.slice(1), 10);
         const inline = tokens[i + 1];
@@ -1631,40 +1713,73 @@ async function exportDocx(): Promise<void> {
           children: inlineRuns(inline.children || []),
         }));
         i += 2;
-      } else if (tk.type === "paragraph_open") {
-        const inline = tokens[i + 1];
-        blocks.push(new Paragraph({ children: inlineRuns(inline.children || []), spacing: { after: 120 } }));
-        i += 2;
+      } else if (tk.type === "inline") {
+        if (listStack.length > 0) {
+          const L = listStack[listStack.length - 1];
+          blocks.push(new Paragraph({
+            numbering: { reference: L.reference, level: L.level },
+            children: inlineRuns(tk.children || []),
+            spacing: { after: 60 },
+          }));
+        } else {
+          blocks.push(new Paragraph({ children: inlineRuns(tk.children || []), spacing: { after: 120 } }));
+        }
       } else if (tk.type === "bullet_list_open" || tk.type === "ordered_list_open") {
-        listOrdered = tk.type === "ordered_list_open"; listIdx = 0; listDepth++;
+        const ordered = tk.type === "ordered_list_open";
+        const depth = listStack.length; // 0-based 嵌套层级
+        const reference = `mdl${++listSeq}`;
+        const start = parseInt(String(tk.attrGet("start") || "1"), 10) || 1;
+        numberingConfigs.push({
+          reference,
+          levels: [{
+            level: depth,
+            format: ordered ? LevelFormat.DECIMAL : LevelFormat.BULLET,
+            text: ordered ? "%1." : ["•", "◦", "▪", "·"][Math.min(depth, 3)],
+            alignment: AlignmentType.START,
+            ...(ordered && start > 1 ? { start } : {}),
+            style: { paragraph: { indent: { left: 480 * (depth + 1), hanging: ordered ? 360 : 280 } } },
+          }],
+        });
+        listStack.push({ reference, level: depth });
       } else if (tk.type === "list_item_open") {
-        listIdx++;
-      } else if (tk.type === "paragraph_open_item" || (tk.type === "paragraph_open" && listDepth > 0)) {
-        const inline = tokens[i + 1];
-        const indent = { left: 360 * listDepth };
-        blocks.push(new Paragraph({
-          children: [new TextRun({ text: listMarker(listOrdered, listIdx), font: FONT }), ...inlineRuns(inline.children || [])],
-          indent, spacing: { after: 60 },
-        }));
-        i += 2;
+        /* 计号交给 Word numbering */
       } else if (tk.type === "bullet_list_close" || tk.type === "ordered_list_close") {
-        listDepth = Math.max(0, listDepth - 1); if (listDepth === 0) flushList();
+        listStack.pop();
       } else if (tk.type === "blockquote_open") {
-        // 跳到对应 close，内部段落加引用样式（左缩进+灰边近似：缩进+斜体）
+        // 整块扫到配对 close（depth 从 1 起算=含自身）：嵌套引用按深度缩进；
+        // 引用内列表用文本 marker 近似；段落同样以 inline 为真身
         let depth = 1; let j = i + 1;
-        for (; j < tokens.length && depth > 0; j++) {
-          if (tokens[j].type === "blockquote_open") depth++;
-          else if (tokens[j].type === "blockquote_close") depth--;
-          else if (tokens[j].type === "paragraph_open" && depth === 1) {
-            const inline = tokens[j + 1];
+        let bqListDepth = 0; let bqOrdered = false; let bqIdx = 0;
+        for (; j < tokens.length; j++) {
+          const t2 = tokens[j];
+          if (t2.type === "blockquote_open") depth++;
+          else if (t2.type === "blockquote_close") { depth--; if (depth === 0) break; }
+          else if (t2.type === "bullet_list_open" || t2.type === "ordered_list_open") { bqOrdered = t2.type === "ordered_list_open"; bqIdx = 0; bqListDepth++; }
+          else if (t2.type === "bullet_list_close" || t2.type === "ordered_list_close") bqListDepth = Math.max(0, bqListDepth - 1);
+          else if (t2.type === "list_item_open") bqIdx++;
+          else if (t2.type === "inline") {
+            const marker = bqListDepth > 0 ? (bqOrdered ? `${bqIdx}. ` : "• ") : "";
             blocks.push(new Paragraph({
-              children: inlineRuns(inline.children || [], { italics: true }),
-              indent: { left: 480 }, spacing: { after: 100 },
+              children: [new TextRun({ text: marker, font: FONT, italics: true }), ...inlineRuns(t2.children || [], { italics: true })],
+              indent: { left: 480 * depth }, spacing: { after: 100 },
             }));
-            j += 2;
           }
         }
-        i = j - 1;
+        i = j;
+      } else if (tk.type === "footnote_block_open") {
+        // 收集脚注定义到 footnotesMap，不再进正文
+        let j = i + 1; let curId = -1; let curRuns: any[] = [];
+        const flushFn = () => {
+          if (curId >= 0 && curRuns.length) footnotesMap[String(curId + 1)] = { children: [new Paragraph({ children: curRuns })] };
+          curRuns = [];
+        };
+        for (; j < tokens.length && tokens[j].type !== "footnote_block_close"; j++) {
+          const t2 = tokens[j];
+          if (t2.type === "footnote_open") { flushFn(); curId = Number(t2.meta?.id ?? -1); }
+          else if (t2.type === "inline") curRuns.push(...inlineRuns(t2.children || []));
+        }
+        flushFn();
+        i = j;
       } else if (tk.type === "fence" || tk.type === "code_block") {
         const lines = (tk.content || "").split("\n");
         blocks.push(new Paragraph({
@@ -1698,7 +1813,11 @@ async function exportDocx(): Promise<void> {
       }
     }
     if (overlay) (document.getElementById("export-pct") as HTMLElement).style.width = "80%";
-    const d = new docx.Document({ sections: [{ children: blocks }] });
+    const d = new docx.Document({
+      ...(Object.keys(footnotesMap).length ? { footnotes: footnotesMap } : {}),
+      ...(numberingConfigs.length ? { numbering: { config: numberingConfigs } } : {}),
+      sections: [{ children: blocks }],
+    });
     const blob = await docx.Packer.toBlob(d);
     const b64 = await new Promise<string>((resolve, reject) => {
       const fr = new FileReader();
@@ -1751,11 +1870,13 @@ async function exportViaPandoc(fmt: string, ext: string, filterName: string): Pr
   if (!pandocPath) { alert(t("pandocMissing")); return; }
   const doc = activeDoc();
   if (!doc || !vditor) { alert(t("exportNoDoc")); return; }
-  const md = vditor.getValue();
+  const md = await rescueFootnoteDefs(vditor.getValue(), doc.path);
   const path = await pickExportPath(ext, filterName);
   if (!path) return;
+  // 相对路径图片按文档目录解析（temp md 在 %TEMP%，不传 resource-path 时 pandoc 静默缺图）
+  const docDir = doc.path ? doc.path.replace(/\\/g, "/").replace(/\/[^/]*$/, "") : null;
   try {
-    await invoke("pandoc_export", { pandoc: pandocPath, md, outPath: path, fmt });
+    await invoke("pandoc_export", { pandoc: pandocPath, md, outPath: path, fmt, docDir });
     alert(t("exportDone") + path);
   } catch (e) { alert(t("exportFail") + e); }
 }
