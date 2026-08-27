@@ -127,7 +127,7 @@ WebView2 Loader、前端全部 JS/CSS 资源。
 | Microsoft Edge | 仅 PDF 导出不可用（有报错提示） | Win10/11 必带 |
 | pandoc.exe（可选） | 仅 EPUB/LaTeX/RTF 置灰 | 放 md-editor.exe 同目录即解锁，[便携版下载](https://pandoc.org/installing.html) |
 
-**分发给他人**：把 `md-editor.exe + pandoc.exe（如需三格式）` 打成一个 zip 拷走即可，免安装、免 VC++ 运行库。
+**分发给他人**：拷走单个 `md-editor.exe` 即可（免安装、免 VC++ 运行库）；需要 EPUB/LaTeX/RTF 时把 `pandoc.exe` 放在它旁边。
 
 ### 📄 协议
 
