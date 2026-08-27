@@ -42,7 +42,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     switchToIRTip: "切回即时渲染模式（Ctrl+Alt+M）", switchToWYSIWYGTip: "切到所见即所得模式以编辑表格（Ctrl+Alt+M）",
     panelTitle: "大纲 · 点击定位 · ✕删除 · 拖动重排",
     export: "💾 导出 ▾", exportNoDoc: "（请先打开或新建文档再导出）", exportFail: "导出失败：", exporting: "正在导出 PDF，请稍候…",
-    exportDone: "导出完成：", pandocMissing: "Pandoc（放入 pandoc.exe 到软件旁即解锁）", pandocReady: "Pandoc 已就绪",
+    exportDone: "导出完成：", pandocMissing: "Pandoc 未就绪：把 pandoc.exe 放到 md-editor.exe 同目录即解锁（免安装）", pandocReady: "Pandoc 已就绪",
     exportImageSlices: "文档较长，已分片导出多张 PNG：", pasteImgUntitledHint: "（提示：文档尚未保存，截图存到了应用目录，保存文档后建议用「另存为」整理）",
     exportStagePage: "正在生成页面…", exportStagePrint: "正在打印为 PDF…", exportStageSave: "正在保存文件…",
     fontSizeTip: "字号：先框选文字，再选字号",
@@ -71,7 +71,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     switchToIRTip: "切回即時渲染模式（Ctrl+Alt+M）", switchToWYSIWYGTip: "切到所見即所得模式以編輯表格（Ctrl+Alt+M）",
     panelTitle: "大綱 · 點擊定位 · ✕刪除 · 拖曳重排",
     export: "💾 匯出 ▾", exportNoDoc: "（請先開啟或新增文件再匯出）", exportFail: "匯出失敗：", exporting: "正在匯出 PDF，請稍候…",
-    exportDone: "匯出完成：", pandocMissing: "Pandoc（放入 pandoc.exe 到軟體旁即解鎖）", pandocReady: "Pandoc 已就緒",
+    exportDone: "匯出完成：", pandocMissing: "Pandoc 未就緒：把 pandoc.exe 放到 md-editor.exe 同目錄即解鎖（免安裝）", pandocReady: "Pandoc 已就緒",
     exportImageSlices: "文件較長，已分片匯出多張 PNG：", pasteImgUntitledHint: "（提示：文件尚未儲存，截圖存到了應用目錄，儲存文件後建議整理）",
     exportStagePage: "正在產生頁面…", exportStagePrint: "正在列印為 PDF…", exportStageSave: "正在儲存檔案…",
     fontSizeTip: "字號：先框選文字，再選字號",
@@ -100,7 +100,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     switchToIRTip: "Switch to Markdown (IR) (Ctrl+Alt+M)", switchToWYSIWYGTip: "Switch to WYSIWYG to edit tables (Ctrl+Alt+M)",
     panelTitle: "Outline · click to navigate · ✕ delete · drag to reorder",
     export: "💾 Export ▾", exportNoDoc: "(Open or create a document first)", exportFail: "Export failed: ", exporting: "Exporting PDF, please wait…",
-    exportDone: "Exported: ", pandocMissing: "Pandoc (drop pandoc.exe beside the app to unlock)", pandocReady: "Pandoc ready",
+    exportDone: "Exported: ", pandocMissing: "Pandoc not found: drop pandoc.exe next to md-editor.exe to unlock (no install needed)", pandocReady: "Pandoc ready",
     exportImageSlices: "Long document, exported as multiple PNG slices: ", pasteImgUntitledHint: "(Tip: document not saved yet; screenshot stored in app folder)",
     exportStagePage: "Generating pages…", exportStagePrint: "Printing to PDF…", exportStageSave: "Saving file…",
     fontSizeTip: "Font size: select text first, then pick a size",
@@ -1330,14 +1330,16 @@ function bindFindBar() {
     const bar = document.getElementById("find-bar")!;
     if (!bar.hidden) closeFind(); else openFind(false);
   });
-  // Ctrl+F / Ctrl+H（WebView2 无原生查找 UI，无冲突）
+  // Ctrl+F / Ctrl+H（WebView2 无原生查找 UI）。必须用捕获阶段 + stopPropagation：
+  // Vditor 内置 toolbar headings 按钮的 hotkey 是 ⌘H（Ctrl+H 弹"一级~六级标题"下拉），
+  // 其 keydown 绑在编辑器元素上，先于 window 冒泡 handler 执行——不拦截就会替换框+标题菜单双弹。
   window.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "f" || e.key === "F")) {
-      e.preventDefault(); openFind(false);
+      e.preventDefault(); e.stopPropagation(); openFind(false);
     } else if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "h" || e.key === "H")) {
-      e.preventDefault(); openFind(true);
+      e.preventDefault(); e.stopPropagation(); openFind(true);
     }
-  });
+  }, true);
   // 编辑内容变化 → 高亮同步（document input 捕获 contenteditable 键入，避免动 vditor 共用 input 回调链）
   // 排除查找条自身输入：否则会清掉 find-input 的 250ms 定时器（同一 debounce 变量被互踩 → findIndex 恒 -1）
   document.addEventListener("input", (e) => {
@@ -1407,7 +1409,7 @@ table { border-collapse: collapse; }
 </html>`;
 }
 
-// ===== v0.3.0 导出中心：HTML 两档 / 图片长图 / DOCX / 复制富文本 / Pandoc 桥 =====
+// ===== v0.3.0 导出中心：HTML 两档 / 图片长图 / DOCX / Pandoc 桥（v0.3.2 移除"复制富文本"）=====
 // Typora 二分法：零依赖格式内置，长尾格式（EPUB/LaTeX/RTF）检测到用户自备 pandoc.exe 才点亮。
 
 /** File → 纯 base64（无 data: 前缀） */
@@ -1835,36 +1837,6 @@ async function exportDocx(): Promise<void> {
   }
 }
 
-/** 复制富文本（HTML+纯文本双格式）：公众号/知乎/Word 直接粘贴带格式 */
-async function copyRichText(): Promise<void> {
-  const frag = exportFragment();
-  if (!frag) return;
-  const html = wrapExportHtml(frag);
-  const plain = vditor ? vditor.getValue() : "";
-  try {
-    await navigator.clipboard.write([new ClipboardItem({
-      "text/html": new Blob([html], { type: "text/html" }),
-      "text/plain": new Blob([plain], { type: "text/plain" }),
-    })]);
-    alert(t("exportDone") + "clipboard");
-  } catch {
-    // WebView2 权限回退：临时 contenteditable + execCommand
-    const tmp = document.createElement("div");
-    tmp.contentEditable = "true";
-    tmp.style.cssText = "position:fixed;left:-99999px;top:0;";
-    tmp.innerHTML = frag;
-    document.body.appendChild(tmp);
-    const range = document.createRange();
-    range.selectNodeContents(tmp);
-    const sel = getSelection();
-    sel!.removeAllRanges(); sel!.addRange(range);
-    document.execCommand("copy");
-    sel!.removeAllRanges();
-    tmp.remove();
-    alert(t("exportDone") + "clipboard");
-  }
-}
-
 /** Pandoc 桥导出（EPUB/LaTeX/RTF） */
 async function exportViaPandoc(fmt: string, ext: string, filterName: string): Promise<void> {
   if (!pandocPath) { alert(t("pandocMissing")); return; }
@@ -1900,7 +1872,6 @@ function bindExportMenu(): void {
     else if (kind === "html-plain") exportHtml(false);
     else if (kind === "image") exportImagePng();
     else if (kind === "docx") exportDocx();
-    else if (kind === "copy") copyRichText();
     else if (kind === "epub") exportViaPandoc("epub", ".epub", "EPUB");
     else if (kind === "latex") exportViaPandoc("latex", ".tex", "LaTeX");
     else if (kind === "rtf") exportViaPandoc("rtf", ".rtf", "RTF");
@@ -1970,13 +1941,10 @@ async function exportPdf() {
   let resultMsg = "";
   try {
     exporting = true;
-    const baseName = (doc.name || t("untitled")).replace(/\.[^.]+$/, "");
-    const sp = await saveDialog({
-      defaultPath: baseName + ".pdf",
-      filters: [{ name: "PDF", extensions: ["pdf"] }],
-    });
-    if (!sp) { return; } // 用户取消：exporting 由 finally 释放（overlay 仍 hidden、unlisten 仍 null）
-    const savePath = sp as string;
+    // 统一走 pickExportPath：生产弹原生保存对话框；e2e（--export-selftest）直拼路径。
+    // 旧实现直接 saveDialog——无头 e2e 环境对话框无人点击，await 永不返回，PDF 项根本测不到。
+    const savePath = await pickExportPath(".pdf", "PDF");
+    if (!savePath) { return; } // 用户取消：exporting 由 finally 释放（overlay 仍 hidden、unlisten 仍 null）
 
     if (overlay) overlay.hidden = false;
     setPct(5);

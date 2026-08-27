@@ -278,6 +278,63 @@ impl Drop for TmpClean {
 /// 导出 PDF 核心：调系统 msedge --headless --print-to-pdf 把 HTML 渲染成矢量 PDF。
 /// 在三个可观测里程碑(page/printing/saving)调用 emit 回调推送真百分比：
 /// 命令版 export_pdf 注入 AppHandle 发 Tauri 事件，self-test 版注入空回调（无 GUI，事件丢弃）。
+/// 单次 msedge 打印尝试：构建命令、执行、白纸校验。profile 策略由调用方决定（固定复用/唯一兜底）。
+fn pdf_attempt<F: Fn(&str, u8)>(
+    msedge: &std::path::Path,
+    profile_dir: &std::path::Path,
+    html_url: &str,
+    tmp_pdf: &std::path::Path,
+    emit: &F,
+) -> Result<(), String> {
+    // user-data-dir 必须用 = 连接：Edge 150 headless=new 会把空格分隔的 flag 值误判为
+    // target URL，叠加 html_url 触发 "Multiple targets are not supported in headless mode"
+    // （exit 13，本机实测复现）。等号连接后值内嵌进 flag，不再被当作独立 target。
+    let profile_str = profile_dir.to_string_lossy().replace('\\', "/");
+    let tmp_pdf_str = tmp_pdf.to_string_lossy().replace('\\', "/");
+    let mut cmd = Command::new(msedge);
+    cmd.args([
+        "--headless=new",
+        "--disable-gpu",
+        "--no-pdf-header-footer",
+        "--virtual-time-budget=5000",
+        "--run-all-compositor-stages-before-draw",
+        // 静音参数：跳过首运行向导/默认浏览器提示/扩展/组件更新/后台网络（对纯本地打印无意义）
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--disable-extensions",
+        "--disable-component-update",
+        "--disable-background-networking",
+        "--disable-default-apps",
+    ]);
+    cmd.arg(format!("--user-data-dir={}", profile_str));
+    cmd.arg(format!("--print-to-pdf={}", tmp_pdf_str));
+    cmd.arg(html_url);
+    // Windows：CREATE_NO_WINDOW，避免闪命令行黑窗
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    // 打印引擎（msedge headless）是黑盒子：父进程无法读取其逐页/字节进度，
+    // 只能在启动前发 "printing"；前端据此启动估算曲线平滑逼近 90%，真完成才跳 100%。
+    emit("printing", 50);
+    run_with_timeout(cmd, Duration::from_secs(30))?;
+    // 白纸校验：文件存在 + %PDF 魔数 + size > 2000（空白壳通常 < 2KB）。
+    // 同 profile 被 Chromium 单实例转发的场景 msedge 仍退出码 0 但不产文件——必须在此拦下。
+    if !tmp_pdf.is_file() {
+        return Err("msedge 未生成 PDF 文件（导出失败）".into());
+    }
+    let bytes = fs::read(tmp_pdf).map_err(|e| format!("读取生成的 PDF 失败：{e}"))?;
+    if bytes.len() < 2000 {
+        return Err(format!("生成的 PDF 异常过小（{} 字节，疑似空白）", bytes.len()));
+    }
+    if !bytes.starts_with(b"%PDF") {
+        return Err("生成的文件不是有效 PDF（缺少 %PDF 魔数）".into());
+    }
+    Ok(())
+}
+
 fn render_pdf<F: Fn(&str, u8)>(html: String, path: String, emit: F) -> Result<(), String> {
     // 1. 校验扩展名与内容
     match std::path::Path::new(&path).extension().and_then(|e| e.to_str()) {
@@ -290,14 +347,13 @@ fn render_pdf<F: Fn(&str, u8)>(html: String, path: String, emit: F) -> Result<()
 
     let msedge = locate_msedge()?;
 
-    // 2. 临时资源：profile 每次用唯一目录（快速连点导出不撞 SingletonLock）；
-    //    全部注册到 TmpClean，函数任意退出路径统一清理，temp 不残留。
+    // 2. 临时资源：HTML 每次唯一并随 TmpClean 清理；profile 改用固定目录跨次复用——
+    //    实测（300 段基准文档）每次新建 profile 冷启动 ~8s，复用固定 profile 热启动 ~2s，
+    //    提速主收益在此。固定 profile 不删除（留给下次复用）；并发/损坏由下方唯一 profile 重试兜底。
     let tmp_dir = std::env::temp_dir();
-    let profile_dir = tmp_dir.join(format!("md-editor-pdf-profile-{}", unique_suffix()));
     let html_path = tmp_dir.join(format!("md_export_{}.html", unique_suffix()));
     let mut clean = TmpClean(Vec::new());
     clean.0.push(html_path.clone());
-    clean.0.push(profile_dir.clone());
     fs::write(&html_path, html.as_bytes())
         .map_err(|e| format!("写临时 HTML 失败：{e}"))?;
     // HTML 已组装落盘，即将启动打印引擎 —— 第一个可观测里程碑
@@ -310,55 +366,25 @@ fn render_pdf<F: Fn(&str, u8)>(html: String, path: String, emit: F) -> Result<()
         .unwrap_or_else(|| std::path::Path::new("."));
     let tmp_pdf = final_dir.join(format!(".md_export_{}.pdf.tmp", unique_suffix()));
     clean.0.push(tmp_pdf.clone());
-    let tmp_pdf_str = tmp_pdf.to_string_lossy().replace('\\', "/");
 
-    // 4. msedge headless 打印
+    // 4. msedge headless 打印：先固定 profile（热启动 ~2s）；失败（profile 损坏/被运行中
+    //    实例转发致 0KB 等，前端重入锁已防同应用连点，跨实例并发仍可能撞）→ 清固定目录，
+    //    换全新唯一 profile 重试一次（退回冷启动 ~8s，保成功）。
     let html_url = file_url_from_path(&html_path);
-    // user-data-dir 必须用 = 连接：Edge 150 headless=new 会把空格分隔的 flag 值误判为
-    // target URL，叠加 html_url 触发 "Multiple targets are not supported in headless mode"
-    // （exit 13，本机实测复现）。等号连接后值内嵌进 flag，不再被当作独立 target。
-    let profile_str = profile_dir.to_string_lossy().replace('\\', "/");
-    let mut cmd = Command::new(&msedge);
-    cmd.args([
-        "--headless=new",
-        "--disable-gpu",
-        "--no-pdf-header-footer",
-        "--virtual-time-budget=5000",
-        "--run-all-compositor-stages-before-draw",
-    ]);
-    cmd.arg(format!("--user-data-dir={}", profile_str));
-    cmd.arg(format!("--print-to-pdf={}", tmp_pdf_str));
-    cmd.arg(&html_url);
-    // Windows：CREATE_NO_WINDOW，避免闪命令行黑窗
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
-
-    // 5. 带超时执行（失败/超时由 ? 提前 return，guard 兜底清理）
-    //    打印引擎（msedge headless）是黑盒子：父进程无法读取其逐页/字节进度，
-    //    只能在启动前发 "printing"；前端据此启动估算曲线平滑逼近 90%，真完成才跳 100%。
-    emit("printing", 50);
-    run_with_timeout(cmd, Duration::from_secs(30))?;
-
-    // 6. 白纸校验：文件存在 + %PDF 魔数 + size > 2000（空白壳通常 < 2KB）
-    if !tmp_pdf.is_file() {
-        return Err("msedge 未生成 PDF 文件（导出失败）".into());
-    }
-    let bytes = fs::read(&tmp_pdf).map_err(|e| format!("读取生成的 PDF 失败：{e}"))?;
-    if bytes.len() < 2000 {
-        return Err(format!("生成的 PDF 异常过小（{} 字节，疑似空白）", bytes.len()));
-    }
-    if !bytes.starts_with(b"%PDF") {
-        return Err("生成的文件不是有效 PDF（缺少 %PDF 魔数）".into());
+    let fixed_profile = tmp_dir.join("md-editor-pdf-profile");
+    if let Err(first_err) = pdf_attempt(&msedge, &fixed_profile, &html_url, &tmp_pdf, &emit) {
+        let _ = fs::remove_dir_all(&fixed_profile);
+        let retry_profile = tmp_dir.join(format!("md-editor-pdf-profile-{}", unique_suffix()));
+        clean.0.push(retry_profile.clone());
+        pdf_attempt(&msedge, &retry_profile, &html_url, &tmp_pdf, &emit)
+            .map_err(|e2| format!("{first_err}（已用全新配置重试仍失败：{e2}）"))?;
     }
 
     // 白纸校验已过，PDF 内容就绪，正在原子落盘到目标路径 —— 最后一个可观测里程碑
     emit("saving", 95);
     // 7. 原子覆盖最终路径；rename 失败（目标被 PDF 阅读器占用）回落 copy+删。
-    //    成功 return 后 guard 统一清理 html_path / profile_dir / 残留 tmp_pdf。
+    //    成功 return 后 guard 统一清理 html_path / 重试 profile / 残留 tmp_pdf
+    //    （固定 profile 有意保留复用，见上）。
     if let Err(e) = fs::rename(&tmp_pdf, &path) {
         if let Err(e2) = fs::copy(&tmp_pdf, &path) {
             return Err(format!(
