@@ -158,7 +158,8 @@ body.focus-mode .vditor-reset > .fw-current { opacity: 1; }
    用户四轮"点✕没反应"的真因（此前误判为事件绑定/剪贴板死锁） */
 #find-bar[hidden], #find-bar [hidden] { display: none !important; }
 #find-bar {
-  position: absolute; top: 6px; right: 14px; z-index: 2000000;
+  /* top 必须让开 Vditor 工具栏(35px)：曾用 6px 压在工具栏右端"全屏切换/切换编辑模式"上 */
+  position: absolute; top: 44px; right: 14px; z-index: 2000000;
   background: #fff; border: 1px solid #ccc; border-radius: 6px;
   box-shadow: 0 2px 10px rgba(0,0,0,.15); padding: 6px 8px;
   display: flex; flex-direction: column; gap: 6px;

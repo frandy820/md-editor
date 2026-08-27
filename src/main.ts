@@ -1195,7 +1195,7 @@ function gotoMatch(idx: number) {
     const r = document.createRange();
     r.setStart(m.node, m.start); r.setEnd(m.node, m.end);
     const rect = r.getBoundingClientRect();
-    if (rect.top < 90 || rect.bottom > innerHeight - 60) m.node.parentElement?.scrollIntoView({ block: "center" });
+    if (rect.top < 130 || rect.bottom > innerHeight - 60) m.node.parentElement?.scrollIntoView({ block: "center" });
   } catch { /* 同上 */ }
   renderFindOverlay();
 }
@@ -1317,14 +1317,8 @@ function bindFindBar() {
     const bar = document.getElementById("find-bar");
     if (bar && !bar.hidden) { e.preventDefault(); closeFind(); }
   });
-  // 点击查找条外部 → 收起（VSCode/Typora 惯例，兼作关闭路径兜底）。
-  // 🔍按钮例外：它的 click 做 toggle（关了再点=重开），若此处先收起会被 click 立即重开，toggle 失效
-  document.addEventListener("pointerdown", (e) => {
-    const bar = document.getElementById("find-bar");
-    if (!bar || bar.hidden) return;
-    if (e.target instanceof Node && (bar.contains(e.target) || document.getElementById("btn-find")?.contains(e.target))) return;
-    closeFind();
-  }, true);
+  // 不做"点击外部收起"（2026-08-27 用户定调：点正文编辑时查找条要留着，等点 ✕ 才关）。
+  // 关闭路径 = ✕ 按钮 / Esc（含输入框外的全局兜底）/ 🔍按钮 toggle。
   // 🔍查找按钮 toggle：开→关（用户预期：再点一次消失）。Ctrl+F/H 仍只开（编辑中快捷键不反关）
   document.getElementById("btn-find")!.addEventListener("click", () => {
     const bar = document.getElementById("find-bar")!;
