@@ -31,7 +31,7 @@
 - **专注模式**：`F8` 淡化非当前段落（打字机模式已按需求移除；粘贴长文本后视口自动滚到光标处）
 - **自动保存**：已有路径的文档每 30 秒及窗口失焦时自动落盘
 - **显示比例**：Word 式右下角缩放滑杆（50%~200%），`Ctrl+滚轮` 缩放、`Ctrl+0` 复位——只缩正文内容区，工具栏/大纲不动，设置重启后记住
-- **导出中心**：顶部「导出 ▾」——PDF（矢量）、HTML（带样式 / 纯净两档）、PNG 长图（超画布上限自动分片，Typora 官方不支持）、Word .docx（标题/嵌套列表(Word原生编号)/表格/代码/链接/图片真嵌入/脚注）；**Pandoc 桥**——把 `pandoc.exe` 放到软件旁即解锁 EPUB / LaTeX / RTF
+- **导出中心**：顶部「导出 ▾」——PDF（矢量）、HTML（带样式 / 纯净两档）、PNG 长图（超画布上限自动分片，Typora 官方不支持）、Word .docx（标题/嵌套列表(Word原生编号)/表格/代码/链接/图片真嵌入/脚注）
 - **粘贴截图落地**：`Ctrl+V` 粘贴图片自动保存到文档旁 `assets/`，正文以**相对路径**引用——源码整个文件夹拷走图片不丢
 - **中文排版**：渲染与导出时中英文之间自动加空格（不改源文）
 - **字数统计**：右下角实时显示（简中「字」/ English "words"）
@@ -70,7 +70,7 @@
 | 查找替换 | `Ctrl+F` 查找 / `Ctrl+H` 带替换；`Enter`/`Shift+Enter` 上下跳转，`Esc` 关闭 |
 | 专注模式 | `F8` 淡化其他段落 |
 | 缩放 | 右下角滑杆拖动 / `Ctrl+滚轮` / `Ctrl+0` 复位（50%~200%，只缩正文） |
-| 导出 | 顶部「导出 ▾」：PDF / HTML 两档 / PNG 长图 / Word；EPUB/LaTeX/RTF 需在软件旁放 `pandoc.exe` |
+| 导出 | 顶部「导出 ▾」：PDF / HTML 两档 / PNG 长图 / Word |
 | 粘贴截图 | 直接 `Ctrl+V`，图片自动存到文档旁 `assets/`，正文引用相对路径 |
 | 粘贴跟随 | 粘贴长文本后视口自动滚到光标 |
 | 自动保存 | 已保存过的文档每 30s 及失焦时自动落盘（标题 ● 消失即已存） |
@@ -125,9 +125,8 @@ WebView2 Loader、前端全部 JS/CSS 资源。
 |---|---|---|
 | WebView2 Runtime | 启动弹中文指引（v0.3.3 预检） | Win10 1803+/Win11 自带；[离线包下载](https://developer.microsoft.com/microsoft-edge/webview2/) |
 | Microsoft Edge | 仅 PDF 导出不可用（有报错提示） | Win10/11 必带 |
-| pandoc.exe（可选） | 仅 EPUB/LaTeX/RTF 置灰 | 放 md-editor.exe 同目录即解锁，[便携版下载](https://pandoc.org/installing.html) |
 
-**分发给他人**：拷走单个 `md-editor.exe` 即可（免安装、免 VC++ 运行库）；需要 EPUB/LaTeX/RTF 时把 `pandoc.exe` 放在它旁边。
+**分发给他人**：拷走单个 `md-editor.exe` 即可（免安装、免 VC++ 运行库）。
 
 ### 📄 协议
 
@@ -154,7 +153,7 @@ A lightweight WYSIWYG Markdown editor for Windows with **visual table editing**,
 - **Focus mode**: `F8` dims other paragraphs (typewriter mode removed on request; the view scrolls to the caret after pasting long text)
 - **Autosave**: files with a path are saved every 30s and on window blur
 - **Zoom**: Word-style slider at the bottom-right (50%–200%), `Ctrl+wheel` to zoom, `Ctrl+0` to reset — zooms the content area only, toolbars/outline untouched; the level persists across restarts
-- **Export center**: top "Export ▾" — PDF (vector), HTML (styled / plain), PNG long image (auto-sliced past the canvas limit — Typora can't), Word .docx (headings/nested lists w/ native numbering/tables/code/links/embedded images/footnotes), copy-as-rich-text (paste into Word/email with formatting); **Pandoc bridge** — drop `pandoc.exe` next to the app to unlock EPUB / LaTeX / RTF
+- **Export center**: top "Export ▾" — PDF (vector), HTML (styled / plain), PNG long image (auto-sliced past the canvas limit — Typora can't), Word .docx (headings/nested lists w/ native numbering/tables/code/links/embedded images/footnotes)
 - **Paste screenshots**: `Ctrl+V` an image and it is saved to `assets/` beside the document, referenced by a **relative path** — move the folder, keep the images
 - **CJK typography**: auto-spacing between CJK & Latin text on render & export (source untouched)
 - **Word count**: live counter at the bottom-right corner ("words" / 「字」)
@@ -193,7 +192,7 @@ Grab `md-editor.exe` from [Releases](https://github.com/frandy820/md-editor/rele
 | Find & replace | `Ctrl+F` find / `Ctrl+H` with replace; `Enter`/`Shift+Enter` navigate, `Esc` close |
 | Focus | `F8` dim others |
 | Zoom | drag the bottom-right slider / `Ctrl+wheel` / `Ctrl+0` reset (50%–200%, content only) |
-| Export | top "Export ▾": PDF / HTML ×2 / PNG / Word / copy rich text; EPUB/LaTeX/RTF need `pandoc.exe` beside the app |
+| Export | top "Export ▾": PDF / HTML ×2 / PNG / Word |
 | Paste image | just `Ctrl+V` — saved to `assets/` beside the doc, referenced relatively |
 | Paste follow | view scrolls to the caret after pasting |
 | Autosave | Documents with a path save every 30s & on blur (● in title disappears once saved) |

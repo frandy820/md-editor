@@ -635,51 +635,6 @@ fn civil_from_days(z: i64) -> (i64, u32, u32) {
     (if m <= 2 { y + 1 } else { y }, m, d)
 }
 
-/// 探测 pandoc：PATH → exe 同目录 → F:\software\PDF4QT 同款便携位思路（exe 旁 pandoc/ 目录）。
-/// 找到返回 exe 路径。检测到才在导出菜单点亮 EPUB/LaTeX/RTF 等格式（Typora 二分法：不内嵌）。
-#[tauri::command]
-fn detect_pandoc() -> Option<String> {
-    let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
-    let mut candidates: Vec<PathBuf> = vec![exe_dir.join("pandoc.exe"), exe_dir.join("pandoc").join("pandoc.exe")];
-    if let Ok(path) = std::env::var("PATH") {
-        for p in std::env::split_paths(&path) {
-            candidates.push(p.join("pandoc.exe"));
-        }
-    }
-    candidates.into_iter().find(|c| c.exists()).map(|c| c.to_string_lossy().into_owned())
-}
-
-/// 用 pandoc 导出：md 写临时文件 → pandoc -f gfm 转目标格式 → 清理临时文件。
-/// fmt: "epub" | "latex" | "rtf" | "odt"（扩展名由前端 saveDialog 决定，这里只传 pandoc -t）
-/// doc_dir：文档所在目录——md 里的相对路径图片（assets/x.png）按它解析（temp md 在 %TEMP%，
-/// 不给 resource-path 时 pandoc 找不到图，EPUB 静默缺图）。
-#[tauri::command]
-fn pandoc_export(pandoc: String, md: String, out_path: String, fmt: String, doc_dir: Option<String>) -> Result<(), String> {
-    if !["epub", "latex", "rtf", "odt"].contains(&fmt.as_str()) {
-        return Err(format!("unsupported pandoc fmt: {fmt}"));
-    }
-    let tmp = std::env::temp_dir().join(format!("md-editor-pandoc-{}.md", std::process::id()));
-    fs::write(&tmp, md).map_err(|e| e.to_string())?;
-    let mut cmd = std::process::Command::new(&pandoc);
-    cmd.arg("-f").arg("gfm")
-        .arg("-t").arg(&fmt);
-    if let Some(d) = doc_dir.as_ref() {
-        if !d.is_empty() {
-            cmd.arg(format!("--resource-path={}", d));
-        }
-    }
-    let out = cmd
-        .arg(&tmp)
-        .arg("-o").arg(&out_path)
-        .output()
-        .map_err(|e| e.to_string())?;
-    let _ = fs::remove_file(&tmp);
-    if !out.status.success() {
-        return Err(format!("pandoc: {}", String::from_utf8_lossy(&out.stderr)));
-    }
-    Ok(())
-}
-
 /// WebView2 Runtime 缺失检测：任一注册表位置有 pv 值即视为已装。
 /// WEBVIEW2_BROWSER_EXECUTABLE_FOLDER 显式指定固定版本时跳过（企业离线分发场景）。
 fn webview2_missing() -> bool {
@@ -791,9 +746,7 @@ pub fn run() {
             read_binary_file,
             write_export_file,
             save_paste_image,
-            detect_pandoc,
             export_selftest_dir,
-            pandoc_export,
             save_ui_state,
             dnd_selftest_enabled
         ])

@@ -42,7 +42,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     switchToIRTip: "切回即时渲染模式（Ctrl+Alt+M）", switchToWYSIWYGTip: "切到所见即所得模式以编辑表格（Ctrl+Alt+M）",
     panelTitle: "大纲 · 点击定位 · ✕删除 · 拖动重排",
     export: "💾 导出 ▾", exportNoDoc: "（请先打开或新建文档再导出）", exportFail: "导出失败：", exporting: "正在导出 PDF，请稍候…",
-    exportDone: "导出完成：", pandocMissing: "Pandoc 未就绪：把 pandoc.exe 放到 md-editor.exe 同目录即解锁（免安装）", pandocReady: "Pandoc 已就绪",
+    exportDone: "导出完成：",
     exportImageSlices: "文档较长，已分片导出多张 PNG：", pasteImgUntitledHint: "（提示：文档尚未保存，截图存到了应用目录，保存文档后建议用「另存为」整理）",
     exportStagePage: "正在生成页面…", exportStagePrint: "正在打印为 PDF…", exportStageSave: "正在保存文件…",
     fontSizeTip: "字号：先框选文字，再选字号",
@@ -71,7 +71,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     switchToIRTip: "切回即時渲染模式（Ctrl+Alt+M）", switchToWYSIWYGTip: "切到所見即所得模式以編輯表格（Ctrl+Alt+M）",
     panelTitle: "大綱 · 點擊定位 · ✕刪除 · 拖曳重排",
     export: "💾 匯出 ▾", exportNoDoc: "（請先開啟或新增文件再匯出）", exportFail: "匯出失敗：", exporting: "正在匯出 PDF，請稍候…",
-    exportDone: "匯出完成：", pandocMissing: "Pandoc 未就緒：把 pandoc.exe 放到 md-editor.exe 同目錄即解鎖（免安裝）", pandocReady: "Pandoc 已就緒",
+    exportDone: "匯出完成：",
     exportImageSlices: "文件較長，已分片匯出多張 PNG：", pasteImgUntitledHint: "（提示：文件尚未儲存，截圖存到了應用目錄，儲存文件後建議整理）",
     exportStagePage: "正在產生頁面…", exportStagePrint: "正在列印為 PDF…", exportStageSave: "正在儲存檔案…",
     fontSizeTip: "字號：先框選文字，再選字號",
@@ -100,7 +100,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     switchToIRTip: "Switch to Markdown (IR) (Ctrl+Alt+M)", switchToWYSIWYGTip: "Switch to WYSIWYG to edit tables (Ctrl+Alt+M)",
     panelTitle: "Outline · click to navigate · ✕ delete · drag to reorder",
     export: "💾 Export ▾", exportNoDoc: "(Open or create a document first)", exportFail: "Export failed: ", exporting: "Exporting PDF, please wait…",
-    exportDone: "Exported: ", pandocMissing: "Pandoc not found: drop pandoc.exe next to md-editor.exe to unlock (no install needed)", pandocReady: "Pandoc ready",
+    exportDone: "Exported: ",
     exportImageSlices: "Long document, exported as multiple PNG slices: ", pasteImgUntitledHint: "(Tip: document not saved yet; screenshot stored in app folder)",
     exportStagePage: "Generating pages…", exportStagePrint: "Printing to PDF…", exportStageSave: "Saving file…",
     fontSizeTip: "Font size: select text first, then pick a size",
@@ -1403,8 +1403,8 @@ table { border-collapse: collapse; }
 </html>`;
 }
 
-// ===== v0.3.0 导出中心：HTML 两档 / 图片长图 / DOCX / Pandoc 桥（v0.3.2 移除"复制富文本"）=====
-// Typora 二分法：零依赖格式内置，长尾格式（EPUB/LaTeX/RTF）检测到用户自备 pandoc.exe 才点亮。
+// ===== v0.3.0 导出中心：HTML 两档 / 图片长图 / DOCX（v0.3.2 移除"复制富文本"，v0.3.5 移除 Pandoc 桥）=====
+
 
 /** File → 纯 base64（无 data: 前缀） */
 function fileToBase64(f: File): Promise<string> {
@@ -1446,17 +1446,6 @@ function resolvePreviewImages(html: string): string {
     else if (docDir) abs = docDir + "/" + src.split("?")[0]; // 相对路径按文档目录解析
     if (!abs) return m;
     try { return p1 + convertFileSrc(abs) + p3; } catch { return m; }
-  });
-}
-
-let pandocPath: string | null = null;
-
-async function refreshPandocMenu(): Promise<void> {
-  try { pandocPath = await invoke<string | null>("detect_pandoc"); } catch { pandocPath = null; }
-  const label = document.getElementById("pandoc-label");
-  if (label) label.textContent = pandocPath ? t("pandocReady") : t("pandocMissing");
-  document.querySelectorAll<HTMLButtonElement>("#export-menu button[data-pandoc]").forEach((b) => {
-    b.disabled = !pandocPath;
   });
 }
 
@@ -1831,29 +1820,12 @@ async function exportDocx(): Promise<void> {
   }
 }
 
-/** Pandoc 桥导出（EPUB/LaTeX/RTF） */
-async function exportViaPandoc(fmt: string, ext: string, filterName: string): Promise<void> {
-  if (!pandocPath) { alert(t("pandocMissing")); return; }
-  const doc = activeDoc();
-  if (!doc || !vditor) { alert(t("exportNoDoc")); return; }
-  const md = await rescueFootnoteDefs(vditor.getValue(), doc.path);
-  const path = await pickExportPath(ext, filterName);
-  if (!path) return;
-  // 相对路径图片按文档目录解析（temp md 在 %TEMP%，不传 resource-path 时 pandoc 静默缺图）
-  const docDir = doc.path ? doc.path.replace(/\\/g, "/").replace(/\/[^/]*$/, "") : null;
-  try {
-    await invoke("pandoc_export", { pandoc: pandocPath, md, outPath: path, fmt, docDir });
-    alert(t("exportDone") + path);
-  } catch (e) { alert(t("exportFail") + e); }
-}
-
 function bindExportMenu(): void {
   const btn = document.getElementById("btn-export")!;
   const menu = document.getElementById("export-menu")!;
-  btn.addEventListener("click", async (e) => {
+  btn.addEventListener("click", (e) => {
     e.stopPropagation();
-    if (menu.hidden) { await refreshPandocMenu(); menu.hidden = false; }
-    else menu.hidden = true;
+    menu.hidden = !menu.hidden;
   });
   menu.addEventListener("click", async (e) => {
     const target = e.target as HTMLElement;
@@ -1866,9 +1838,6 @@ function bindExportMenu(): void {
     else if (kind === "html-plain") exportHtml(false);
     else if (kind === "image") exportImagePng();
     else if (kind === "docx") exportDocx();
-    else if (kind === "epub") exportViaPandoc("epub", ".epub", "EPUB");
-    else if (kind === "latex") exportViaPandoc("latex", ".tex", "LaTeX");
-    else if (kind === "rtf") exportViaPandoc("rtf", ".rtf", "RTF");
   });
   // 点外部收起（capture，与查找条同模式；排除导出按钮自身）；Esc 同关（浮层统一交互）
   document.addEventListener("pointerdown", (e) => {
