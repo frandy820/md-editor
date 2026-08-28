@@ -58,6 +58,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     replaceManyConfirm: "匹配超过 500 处，仍要全部替换吗？",
     histBtn: "🕘 历史", histTitle: "版本历史（保存时自动归档，每文件留 50 版/30 天）", histEmpty: "暂无历史版本——本文件保存覆盖旧版后才会产生归档",
     histRestore: "恢复此版本", histRestored: "已载入所选版本（未保存），确认内容后 Ctrl+S 保存落盘", histRestoreFail: "恢复失败：", histNoDoc: "（请先打开一个已保存的文档）", histPreview: "（预览）",
+    tblRowUp: "整行上移", tblRowDown: "整行下移",
     appName: "MD 编辑器",
   },
   "zh-TW": {
@@ -89,6 +90,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     replaceManyConfirm: "符合超過 500 處，仍要全部替換嗎？",
     histBtn: "🕘 歷史", histTitle: "版本歷史（儲存時自動歸檔，每文件留 50 版/30 天）", histEmpty: "暫無歷史版本——本文件儲存覆蓋舊版後才會產生歸檔",
     histRestore: "恢復此版本", histRestored: "已載入所選版本（未儲存），確認內容後 Ctrl+S 儲存落盤", histRestoreFail: "恢復失敗：", histNoDoc: "（請先開啟一個已儲存的文件）", histPreview: "（預覽）",
+    tblRowUp: "整行上移", tblRowDown: "整行下移",
     appName: "MD 編輯器",
   },
   "en": {
@@ -120,6 +122,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     replaceManyConfirm: "More than 500 matches. Replace all anyway?",
     histBtn: "🕘 History", histTitle: "Version history (auto-archived on save, 50 versions / 30 days per file)", histEmpty: "No versions yet — archives appear after this file is saved over an older version",
     histRestore: "Restore this version", histRestored: "Version loaded (unsaved). Review and press Ctrl+S to write to disk", histRestoreFail: "Restore failed: ", histNoDoc: "(Open a saved document first)", histPreview: "(preview)",
+    tblRowUp: "Move row up", tblRowDown: "Move row down",
     appName: "MD Editor",
   },
 };
@@ -671,6 +674,14 @@ async function handleOpenPdf(pdfPath: string) {
 
 let pendingFile: string | null = null;
 
+// 表格浮条"整行上移/下移"的光标兜底：最近一次点击的单元格。document 级 capture 挂一次
+// （编辑区 pre.vditor-reset 会被 Vditor 销毁重建，挂元素上会随重建丢失）。
+let lastTblCell: HTMLTableCellElement | null = null;
+document.addEventListener("mousedown", (e) => {
+  const c = (e.target as Element | null)?.closest?.(".vditor-reset td, .vditor-reset th");
+  if (c) lastTblCell = c as HTMLTableCellElement;
+}, true);
+
 // 构造 Vditor options：toolbar/input/after 统一在此，mode 由参数决定（销毁重建切换模式时复用）
 type VditorOptions = NonNullable<ConstructorParameters<typeof Vditor>[1]>;
 function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
@@ -697,8 +708,64 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
     outline: { enable: false, position: "right" },
     // Vditor 3.11.2 的 popover 高亮链会无守卫调用 options.customWysiwygToolbar(...)：
     // 光标进入表格/引用/列表/脚注时必触发，未配置即抛 TypeError（PAGEERROR 杂音来源）。
-    // 官方可选回调（dist/types/index.d.ts:815），给空实现消除——将来要扩展浮条可在此挂。
-    customWysiwygToolbar: () => {},
+    // v0.3.10 给空实现消噪；v0.3.12 扩展为表格浮条补齐：原生已有对齐（居左/中/右）+插入/删
+    // 除行列，但没有"整行上移/下移"（原生上/下按钮移动的是整个表格块，实测前段与表格换位），
+    // 在此补两键（tbody 内 tr 换位，行序即内容，经 Lute 序列化进源码）。
+    // 防重只能查按钮本身：Vditor 保存后会清空重建 popover 子内容（按钮丢失），但复用
+    // panel 元素——dataset 标记会残留导致重注入被跳过（e2e T3 实测踩坑）。
+    customWysiwygToolbar: (type: string, popover?: HTMLElement) => {
+      if (type !== "table" || !popover || popover.querySelector(".mded-tbl-btn")) return;
+      // 光标兜底链：选区 anchorNode → 最近一次真实点击过的单元格（点按钮的 mousedown
+      // preventDefault 保选区，但 caret 形态/重渲染都可能让 anchorNode 失效，缓存最稳）
+      const lastCell = (): HTMLTableCellElement | null => lastTblCell;
+      const curCell = (): HTMLTableCellElement | null => {
+        const n = document.getSelection()?.anchorNode;
+        const el = n && (n.nodeType === 1 ? (n as Element) : n.parentElement);
+        return (el?.closest(".vditor-reset td, .vditor-reset th") as HTMLTableCellElement)
+          || lastCell();
+      };
+      const syncDoc = (): void => { // 与 input 回调同构：直接 DOM 操作也要更新内容缓存+脏标
+        const doc = activeDoc();
+        if (doc && vditor) {
+          const v = mdValue();
+          if (v !== "" || doc.content === "") doc.content = v;
+          doc.dirty = true;
+        }
+        updateTitle(); renderTabs(); scheduleOutline();
+      };
+      const moveRow = (dir: -1 | 1): void => {
+        const cell = curCell();
+        const tr = cell?.closest("tr");
+        const body = tr?.parentElement;
+        if (!cell || !tr || !body || body.tagName !== "TBODY") return; // 表头行不参与移动
+        const sib = dir < 0 ? tr.previousElementSibling : tr.nextElementSibling;
+        if (!sib) return;
+        body.insertBefore(tr, dir < 0 ? sib : sib.nextElementSibling);
+        const back = tr.cells[Math.min(cell.cellIndex, tr.cells.length - 1)];
+        if (back) {
+          const range = document.createRange();
+          range.selectNodeContents(back);
+          const sel = document.getSelection();
+          sel?.removeAllRanges();
+          sel?.addRange(range);
+        }
+        syncDoc();
+      };
+      const sep = document.createElement("span");
+      sep.style.cssText = "width:1px;height:16px;background:currentColor;opacity:.25;margin:0 3px;align-self:center";
+      popover.appendChild(sep);
+      ([["up", "tblRowUp", () => moveRow(-1)],
+        ["down", "tblRowDown", () => moveRow(1)]] as [string, string, () => void][]).forEach(([icon, key, fn]) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "vditor-icon vditor-tooltipped vditor-tooltipped__n mded-tbl-btn";
+        btn.setAttribute("aria-label", t(key));
+        btn.innerHTML = `<svg><use xlink:href="#vditor-icon-${icon}"></use></svg>`;
+        btn.addEventListener("mousedown", (e) => e.preventDefault()); // 防点击夺走选区（curCell 依赖）
+        btn.addEventListener("click", fn);
+        popover.appendChild(btn);
+      });
+    },
     preview: {
       hljs: { lineNumber: true, style: "github" },
       // 数学公式 KaTeX（引擎资源已本地化；inlineDigit 允许行内 $ 后跟数字，兼容中文排版场景）
@@ -741,6 +808,7 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
       document.querySelector(".vditor-wysiwyg pre.vditor-reset, .vditor-ir pre.vditor-reset")
         ?.setAttribute("spellcheck", "true");
       rebindImagePreview(); // v0.3.11 编辑器内本地图片预览（wysiwyg；重建后重挂 observer）
+      rebindTableResize(); // v0.3.11 表格列宽拖动（近缘判定+持久化重应用）
       closeFind(); // 模式/语言切换销毁重建：旧匹配节点全部失效
       if (!vditorInited) {
         // 首次初始化：打开欢迎文档、处理命令行传入的文件
@@ -1585,6 +1653,144 @@ function rebindImagePreview(): void {
   imgPreviewObserver.observe(root, { childList: true, subtree: true });
 }
 
+// ===== v0.3.11 表格列宽拖动（视图层方案：不动 md 源码，宽度按文档+表格签名持久化） =====
+// 交互=Excel/Word 式近缘判定：鼠标移到表头单元格右缘 6px 内出 col-resize 光标，拖动改列宽，
+// 右邻列互补（表格总宽稳定）。table-layout:fixed + 首行 th.style.width 定列宽（Lute 序列化
+// 只取文本与对齐，样式不进源码——e2e 断言 getValue 干净性兜底）。Vditor 重渲染清 style 后由
+// observer 重应用。导出链在 resolveImageSources 同期把宽度写进产物（见 applyExportWidths）。
+const COLW_KEY = "mded-colw-v1";
+let tblWidthObserver: MutationObserver | null = null;
+
+function colwAll(): Record<string, Record<string, number[]>> {
+  try { return JSON.parse(localStorage.getItem(COLW_KEY) || "{}"); } catch { return {}; }
+}
+function tableSig(tb: HTMLTableElement): string {
+  return (tb.rows[0]?.innerText || "").replace(/\s+/g, "").slice(0, 60);
+}
+function docKeyOf(): string {
+  const doc = activeDoc();
+  return doc?.path || ("name:" + (doc?.name || ""));
+}
+/** 把存档宽度应用到当前所有表格（重渲染/切文档/启动后调用） */
+function applyTableWidths(): void {
+  const root = document.querySelector(".vditor-wysiwyg pre.vditor-reset");
+  if (!root) return;
+  const saved = colwAll()[docKeyOf()] || {};
+  root.querySelectorAll<HTMLTableElement>("table").forEach((tb) => {
+    const w = saved[tableSig(tb)];
+    if (!w) return;
+    tb.style.tableLayout = "fixed";
+    const first = tb.rows[0];
+    if (!first) return;
+    [...first.cells].forEach((c, i) => { if (w[i] > 0) (c as HTMLElement).style.width = w[i] + "px"; });
+  });
+}
+/** 导出用：把编辑器当前的列宽写进导出 fragment 的 table（HTML/PDF/PNG 同步所见） */
+function applyExportWidths(fragment: HTMLElement): void {
+  const saved = colwAll()[docKeyOf()] || {};
+  fragment.querySelectorAll<HTMLTableElement>("table").forEach((tb) => {
+    const w = saved[tableSig(tb)];
+    if (!w) return;
+    tb.style.tableLayout = "fixed";
+    const first = tb.rows[0];
+    if (!first) return;
+    [...first.cells].forEach((c, i) => { if (w[i] > 0) (c as HTMLElement).style.width = w[i] + "px"; });
+  });
+}
+function rebindTableResize(): void {
+  tblWidthObserver?.disconnect();
+  const root = document.querySelector(".vditor-wysiwyg pre.vditor-reset") as HTMLElement | null;
+  if (!root) return;
+  applyTableWidths();
+  tblWidthObserver = new MutationObserver(() => applyTableWidths());
+  tblWidthObserver.observe(root, { childList: true, subtree: true });
+
+  // 近缘光标（mousemove 节流切换，不加 DOM 手柄——零注入零序列化风险）
+  root.addEventListener("mousemove", (e) => {
+    const cell = (e.target as HTMLElement).closest?.("th,td") as HTMLElement | null;
+    if (!cell) { root.style.cursor = ""; return; }
+    const r = cell.getBoundingClientRect();
+    const near = e.clientX > r.right - 6 && e.clientX < r.right + 4;
+    root.style.cursor = near ? "col-resize" : "";
+  });
+  root.addEventListener("mouseleave", () => { root.style.cursor = ""; });
+  root.addEventListener("mousedown", (e) => {
+    const cell = (e.target as HTMLElement).closest?.("th,td") as HTMLElement | null;
+    if (!cell || !cell.closest("table")) return;
+    const r = cell.getBoundingClientRect();
+    if (!(e.clientX > r.right - 6 && e.clientX < r.right + 4)) return;
+    const tb = cell.closest("table") as HTMLTableElement;
+    const idx = (cell as HTMLTableCellElement).cellIndex;
+    const first = tb.rows[0];
+    if (!first || idx >= first.cells.length) return;
+    // 锚定：编辑器当前真实列宽（渲染态可能与存档有偏差，从 rect 起算）
+    const colRect = (first.cells[idx] as HTMLElement).getBoundingClientRect();
+    const nextCell = first.cells[idx + 1] as HTMLElement | undefined;
+    const nextRect = nextCell?.getBoundingClientRect();
+    const startX = e.clientX;
+    const w0 = colRect.width, w1 = nextRect?.width ?? 0;
+    tb.style.tableLayout = "fixed";
+    (first.cells[idx] as HTMLElement).style.width = w0 + "px";
+    if (nextCell) nextCell.style.width = w1 + "px"; // 固定右邻宽，拖动只伸缩本列+压缩右邻
+    e.preventDefault();
+    const onMove = (ev: MouseEvent): void => {
+      const dx = ev.clientX - startX;
+      const nw = Math.max(30, w0 + dx);
+      (first.cells[idx] as HTMLElement).style.width = nw + "px";
+      if (nextCell) nextCell.style.width = Math.max(30, w1 - dx) + "px";
+    };
+    const onUp = (): void => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      const widths = [...first.cells].map((c) => Math.round((c as HTMLElement).getBoundingClientRect().width));
+      const all = colwAll();
+      const k = docKeyOf();
+      all[k] = all[k] || {};
+      all[k][tableSig(tb)] = widths;
+      try { localStorage.setItem(COLW_KEY, JSON.stringify(all)); } catch { /* 存储禁用则仅本会话 */ }
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  });
+}
+
+/** v0.3.12 大纲侧栏可拖宽（参考 Word 导航窗格）：右缘 5px 近缘拖动，clamp [180, 520]
+ *  且不超过视口一半，宽度持久化 localStorage。面板为静态元素只挂一次。 */
+const OUTLINE_W_KEY = "mded-outline-w-v1";
+const OUTLINE_W_MIN = 180, OUTLINE_W_MAX = 520;
+function initOutlineResize(): void {
+  const panel = document.getElementById("outline-panel");
+  if (!panel || panel.dataset.mdedResizable) return;
+  panel.dataset.mdedResizable = "1";
+  const clamp = (w: number): number =>
+    Math.min(OUTLINE_W_MAX, Math.max(OUTLINE_W_MIN, Math.min(w, Math.floor(window.innerWidth / 2))));
+  try {
+    const saved = parseInt(localStorage.getItem(OUTLINE_W_KEY) || "", 10);
+    if (!isNaN(saved)) panel.style.width = clamp(saved) + "px";
+  } catch { /* 存储禁用则用 CSS 默认宽 */ }
+  panel.addEventListener("mousemove", (e) => {
+    const r = panel.getBoundingClientRect();
+    panel.style.cursor = (e.clientX > r.right - 5) ? "col-resize" : "";
+  });
+  panel.addEventListener("mouseleave", () => { panel.style.cursor = ""; });
+  panel.addEventListener("mousedown", (e) => {
+    const r = panel.getBoundingClientRect();
+    if (e.clientX <= r.right - 5) return;
+    e.preventDefault();
+    const startX = e.clientX, w0 = r.width;
+    const onMove = (ev: MouseEvent): void => {
+      panel.style.width = clamp(w0 + (ev.clientX - startX)) + "px";
+    };
+    const onUp = (): void => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      try { localStorage.setItem(OUTLINE_W_KEY, String(Math.round(panel.getBoundingClientRect().width))); } catch { /* 同上 */ }
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  });
+}
+
 /** 统一取"干净"md 源码：wysiwyg 显示层换算会把 img src 写成 asset URL（DOM 序列化污染），
  *  保存/导出/查找前还原为可移植相对路径。全部 getValue 调用点统一走此函数（单一出口）。 */
 function mdValue(): string {
@@ -1673,6 +1879,7 @@ async function exportFragment(mathOutput: "html" | "mathml" = "html"): Promise<s
   const tmp = document.createElement("div");
   tmp.innerHTML = fragmentHtml;
   resolveImageSources(tmp, doc.path);
+  applyExportWidths(tmp); // v0.3.11 编辑器内拖定的列宽同步进导出物
   await renderSpecialBlocks(tmp, mathOutput);
   return tmp.innerHTML;
 }
@@ -2505,6 +2712,7 @@ async function boot() {
   bindFocusTypewriter();
   bindFindBar();
   bindHistory(); // v0.3.11 版本历史（工具栏 🕘 按钮）
+  initOutlineResize(); // v0.3.12 大纲侧栏拖宽（Word 式近缘拖动+持久化）
   // 版本号：优先 Tauri 运行时真实版本（与构建产物一致），失败回落 index.html 硬编码
   try {
     const v = await getVersion();
