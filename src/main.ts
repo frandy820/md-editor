@@ -1328,11 +1328,12 @@ function refreshFind(resetIndex: boolean) {
 
 function openFind(withReplace: boolean) {
   const bar = document.getElementById("find-bar")!;
-  bar.hidden = false;
+  const wasOpen = !bar.hidden; // v0.3.12：条已开（如 Ctrl+F 后再 Ctrl+H 展开替换行）时
+  bar.hidden = false;          // 不做选区预填——否则编辑区残留选区会覆盖用户已输入的查找词
   if (withReplace) document.getElementById("replace-row")!.hidden = false;
   const inp = document.getElementById("find-input") as HTMLInputElement;
   // 选区文本预填（≤200 字符），无选区保留上次关键词
-  const selText = getSelection()?.toString() ?? "";
+  const selText = wasOpen ? "" : (getSelection()?.toString() ?? "");
   if (selText && selText.length <= 200 && selText.includes("\n") === false) {
     inp.value = selText;
     refreshFind(true);
@@ -1377,32 +1378,55 @@ function replaceCurrent() {
   refreshFind(false);
 }
 
-// 全部替换：源码级（getValue→替换→setValue）。
-// 不用 DOM 快照逐个替换：每次 execCommand 后 Vditor 重渲染会使快照节点失效（部分替换中断）。
-// 语义注记：单个替换作用于渲染文本，全部替换作用于 md 源码——含 md 标记的关键词在两路径下命中可能不同，可靠优先。
-// 正则模式直接 new RegExp（$1 引用由 String.replace 原生展开）；字面模式转义元字符，
-// 且 rep 走函数形式防 $&/$1 被意外展开（字面替换串含 $ 的历史隐患顺手修）。
+// 全部替换：DOM 循环替换（每轮重扫拿新快照再替换第一处）。
+// v0.3.12 重做：旧路径 getValue→setValue(newSrc, **true**) 会清空 undo 栈=全替后完全
+// 不可撤销（全面测试实测落盘铁证，用户误替换只能靠版本历史救）。改为与单替同构的
+// execCommand("insertText") 键入管线——每处替换一个 undo 步，Ctrl+Z 逐处回退（Word 同语义）。
+// 当年弃用 DOM 快照的根因（execCommand 后 Vditor 重渲染使快照节点失效）用"每轮重扫"化解。
+// 语义注记：单替/全替统一作用于渲染文本（含 md 标记的关键词命中一致）；
+// insertText 原样插入替换串，字面 rep 含 $&/$1 不展开（String.replace 隐患不再存在）。
 function replaceAllMatches() {
   if (!vditor) return;
   const q = (document.getElementById("find-input") as HTMLInputElement).value;
   if (!q) return;
-  const rep = (document.getElementById("replace-input") as HTMLInputElement).value;
-  const src = mdValue();
-  let re: RegExp | null;
-  if (findRegexOn) re = buildFindRegex(q);
-  else re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
-  if (!re) return;
-  const newSrc = findRegexOn ? src.replace(re, rep) : src.replace(re, () => rep);
-  if (newSrc === src) return;
-  const doc = activeDoc();
-  if (doc) {
-    suppressInput = true;
-    vditor.setValue(newSrc, true);
-    suppressInput = false;
-    doc.content = newSrc;
-    doc.dirty = true;
-    scheduleOutline();
-    updateTitle();
+  const repRaw = (document.getElementById("replace-input") as HTMLInputElement).value;
+  let guard = 1500; // 防跑飞（>500 处入口已有确认弹窗，留重扫余量）
+  let done = 0;
+  // 起点重置到文档头：清选区（execCommand 后选区塌缩在插入末尾，是天然的"已处理边界"）
+  getSelection()?.removeAllRanges();
+  refreshFind(true);
+  while (guard-- > 0) {
+    // 只处理"当前选区（上一替换插入点）之后"的匹配：替换产物自身含匹配内容时
+    // （如 #1# 里的 1 再命中 (\d+)）不回头重替换，防滚雪球死循环
+    const sel = getSelection();
+    const an = sel?.anchorNode ?? null, ao = sel?.anchorOffset ?? 0;
+    const ms = (!an) ? findMatches : findMatches.filter((m) => {
+      if (m.node === an) return m.start >= ao;
+      // an 在 m.node 之前（m 已过）→ an 是 m.node 的 FOLLOWING → 排除
+      return !(m.node.compareDocumentPosition(an) & Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+    const m = ms[0];
+    if (!m) break;
+    let rep = repRaw;
+    if (findRegexOn) {
+      const hit = m.node.data.slice(m.start, m.end);
+      try { rep = hit.replace(new RegExp(q, "i"), repRaw); } catch { /* 无效正则按字面 */ }
+    }
+    const root = document.querySelector(".vditor-wysiwyg pre.vditor-reset, .vditor-ir pre.vditor-reset") as HTMLElement | null;
+    try {
+      const r = document.createRange();
+      r.setStart(m.node, m.start); r.setEnd(m.node, m.end);
+      root?.focus();
+      const sel2 = getSelection(); sel2!.removeAllRanges(); sel2!.addRange(r);
+      if (!document.execCommand("insertText", false, rep)) break;
+    } catch { break; }
+    done++;
+    refreshFind(true); // DOM 已重渲染，重扫取新快照（旧 findMatches 全部作废）
+  }
+  if (done > 0) {
+    const doc = activeDoc();
+    if (doc) { doc.content = mdValue(); doc.dirty = true; } // input 回调也会做，双保险
+    scheduleOutline(); updateTitle();
   }
   refreshFind(true);
 }
