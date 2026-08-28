@@ -522,6 +522,40 @@ fn dnd_selftest_enabled() -> bool {
     std::env::args().any(|a| a == "--dnd-selftest")
 }
 
+/// v0.3.9 打印：WebView2 的 window.print() 被 WebView2 静默忽略（宿主负责打印，实测无窗口），
+/// 走微软正路 ICoreWebView2_16::ShowPrintUI —— 系统"打印预览"窗口（可选打印机/份数/双面）。
+/// 打印内容（正文渲染 HTML）由前端先备好 #print-root + @media print 隐藏应用 UI。
+/// ShowPrintUI 打开预览后立即返回（非模态）；预览窗口关闭时前端收 afterprint 清理。
+#[tauri::command]
+fn print_webview(window: tauri::WebviewWindow) -> Result<(), String> {
+    use webview2_com::Microsoft::Web::WebView2::Win32::{
+        ICoreWebView2_16, COREWEBVIEW2_PRINT_DIALOG_KIND_SYSTEM,
+    };
+    use windows::core::Interface; // cast() 是 Interface trait 方法
+    // with_webview 闭包在主线程执行，invoke 在 runtime 线程等结果——channel 传回，无死锁
+    let (tx, rx) = std::sync::mpsc::channel::<Result<(), String>>();
+    window
+        .with_webview(move |webview| {
+            let res = unsafe {
+                (|| -> windows::core::Result<()> {
+                    let t0 = std::time::Instant::now();
+                    let core = webview.controller().CoreWebView2()?;
+                    let p16: ICoreWebView2_16 = core.cast()?;
+                    // SYSTEM(1)=传统系统打印对话框（选打印机/份数/双面），实测本机可弹；
+                    // BROWSER(0)=Edge 式预览窗在 Tauri 宿主下静默无效（S_OK 无窗），不用
+                    let hr = p16.ShowPrintUI(COREWEBVIEW2_PRINT_DIALOG_KIND_SYSTEM);
+                    eprintln!("[print] ShowPrintUI(SYSTEM) 返回 {hr:?}，阻塞 {:?}", t0.elapsed());
+                    hr
+                })()
+            };
+            let _ = tx.send(res.map_err(|e| e.to_string()));
+        })
+        .map_err(|e| format!("with_webview 失败：{e}"))?;
+    rx.recv()
+        .map_err(|_| "打印结果通道关闭".to_string())?
+        .map_err(|e| format!("ShowPrintUI 失败：{e}"))
+}
+
 /// 自测导出目录：启动参数 --export-selftest <dir> 时返回该目录（前端导出跳过原生保存对话框、
 /// 直接拼 dir/文档名.ext 落盘，供 e2e 全链路自动化；正常启动返回 None 走对话框）
 #[tauri::command]
@@ -751,7 +785,8 @@ pub fn run() {
             save_paste_image,
             export_selftest_dir,
             save_ui_state,
-            dnd_selftest_enabled
+            dnd_selftest_enabled,
+            print_webview
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

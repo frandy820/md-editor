@@ -1345,6 +1345,10 @@ function bindFindBar() {
       e.preventDefault(); e.stopPropagation(); openFind(false);
     } else if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "h" || e.key === "H")) {
       e.preventDefault(); e.stopPropagation(); openFind(true);
+    } else if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "p" || e.key === "P")) {
+      // v0.3.9 打印。Vditor 内置 ⌘P=edit-mode 按钮热键，但工具栏未配置该按钮不激活；
+      // 捕获拦截兜底（与 Ctrl+H 同理），防双触发
+      e.preventDefault(); e.stopPropagation(); printCurrentDoc();
     }
   }, true);
   // 编辑内容变化 → 高亮同步（document input 捕获 contenteditable 键入，避免动 vditor 共用 input 回调链）
@@ -1617,6 +1621,35 @@ async function exportImagePng(): Promise<void> {
     alert(t("exportFail") + e);
   } finally {
     if (overlay) overlay.hidden = true;
+  }
+}
+
+/** v0.3.9 打印正文：内容与导出同管线（公式/图表渲染、图片 file:// 解析、A4 模板样式）备进
+ * #print-root（屏幕藏视口外），打印态只留它；再走 Rust ShowPrintUI 弹系统打印预览
+ * （WebView2 的 window.print() 被静默忽略——宿主负责打印，实测无任何窗口）。
+ * 模板 CSS 整体包 @media print 注入：屏幕零扰动，打印布局与 PDF 导出一致（含 @page A4）。
+ * 预览窗口关闭后 WebView 发 afterprint 清理；兜底 120s（打印引擎不发事件的极端情况）。 */
+let printingCleanupTimer = 0;
+function cleanupPrintRoot(): void {
+  document.getElementById("print-root")?.remove();
+  if (printingCleanupTimer) { window.clearTimeout(printingCleanupTimer); printingCleanupTimer = 0; }
+}
+async function printCurrentDoc(): Promise<void> {
+  const frag = await exportFragment("html");
+  if (!frag) return;
+  cleanupPrintRoot();
+  const root = document.createElement("div");
+  root.id = "print-root";
+  const css = wrapExportHtml("").match(/<style>([\s\S]*?)<\/style>/)?.[1] || "";
+  root.innerHTML = `<style>@media print{\n${css}\n}</style><div class="vditor-reset">${frag}</div>`;
+  document.body.appendChild(root);
+  try {
+    await invoke("print_webview");
+    window.addEventListener("afterprint", cleanupPrintRoot, { once: true });
+    printingCleanupTimer = window.setTimeout(cleanupPrintRoot, 120000);
+  } catch (e) {
+    cleanupPrintRoot();
+    alert(t("exportFail") + e);
   }
 }
 
@@ -1924,6 +1957,7 @@ function bindExportMenu(): void {
     else if (kind === "html-plain") exportHtml(false);
     else if (kind === "image") exportImagePng();
     else if (kind === "docx") exportDocx();
+    else if (kind === "print") printCurrentDoc();
   });
   // 点外部收起（capture，与查找条同模式；排除导出按钮自身）；Esc 同关（浮层统一交互）
   document.addEventListener("pointerdown", (e) => {
@@ -2248,14 +2282,8 @@ async function boot() {
     }
   });
 
-  // 导出 PDF：点击按钮 或 Ctrl+P（拦截浏览器原生打印，改为打印渲染后的纯内容，排除工具栏/大纲）
-  bindExportMenu(); // 导出中心下拉菜单（Ctrl+P 仍直达 PDF）
-  window.addEventListener("keydown", (e) => {
-    if ((e.ctrlKey || e.metaKey) && (e.key === "p" || e.key === "P")) {
-      e.preventDefault();
-      exportPdf();
-    }
-  });
+  // 导出中心下拉菜单（PDF/HTML/图片/Word/打印）。Ctrl+P=打印，在上方 capture 阶段统一拦截
+  bindExportMenu();
 
   // Ctrl+S 保存（编辑器标配；此前只有保存按钮+30s 自动保存，真实用户测试发现的缺口）
   window.addEventListener("keydown", (e) => {

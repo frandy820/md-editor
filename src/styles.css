@@ -192,3 +192,11 @@ body.focus-mode .vditor-reset > .fw-current { opacity: 1; }
 #find-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 300; }
 .find-mark { position: fixed; background: rgba(255, 213, 0, 0.35); border-radius: 2px; }
 .find-mark.current { background: rgba(255, 140, 0, 0.5); outline: 1px solid #e80; }
+
+/* ===== v0.3.9 打印：正文渲染结果备于此（屏幕藏视口外），打印态只留它 ===== */
+#print-root { position: fixed; left: -20000px; top: 0; width: 794px; background: #fff; }
+@media print {
+  /* 应用 UI 全部让位（body 直接子元素除打印根外一律不显示） */
+  body > *:not(#print-root) { display: none !important; }
+  #print-root { position: static !important; left: 0 !important; top: auto !important; width: auto !important; }
+}
