@@ -689,6 +689,10 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
     // Vditor 工具栏 padding-left 计算式只看 position=="left" 就加上 outline 宽(188px)，
     // enable=false 也照加，表现为格式工具条左侧一大段空白（用户报"顶格才好看"的根因）
     outline: { enable: false, position: "right" },
+    // Vditor 3.11.2 的 popover 高亮链会无守卫调用 options.customWysiwygToolbar(...)：
+    // 光标进入表格/引用/列表/脚注时必触发，未配置即抛 TypeError（PAGEERROR 杂音来源）。
+    // 官方可选回调（dist/types/index.d.ts:815），给空实现消除——将来要扩展浮条可在此挂。
+    customWysiwygToolbar: () => {},
     preview: {
       hljs: { lineNumber: true, style: "github" },
       // 数学公式 KaTeX（引擎资源已本地化；inlineDigit 允许行内 $ 后跟数字，兼容中文排版场景）
@@ -1349,6 +1353,27 @@ function bindFindBar() {
       // v0.3.9 打印。Vditor 内置 ⌘P=edit-mode 按钮热键，但工具栏未配置该按钮不激活；
       // 捕获拦截兜底（与 Ctrl+H 同理），防双触发
       e.preventDefault(); e.stopPropagation(); printCurrentDoc();
+    } else if (!e.isComposing && (e.ctrlKey || e.metaKey) && !e.altKey && !e.key.startsWith("Arrow") && (
+        (!e.shiftKey && (e.key === "z" || e.key === "Z")) || // Ctrl+Z 撤销
+        (!e.shiftKey && (e.key === "y" || e.key === "Y")) || // Ctrl+Y 重做
+        (e.shiftKey && (e.key === "z" || e.key === "Z"))     // Ctrl+Shift+Z 重做
+      ) && !!(e.target as Element | null)?.closest?.(".vditor")) {
+      // v0.3.10 撤销/重做统一 Vditor 单轨。Vditor 键盘分支自带 !toolbar.elements.undo 条件：
+      // 工具栏配了 undo/redo 按钮后键盘 ⌘Z/⌘Y 不再走 Vditor，落入 Chromium 原生
+      // contenteditable undo——与按钮的 Vditor patch 栈双轨互踩，键盘撤掉的步不进
+      // Vditor redoStack，按钮 redo 恒灰（"点不动"的真因，v0.3.3 误判为内核清栈）。
+      // 捕获转发到与工具栏按钮同一 Vditor undo 栈；焦点在查找条等输入框时不拦（保留原生）。
+      e.preventDefault(); e.stopPropagation();
+      const isRedo = e.shiftKey || e.key === "y" || e.key === "Y";
+      // vditor.undo 运行时存在（toolbar MenuItem 即此路径）但 Vditor 类类型未暴露
+      // （挂在 IVditor 接口，dist/types/index.d.ts:876），按序断言取用
+      const vu = (vditor as unknown as {
+        undo?: { undo(v: Vditor): void; redo(v: Vditor): void };
+      })?.undo;
+      if (vditor && vu) {
+        if (isRedo) vu.redo(vditor);
+        else vu.undo(vditor);
+      }
     }
   }, true);
   // 编辑内容变化 → 高亮同步（document input 捕获 contenteditable 键入，避免动 vditor 共用 input 回调链）
