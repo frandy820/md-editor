@@ -75,6 +75,7 @@ fn save_file(path: String, content: String) -> Result<(), String> {
             }
         }
     }
+    archive_old_version(&path); // v0.3.11 覆盖前归档旧版（best-effort）
     let tmp = format!("{}.tmp", path);
     fs::write(&tmp, &content).map_err(|e| e.to_string())?;
     // 同目录 rename 在 Windows 上原子覆盖目标文件
@@ -82,6 +83,120 @@ fn save_file(path: String, content: String) -> Result<(), String> {
         let _ = fs::remove_file(&tmp);
         e.to_string()
     })
+}
+
+// ===== v0.3.11 版本历史/文件恢复 =====
+// 保存覆盖前把磁盘旧内容归档到 %APPDATA%\md-editor\versions\<文件stem>\，
+// 保留策略：每文件最近 50 版且 30 天内（保存时顺带清理）。best-effort：归档失败不阻断保存。
+
+fn versions_root() -> std::path::PathBuf {
+    let base = std::env::var("APPDATA").unwrap_or_else(|_| ".".into());
+    std::path::PathBuf::from(base).join("md-editor").join("versions")
+}
+
+fn version_stem(path: &str) -> String {
+    let stem = std::path::Path::new(path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("doc");
+    // 同名不同目录的文档共用一个 stem 分组：加路径短哈希消歧（FNV-1a 16 位足够）
+    let mut h: u16 = 0;
+    for b in path.bytes() {
+        h = (h.wrapping_mul(31)).wrapping_add(b as u16);
+    }
+    format!("{}_{:04x}", stem.chars().map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' }).collect::<String>(), h)
+}
+
+/// 本地(UTC+8)时间戳串 yyyyMMdd_HHmmss（复用截图命名的无 chrono 换算）
+fn local_ts() -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let local = now + 8 * 3600;
+    let (y, mo, d) = civil_from_days((local / 86400) as i64);
+    let s = local % 86400;
+    format!("{:04}{:02}{:02}_{:02}{:02}{:02}", y, mo, d, s / 3600, s % 3600 / 60, s % 60)
+}
+
+/// 保存前归档旧内容（无旧文件/空文件跳过）。不返回 Result：失败静默（不影响保存主流程）。
+fn archive_old_version(path: &str) {
+    // 测试隔离（仅 cargo test 编译期生效）：夹具全在 tempdir，跳过归档避免污染真实 %APPDATA%。
+    // 不能运行时判 temp 路径——本机 TEMP 重定向到 F:\Cache\temp，e2e 夹具同在其中会被误伤
+    #[cfg(test)]
+    if std::path::Path::new(path).starts_with(std::env::temp_dir()) { return; }
+    let Ok(old) = fs::read_to_string(path) else { return };
+    if old.is_empty() { return; }
+    let dir = versions_root().join(version_stem(path));
+    if fs::create_dir_all(&dir).is_err() { return; }
+    let _ = fs::write(dir.join(format!("{}.md", local_ts())), &old);
+    // 清理：>50 版删最旧；>30 天删
+    let mut entries: Vec<(std::path::PathBuf, std::time::SystemTime)> = Vec::new();
+    if let Ok(rd) = fs::read_dir(&dir) {
+        for e in rd.flatten() {
+            if let Ok(meta) = e.metadata() {
+                if let Ok(m) = meta.modified() {
+                    entries.push((e.path(), m));
+                }
+            }
+        }
+    }
+    let cutoff = std::time::SystemTime::now() - std::time::Duration::from_secs(30 * 86400);
+    entries.retain(|(_, m)| *m >= cutoff);
+    if entries.len() > 50 {
+        entries.sort_by_key(|(_, m)| *m);
+        for (p, _) in &entries[..entries.len() - 50] {
+            let _ = fs::remove_file(p);
+        }
+    }
+}
+
+#[derive(serde::Serialize)]
+struct VersionInfo {
+    file: String,
+    #[serde(rename = "mtimeMs")]
+    mtime_ms: u64,
+    size: u64,
+}
+
+/// 列出某文档的全部版本（mtime 降序 = 最新在前）
+#[tauri::command]
+fn list_versions(path: String) -> Result<Vec<VersionInfo>, String> {
+    let dir = versions_root().join(version_stem(&path));
+    let mut out = Vec::new();
+    if let Ok(rd) = fs::read_dir(&dir) {
+        for e in rd.flatten() {
+            let p = e.path();
+            if p.extension().and_then(|s| s.to_str()) != Some("md") { continue; }
+            let meta = e.metadata().map_err(|e| e.to_string())?;
+            let mtime_ms = meta
+                .modified()
+                .ok()
+                .and_then(|m| m.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(0);
+            out.push(VersionInfo {
+                file: p.to_string_lossy().into_owned(),
+                mtime_ms,
+                size: meta.len(),
+            });
+        }
+    }
+    out.sort_by(|a, b| b.mtime_ms.cmp(&a.mtime_ms));
+    Ok(out)
+}
+
+/// 读一个版本快照。校验路径必须位于 versions 根内（防目录穿越读任意文件）。
+#[tauri::command]
+fn read_version(file: String) -> Result<String, String> {
+    let root = versions_root();
+    let p = std::path::Path::new(&file);
+    let canon = p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
+    let canon_root = root.canonicalize().unwrap_or(root);
+    if !canon.starts_with(&canon_root) {
+        return Err("非法版本文件路径".into());
+    }
+    fs::read_to_string(&canon).map_err(|e| e.to_string())
 }
 
 // ===== PDF 导出：调系统 msedge --headless --print-to-pdf =====
@@ -773,6 +888,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             open_file,
             save_file,
+            list_versions,
+            read_version,
             export_pdf,
             get_startup_file,
             find_pdf_source,
@@ -1138,6 +1255,32 @@ mod tests {
         let p = dir.join("a.docx");
         let err = save_file(p.to_str().unwrap().to_string(), "x".to_string()).unwrap_err();
         assert!(err.contains("不支持"), "非白名单扩展名应拒绝，实际 err={err}");
+    }
+
+    // ===== v0.3.11 版本历史 =====
+    #[test]
+    fn read_version_rejects_path_escape() {
+        let err = read_version("C:\\Windows\\win.ini".to_string()).unwrap_err();
+        assert!(err.contains("非法"), "目录穿越应拒绝，实际 err={err}");
+    }
+
+    #[test]
+    fn archive_skips_temp_paths() {
+        // tempdir 夹具：不归档不崩溃（隔离验证，真实归档由 release e2e 覆盖）
+        let dir = tempdir();
+        let p = dir.join("t.md");
+        fs::write(&p, "v1").unwrap();
+        archive_old_version(p.to_str().unwrap());
+        save_file(p.to_str().unwrap().to_string(), "v2".to_string()).unwrap();
+        assert_eq!(fs::read_to_string(&p).unwrap(), "v2");
+    }
+
+    #[test]
+    fn version_stem_sanitizes_and_disambiguates() {
+        let a = version_stem("C:\\docs\\报告 一.md");
+        let b = version_stem("C:\\docs\\报告一.md");
+        assert!(a.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '.'), "非法字符应被替换: {a}");
+        assert_ne!(a, b, "同名不同路径应消歧");
     }
 
     // ===== PDF 分流相关测试（find_pdf_source 各分支 / open_pdf_external reject）=====

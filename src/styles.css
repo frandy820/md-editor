@@ -188,10 +188,27 @@ body.focus-mode .vditor-reset > .fw-current { opacity: 1; }
 .find-row button:hover { background: #e8eefc; }
 /* 按下即时变色：用户肉眼可见"系统收到了点击"（排查"点不动"的反馈通道） */
 .find-row button:active { background: #4470e0; color: #fff; border-color: #4470e0; }
+/* 正则模式开关（v0.3.11）：激活=蓝底白字，一眼可辨当前匹配语义 */
+#find-re.active { background: #4470e0; color: #fff; border-color: #4470e0; }
+#find-re.active:hover { background: #3560d0; }
 /* 查找高亮层：fixed 视口坐标（Range 的 getClientRects 即视口系），不进 contenteditable DOM */
 #find-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 300; }
 .find-mark { position: fixed; background: rgba(255, 213, 0, 0.35); border-radius: 2px; }
 .find-mark.current { background: rgba(255, 140, 0, 0.5); outline: 1px solid #e80; }
+
+/* ===== v0.3.11 版本历史弹窗：左列表右预览 ===== */
+.history-modal { min-width: 640px; max-width: 780px; }
+.history-modal .modal-msg { font-size: 13px; color: #555; }
+.hist-body { display: flex; gap: 10px; height: 320px; }
+#hist-list { flex: 0 0 230px; overflow: auto; list-style: none; border: 1px solid #e5e5e5; border-radius: 4px; padding: 2px; }
+#hist-list li { padding: 6px 8px; cursor: pointer; font-size: 12px; color: #333; border-radius: 3px; white-space: nowrap; }
+#hist-list li:hover { background: #eaf2ff; }
+#hist-list li.sel { background: #4470e0; color: #fff; }
+#hist-list li .hv-size { color: #999; margin-left: 4px; }
+#hist-list li.sel .hv-size { color: #dbe6ff; }
+.hist-preview { flex: 1 1 auto; overflow: auto; margin: 0; padding: 8px; border: 1px solid #e5e5e5; border-radius: 4px;
+  font-size: 12px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; color: #444; background: #fafafa; }
+#hist-restore:disabled { color: #aaa; cursor: default; }
 
 /* ===== v0.3.9 打印：正文渲染结果备于此（屏幕藏视口外），打印态只留它 ===== */
 #print-root { position: fixed; left: -20000px; top: 0; width: 794px; background: #fff; }

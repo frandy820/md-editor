@@ -56,6 +56,8 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     findPlaceholder: "查找…", replacePlaceholder: "替换为…",
     replaceOne: "替换", replaceAll: "全部替换",
     replaceManyConfirm: "匹配超过 500 处，仍要全部替换吗？",
+    histBtn: "🕘 历史", histTitle: "版本历史（保存时自动归档，每文件留 50 版/30 天）", histEmpty: "暂无历史版本——本文件保存覆盖旧版后才会产生归档",
+    histRestore: "恢复此版本", histRestored: "已载入所选版本（未保存），确认内容后 Ctrl+S 保存落盘", histRestoreFail: "恢复失败：", histNoDoc: "（请先打开一个已保存的文档）", histPreview: "（预览）",
     appName: "MD 编辑器",
   },
   "zh-TW": {
@@ -85,6 +87,8 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     findPlaceholder: "尋找…", replacePlaceholder: "替換為…",
     replaceOne: "替換", replaceAll: "全部替換",
     replaceManyConfirm: "符合超過 500 處，仍要全部替換嗎？",
+    histBtn: "🕘 歷史", histTitle: "版本歷史（儲存時自動歸檔，每文件留 50 版/30 天）", histEmpty: "暫無歷史版本——本文件儲存覆蓋舊版後才會產生歸檔",
+    histRestore: "恢復此版本", histRestored: "已載入所選版本（未儲存），確認內容後 Ctrl+S 儲存落盤", histRestoreFail: "恢復失敗：", histNoDoc: "（請先開啟一個已儲存的文件）", histPreview: "（預覽）",
     appName: "MD 編輯器",
   },
   "en": {
@@ -114,6 +118,8 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     findPlaceholder: "Find…", replacePlaceholder: "Replace with…",
     replaceOne: "Replace", replaceAll: "Replace all",
     replaceManyConfirm: "More than 500 matches. Replace all anyway?",
+    histBtn: "🕘 History", histTitle: "Version history (auto-archived on save, 50 versions / 30 days per file)", histEmpty: "No versions yet — archives appear after this file is saved over an older version",
+    histRestore: "Restore this version", histRestored: "Version loaded (unsaved). Review and press Ctrl+S to write to disk", histRestoreFail: "Restore failed: ", histNoDoc: "(Open a saved document first)", histPreview: "(preview)",
     appName: "MD Editor",
   },
 };
@@ -340,7 +346,7 @@ function parseSections(md: string): Section[] {
 function rebuildOutline() {
   if (!vditor) return;
   const doc = activeDoc();
-  const secs = parseSections(doc ? doc.content : vditor.getValue());
+  const secs = parseSections(doc ? doc.content : mdValue());
   const ul = document.getElementById("outline")!;
   ul.innerHTML = "";
   if (secs.length === 0) {
@@ -404,7 +410,7 @@ function scheduleOutline() {
 
 function scrollToHeading(idx: number) {
   const doc = activeDoc();
-  const secs = parseSections(doc ? doc.content : vditor ? vditor.getValue() : "");
+  const secs = parseSections(doc ? doc.content : vditor ? mdValue() : "");
   const target = secs[idx];
   if (!target) return;
   const heads = Array.from(
@@ -523,7 +529,7 @@ function switchDoc(id: string) {
   if (vditor) {
     const cur = activeDoc();
     if (cur) {
-      const v = vditor.getValue();
+      const v = mdValue();
       if (v !== "" || cur.content === "") cur.content = v;
     }
   }
@@ -719,7 +725,7 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
       if (suppressInput) return;
       const doc = activeDoc();
       if (doc && vditor) {
-        const v = vditor.getValue();
+        const v = mdValue();
         if (v !== "" || doc.content === "") doc.content = v; // 守卫：空值不覆盖
         doc.dirty = true;
       }
@@ -729,6 +735,12 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
     },
     after: () => {
       fixToolbarTooltipDirection();
+      // v0.3.11 拼写检查：Vditor 显式给 pre.vditor-reset 设 spellcheck="false"（dist 源码 3 处），
+      // 编辑区元素固定不重建，after 统一改回 true 即可持续生效（模式/语言切换重建也会再进 after）。
+      // WebView2/Chromium 内建检查：英文错词红波浪线+右键建议；中文无拼写概念不受影响。
+      document.querySelector(".vditor-wysiwyg pre.vditor-reset, .vditor-ir pre.vditor-reset")
+        ?.setAttribute("spellcheck", "true");
+      rebindImagePreview(); // v0.3.11 编辑器内本地图片预览（wysiwyg；重建后重挂 observer）
       closeFind(); // 模式/语言切换销毁重建：旧匹配节点全部失效
       if (!vditorInited) {
         // 首次初始化：打开欢迎文档、处理命令行传入的文件
@@ -791,7 +803,7 @@ function switchMode(mode: "ir" | "wysiwyg") {
   // 销毁前先把当前编辑器内容回写 doc（getValue 空读守卫：空值不覆盖）
   const cur = activeDoc();
   if (cur) {
-    const v = vditor.getValue();
+    const v = mdValue();
     if (v !== "" || cur.content === "") cur.content = v;
   }
   currentMode = mode;
@@ -871,7 +883,7 @@ function setLang(lang: Lang) {
     switchInFlight = true; // 语言切换重建期间上锁，与 switchMode 互斥（after 回调统一释放）
     const cur = activeDoc();
     if (cur) {
-      const v = vditor.getValue();
+      const v = mdValue();
       if (v !== "" || cur.content === "") cur.content = v;
       // 欢迎页(无 path)随语言切换更新欢迎内容；用户文档(有 path)保留原内容不动
       if (!cur.path) { cur.content = welcomeMd(); cur.name = t("welcomeName"); cur.dirty = false; }
@@ -992,7 +1004,7 @@ function showCloseConfirm(): Promise<"save" | "discard" | "cancel"> {
 // getValue 守卫：空值不覆盖 doc.content（防 IR 模式空读清零文件）
 async function saveDoc(doc: Doc): Promise<boolean> {
   if (vditor && activeDoc()?.id === doc.id) {
-    const v = vditor.getValue();
+    const v = mdValue();
     if (v !== "" || doc.content === "") doc.content = v;
   }
   let path = doc.path;
@@ -1034,7 +1046,7 @@ async function autosaveDirty(): Promise<void> {
   for (const doc of docs) {
     if (!doc.dirty || !doc.path) continue;
     if (activeDoc()?.id === doc.id) {
-      const v = vditor.getValue();
+      const v = mdValue();
       if (v !== "" || doc.content === "") doc.content = v; // 守卫：空值不覆盖（同 saveDoc）
     }
     if (doc.content === "") continue;
@@ -1155,12 +1167,19 @@ function scrollCaretIntoBand() {
 interface FindMatch { node: Text; start: number; end: number; }
 let findMatches: FindMatch[] = [];
 let findIndex = -1;
+// v0.3.11 正则模式：查找条 ".*" 开关（会话内保持）。字面模式大小写不敏感；正则默认 gi
+// （与字面行为一致），元字符生效，替换支持 $1 引用。无效正则按 0 命中处理并在计数位提示。
+let findRegexOn = false;
+
+function buildFindRegex(query: string): RegExp | null {
+  try { return new RegExp(query, "gi"); } catch { return null; }
+}
 
 function scanMatches(query: string): FindMatch[] {
   const out: FindMatch[] = [];
   const root = document.querySelector(".vditor-wysiwyg pre.vditor-reset, .vditor-ir pre.vditor-reset");
   if (!root || !query) return out;
-  const q = query.toLowerCase();
+  const re = findRegexOn ? buildFindRegex(query) : null;
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode: (n) => {
       const p = n.parentElement;
@@ -1171,11 +1190,22 @@ function scanMatches(query: string): FindMatch[] {
   let n: Node | null;
   while ((n = walker.nextNode())) {
     const t = n as Text;
-    const hay = t.data.toLowerCase();
-    let i = hay.indexOf(q);
-    while (i !== -1) {
-      out.push({ node: t, start: i, end: i + q.length });
-      i = hay.indexOf(q, i + q.length);
+    if (findRegexOn) {
+      if (!re) break; // 无效正则：空结果
+      re.lastIndex = 0;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(t.data)) !== null) {
+        if (m[0].length === 0) { re.lastIndex++; continue; } // 空匹配（如 a*）防死循环
+        out.push({ node: t, start: m.index, end: m.index + m[0].length });
+      }
+    } else {
+      const hay = t.data.toLowerCase();
+      const q = query.toLowerCase();
+      let i = hay.indexOf(q);
+      while (i !== -1) {
+        out.push({ node: t, start: i, end: i + q.length });
+        i = hay.indexOf(q, i + q.length);
+      }
     }
   }
   return out;
@@ -1223,6 +1253,9 @@ function refreshFind(resetIndex: boolean) {
   findMatches = scanMatches(q);
   if (resetIndex || findIndex >= findMatches.length) findIndex = findMatches.length > 0 ? 0 : -1;
   renderFindOverlay();
+  // 无效正则显式提示（0/0 与"没找到"不可区分会误导排错）
+  const cnt = document.getElementById("find-count");
+  if (cnt && findRegexOn && q && !buildFindRegex(q)) cnt.textContent = "无效";
 }
 
 function openFind(withReplace: boolean) {
@@ -1257,7 +1290,14 @@ function closeFind() {
 function replaceCurrent() {
   const m = findMatches[findIndex];
   if (!m || !vditor) return;
-  const rep = (document.getElementById("replace-input") as HTMLInputElement).value;
+  const repRaw = (document.getElementById("replace-input") as HTMLInputElement).value;
+  // 正则模式：把 $1/$2 展开为当前命中里的实际分组内容，再走 insertText（键入管线/undo 完整）
+  let rep = repRaw;
+  if (findRegexOn) {
+    const q = (document.getElementById("find-input") as HTMLInputElement).value;
+    const hit = m.node.data.slice(m.start, m.end);
+    try { rep = hit.replace(new RegExp(q, "i"), repRaw); } catch { /* 无效正则按字面 */ }
+  }
   const root = document.querySelector(".vditor-wysiwyg pre.vditor-reset, .vditor-ir pre.vditor-reset") as HTMLElement | null;
   try {
     const r = document.createRange();
@@ -1269,17 +1309,22 @@ function replaceCurrent() {
   refreshFind(false);
 }
 
-// 全部替换：源码级（getValue→字面替换→setValue）。
+// 全部替换：源码级（getValue→替换→setValue）。
 // 不用 DOM 快照逐个替换：每次 execCommand 后 Vditor 重渲染会使快照节点失效（部分替换中断）。
 // 语义注记：单个替换作用于渲染文本，全部替换作用于 md 源码——含 md 标记的关键词在两路径下命中可能不同，可靠优先。
+// 正则模式直接 new RegExp（$1 引用由 String.replace 原生展开）；字面模式转义元字符，
+// 且 rep 走函数形式防 $&/$1 被意外展开（字面替换串含 $ 的历史隐患顺手修）。
 function replaceAllMatches() {
   if (!vditor) return;
   const q = (document.getElementById("find-input") as HTMLInputElement).value;
   if (!q) return;
   const rep = (document.getElementById("replace-input") as HTMLInputElement).value;
-  const src = vditor.getValue();
-  const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
-  const newSrc = src.replace(re, rep);
+  const src = mdValue();
+  let re: RegExp | null;
+  if (findRegexOn) re = buildFindRegex(q);
+  else re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+  if (!re) return;
+  const newSrc = findRegexOn ? src.replace(re, rep) : src.replace(re, () => rep);
   if (newSrc === src) return;
   const doc = activeDoc();
   if (doc) {
@@ -1314,6 +1359,13 @@ function bindFindBar() {
   };
   onDown("find-next", () => gotoMatch(findIndex + 1));
   onDown("find-prev", () => gotoMatch(findIndex - 1));
+  // 正则模式开关：toggle 后立即重扫（.* 高亮态即当前语义）
+  document.getElementById("find-re")!.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    findRegexOn = !findRegexOn;
+    (e.currentTarget as HTMLElement).classList.toggle("active", findRegexOn);
+    refreshFind(true);
+  });
   // ✕ 用 pointerdown 而非 click：click 需 down+up 落在同一元素，任何扰动（微小拖动、
   // 浮层闪现、IME 状态切换）都会吃掉事件且无任何报错——用户两次报告"点✕无反应"。
   // pointerdown 按下即触发；closeFind 幂等（bar.hidden 直接 return），后续 click 重入无害。
@@ -1404,8 +1456,15 @@ function resolveImageSources(fragment: HTMLElement, docPath: string | null) {
   // 取文档所在目录作为 base（Windows 反斜杠统一为正斜杠）
   const dir = docPath.replace(/\\/g, "/").replace(/\/[^/]*$/, "");
   fragment.querySelectorAll<HTMLImageElement>("img[src]").forEach((img) => {
-    const src = img.getAttribute("src");
+    let src = img.getAttribute("src");
     if (!src) return;
+    // v0.3.11 图片预览的显示层 asset URL（getHTML 从污染源码生成）→ 解码还原磁盘绝对路径，
+    // 走下方既有链路（绝对路径保持原样，浏览器按 file:/// 规范化解析）
+    const am = src.match(/^(?:https?:)?\/\/asset\.localhost\/(.+)$/);
+    if (am) {
+      try { src = decodeURIComponent(am[1]).replace(/\/$/, ""); img.setAttribute("src", src); }
+      catch { /* 解码失败保原样 */ }
+    }
     // 已带协议（http/https/file）或 data: base64 的绝对资源不动
     if (/^([a-z][a-z0-9+.-]*:)?\/\//i.test(src) || src.startsWith("data:")) return;
     const clean = src.replace(/^\.\//, "");
@@ -1493,6 +1552,56 @@ function resolvePreviewImages(html: string): string {
     else if (docDir) abs = docDir + "/" + src.split("?")[0]; // 相对路径按文档目录解析
     if (!abs) return m;
     try { return p1 + convertFileSrc(abs) + p3; } catch { return m; }
+  });
+}
+
+// ===== v0.3.11 编辑器内本地图片预览（wysiwyg）=====
+// 架构：v0.3.0 取舍"源码可移植 vs 编辑器内显示"——现在两头都要：显示层把相对 src 换算
+// asset://（MutationObserver 持续兜住 Vditor 重渲染），序列化层统一走 mdValue() 把 asset
+// URL 还原为相对路径。IR 模式继续走 preview.transform（resolvePreviewImages），互不干扰。
+let imgPreviewObserver: MutationObserver | null = null;
+function rebindImagePreview(): void {
+  imgPreviewObserver?.disconnect();
+  const root = document.querySelector(".vditor-wysiwyg pre.vditor-reset") as HTMLElement | null;
+  if (!root) return;
+  const fix = (): void => {
+    const doc = activeDoc();
+    const dir = doc?.path ? doc.path.replace(/\\/g, "/").replace(/\/[^/]*$/, "") : null;
+    root.querySelectorAll<HTMLImageElement>("img[src]").forEach((img) => {
+      const src = img.getAttribute("src") || "";
+      // 已是显示 URL（asset）或远程/base64/应用资源：不动。data-orig-src 标记防重入循环
+      if (img.dataset.origSrc !== undefined || !src) return;
+      if (/^(https?:|data:|blob:|asset:|\/\/|\/vditor-assets)/i.test(src)) return;
+      let abs: string | null = null;
+      if (/^[A-Za-z]:[\\/]/.test(src)) abs = src.replace(/\\/g, "/"); // 未命名文档的绝对路径粘贴
+      else if (dir) abs = dir + "/" + src.split("?")[0];
+      if (!abs) return;
+      img.dataset.origSrc = src;
+      try { img.src = convertFileSrc(abs); } catch { delete img.dataset.origSrc; }
+    });
+  };
+  fix();
+  imgPreviewObserver = new MutationObserver(() => fix());
+  imgPreviewObserver.observe(root, { childList: true, subtree: true });
+}
+
+/** 统一取"干净"md 源码：wysiwyg 显示层换算会把 img src 写成 asset URL（DOM 序列化污染），
+ *  保存/导出/查找前还原为可移植相对路径。全部 getValue 调用点统一走此函数（单一出口）。 */
+function mdValue(): string {
+  if (!vditor) return "";
+  const v = (vditor as { getValue(): string }).getValue(); // 间接调用防下方全局替换误伤自身
+  if (!v.includes("asset.localhost")) return v;
+  const doc = activeDoc();
+  const dir = doc?.path ? doc.path.replace(/\\/g, "/").replace(/\/[^/]*$/, "") : null;
+  // `![alt](http://asset.localhost/F%3A/dir/x.png)` 与 `<img src="http://asset.localhost/...">`
+  return v.replace(/(\]\(|src=")(?:https?:)?\/\/asset\.localhost\/([^)"\s]+)/g, (m, p1: string, enc: string) => {
+    try {
+      const abs = decodeURIComponent(enc).replace(/\/$/, "");
+      let rel = abs;
+      if (dir && abs.toLowerCase().startsWith(dir.toLowerCase() + "/")) rel = abs.slice(dir.length + 1);
+      // 空格/括号会破坏 md 链接语法，按需转义；中文路径保持原样（与插入时形态一致）
+      return p1 + rel.replace(/([ ()])/g, (c) => ({ " ": "%20", "(": "%28", ")": "%29" }[c] as string));
+    } catch { return m; }
   });
 }
 
@@ -1659,6 +1768,79 @@ function cleanupPrintRoot(): void {
   document.getElementById("print-root")?.remove();
   if (printingCleanupTimer) { window.clearTimeout(printingCleanupTimer); printingCleanupTimer = 0; }
 }
+
+// ===== v0.3.11 版本历史：列表+预览+恢复（恢复=载入编辑器并标 dirty，不直接写盘——用户确认后 Ctrl+S） =====
+let histSelected = "";
+function fmtHistTime(ms: number): string {
+  const d = new Date(ms);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+async function openHistory(): Promise<void> {
+  const doc = activeDoc();
+  const modal = document.getElementById("history-modal") as HTMLElement;
+  const list = document.getElementById("hist-list") as HTMLUListElement;
+  const preview = document.getElementById("hist-preview") as HTMLPreElement;
+  const restoreBtn = document.getElementById("hist-restore") as HTMLButtonElement;
+  if (!doc?.path) { alert(t("histNoDoc")); return; }
+  document.getElementById("hist-title")!.textContent = `${doc.name} · ` + t("histTitle");
+  list.innerHTML = ""; preview.textContent = t("histPreview"); histSelected = "";
+  restoreBtn.disabled = true;
+  modal.hidden = false;
+  let versions: { file: string; mtimeMs: number; size: number }[] = [];
+  try { versions = await invoke("list_versions", { path: doc.path }); }
+  catch (e) { alert(t("histRestoreFail") + e); modal.hidden = true; return; }
+  if (versions.length === 0) {
+    const li = document.createElement("li");
+    li.textContent = t("histEmpty");
+    li.style.cursor = "default"; li.style.color = "#999";
+    list.appendChild(li);
+    return;
+  }
+  versions.forEach((v, i) => {
+    const li = document.createElement("li");
+    const tm = document.createElement("span");
+    tm.textContent = fmtHistTime(v.mtimeMs);
+    const sz = document.createElement("span");
+    sz.className = "hv-size";
+    sz.textContent = (v.size / 1024).toFixed(1) + " KB";
+    li.appendChild(tm); li.appendChild(sz);
+    li.addEventListener("click", async () => {
+      list.querySelectorAll("li").forEach((x) => x.classList.remove("sel"));
+      li.classList.add("sel");
+      histSelected = v.file;
+      restoreBtn.disabled = false;
+      try { preview.textContent = (await invoke<string>("read_version", { file: v.file })).slice(0, 2000); }
+      catch { preview.textContent = "(…)"; }
+    });
+    if (i === 0) { // 默认选中最新一版（下一版即当前磁盘内容的前身）
+      // 首版不自动选中：恢复是显式动作，误触恢复旧版代价高。仅高亮提示
+    }
+    list.appendChild(li);
+  });
+}
+function bindHistory(): void {
+  document.getElementById("btn-history")!.addEventListener("click", () => { void openHistory(); });
+  document.getElementById("hist-close")!.addEventListener("click", () => {
+    (document.getElementById("history-modal") as HTMLElement).hidden = true;
+  });
+  document.getElementById("history-modal")!.addEventListener("pointerdown", (e) => {
+    if (e.target === e.currentTarget) (e.currentTarget as HTMLElement).hidden = true; // 点遮罩关闭
+  });
+  document.getElementById("hist-restore")!.addEventListener("click", async () => {
+    if (!histSelected || !vditor) return;
+    const doc = activeDoc();
+    try {
+      const content = await invoke<string>("read_version", { file: histSelected });
+      suppressInput = true;
+      vditor.setValue(content, true);
+      suppressInput = false;
+      if (doc) { doc.content = content; doc.dirty = true; updateTitle(); scheduleOutline(); }
+      (document.getElementById("history-modal") as HTMLElement).hidden = true;
+      alert(t("histRestored"));
+    } catch (e) { alert(t("histRestoreFail") + e); }
+  });
+}
 async function printCurrentDoc(): Promise<void> {
   const frag = await exportFragment("html");
   if (!frag) return;
@@ -1725,7 +1907,7 @@ function imageSize(b: Uint8Array): { w: number; h: number; type: "png" | "jpg" |
 async function exportDocx(): Promise<void> {
   const doc = activeDoc();
   if (!doc || !vditor) { alert(t("exportNoDoc")); return; }
-  const md = await rescueFootnoteDefs(vditor.getValue(), doc.path);
+  const md = await rescueFootnoteDefs(mdValue(), doc.path);
   if (!md) { alert(t("exportNoDoc")); return; }
   const path = await pickExportPath(".docx", "Word");
   if (!path) return;
@@ -2003,7 +2185,7 @@ async function exportPdf() {
   const doc = activeDoc();
   if (!doc) { alert(t("exportNoDoc")); return; }
   // 先把当前编辑器实时内容回写 doc（与保存一致，getValue 空读守卫：空值不覆盖）
-  const v = vditor.getValue();
+  const v = mdValue();
   if (v !== "" || doc.content === "") doc.content = v;
 
   // 取渲染后 HTML 片段（getHTML 在某些异常态可能抛错，try/catch 兜底）；v0.3.8 起含 math/mermaid 渲染
@@ -2286,7 +2468,7 @@ async function boot() {
     if (!vditor) return;
     const doc = activeDoc();
     if (!doc) return;
-    const v = vditor.getValue();
+    const v = mdValue();
     if (v !== "" || doc.content === "") doc.content = v; // 守卫：空值不覆盖
     let path = doc.path;
     if (!path) {
@@ -2322,6 +2504,7 @@ async function boot() {
   startAutosave();
   bindFocusTypewriter();
   bindFindBar();
+  bindHistory(); // v0.3.11 版本历史（工具栏 🕘 按钮）
   // 版本号：优先 Tauri 运行时真实版本（与构建产物一致），失败回落 index.html 硬编码
   try {
     const v = await getVersion();

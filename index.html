@@ -25,6 +25,7 @@
       </span>
       <button id="btn-focus-mode" type="button" title="专注模式（F8）：淡化非当前段落">🎯 专注</button>
       <button id="btn-find" type="button" title="查找替换（Ctrl+F / Ctrl+H）">🔍 查找</button>
+      <button id="btn-history" type="button" title="版本历史：保存时自动归档旧版，可预览/一键恢复">🕘 历史</button>
       <button id="btn-mode" type="button" title="切回即时渲染模式（Ctrl+Alt+M）">切回即时渲染</button>
       <span id="mode-badge" class="mode-badge wysiwyg" title="当前：所见即所得模式（可直接编辑表格）">所见即所得</span>
       <input id="font-size-select" type="number" min="8" max="72" step="1" value="16" title="编辑区字号" style="width: 4em" />
@@ -35,7 +36,7 @@
       </select>
       <span id="file-title">（未命名）</span>
       <span id="encoding-badge"></span>
-      <span id="app-version" title="软件版本（报问题时先看这里）">v0.3.10</span>
+      <span id="app-version" title="软件版本（报问题时先看这里）">v0.3.11</span>
     </div>
     <div id="tabs"></div>
     <div id="main">
@@ -48,6 +49,7 @@
         <div id="find-bar" hidden>
           <div class="find-row">
             <input id="find-input" type="text" placeholder="查找…" autocomplete="off" spellcheck="false" />
+            <button id="find-re" type="button" title="正则模式：. * + ? ( ) [ ] 等元字符生效（默认忽略大小写）；替换支持 $1 引用分组">.*</button>
             <span id="find-count" class="find-count">0/0</span>
             <button id="find-prev" type="button" title="上一个（Shift+Enter）">↑</button>
             <button id="find-next" type="button" title="下一个（Enter）">↓</button>
@@ -84,6 +86,19 @@
         <div class="modal-msg" id="export-msg">正在导出 PDF，请稍候…</div>
         <div class="export-progress"><div class="export-progress-bar" id="export-progress-bar"></div></div>
         <div class="export-pct" id="export-pct">0%</div>
+      </div>
+    </div>
+    <div id="history-modal" class="modal-mask" hidden>
+      <div class="modal history-modal">
+        <div class="modal-msg" id="hist-title">版本历史</div>
+        <div class="hist-body">
+          <ul id="hist-list"></ul>
+          <pre id="hist-preview" class="hist-preview">（预览）</pre>
+        </div>
+        <div class="modal-btns">
+          <button id="hist-restore" type="button" disabled>恢复此版本</button>
+          <button id="hist-close" type="button">关闭</button>
+        </div>
       </div>
     </div>
   </body>
