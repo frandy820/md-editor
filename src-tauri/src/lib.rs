@@ -700,6 +700,129 @@ fn save_ui_state(app: AppHandle, v: serde_json::Value) -> Result<(), String> {
     fs::write(&p, serde_json::to_string(&v).map_err(|e| e.to_string())?).map_err(|e| e.to_string())
 }
 
+// ===== v0.3.14 文件树侧栏 + 全局跨文件搜索 =====
+
+/// 目录树忽略的子目录名（隐藏目录「.」开头另行判断）
+const TREE_SKIP_DIRS: &[&str] = &["node_modules", "target", "dist", "__pycache__"];
+
+fn tree_skip(name: &str) -> bool {
+    name.starts_with('.') || TREE_SKIP_DIRS.iter().any(|s| *s == name)
+}
+
+/// 列目录一层（文件树懒展开用）：目录（跳过隐藏/node_modules 等）+ 文本类文件。
+/// 排序：目录在前、名字母序（不区分大小写）。返回 [{name, path, is_dir}]
+#[tauri::command]
+fn list_md_dir(path: String) -> Result<Vec<serde_json::Value>, String> {
+    let mut dirs: Vec<(String, String)> = vec![];
+    let mut files: Vec<(String, String)> = vec![];
+    let rd = fs::read_dir(&path).map_err(|e| e.to_string())?;
+    for entry in rd.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if tree_skip(&name) {
+            continue;
+        }
+        let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
+        let full = entry.path().to_string_lossy().to_string();
+        if is_dir {
+            dirs.push((name, full));
+        } else if has_allowed_ext(&full) {
+            files.push((name, full));
+        }
+    }
+    let key = |v: &(String, String)| v.0.to_lowercase();
+    dirs.sort_by_key(&key);
+    files.sort_by_key(&key);
+    let mk = |v: (String, String), d: bool| {
+        serde_json::json!({ "name": v.0, "path": v.1, "is_dir": d })
+    };
+    Ok(dirs.into_iter().map(|v| mk(v, true))
+        .chain(files.into_iter().map(|v| mk(v, false)))
+        .collect())
+}
+
+/// 跨文件搜索命中上限与扫描护栏（大目录防卡：深挖会拖垮 UI 线程返回）
+const SEARCH_MAX_HITS: usize = 200;
+const SEARCH_MAX_FILES: usize = 800;
+const SEARCH_MAX_DEPTH: usize = 8;
+const SEARCH_MAX_FILE_BYTES: u64 = 2 * 1024 * 1024;
+
+/// 递归搜 root 下所有文本类文件内容（忽略大小写 contains）。
+/// 返回 [{file, line_no, line_text}]，line_no 从 1 起，line_text 首尾去空白截 120 字符。
+#[tauri::command]
+fn search_md_files(root: String, query: String) -> Result<Vec<serde_json::Value>, String> {
+    let q = query.to_lowercase();
+    if q.is_empty() {
+        return Ok(vec![]);
+    }
+    let mut hits: Vec<serde_json::Value> = vec![];
+    let mut files_scanned = 0usize;
+    // 显式栈 DFS：元素 = (路径, 深度)
+    let mut stack: Vec<(PathBuf, usize)> = vec![(PathBuf::from(&root), 0)];
+    while let Some((dir, depth)) = stack.pop() {
+        if depth > SEARCH_MAX_DEPTH || files_scanned >= SEARCH_MAX_FILES || hits.len() >= SEARCH_MAX_HITS {
+            break;
+        }
+        let rd = match fs::read_dir(&dir) {
+            Ok(r) => r,
+            Err(_) => continue, // 无权限子目录跳过
+        };
+        for entry in rd.flatten() {
+            if hits.len() >= SEARCH_MAX_HITS {
+                break;
+            }
+            let name = entry.file_name().to_string_lossy().to_string();
+            if tree_skip(&name) {
+                continue;
+            }
+            let ft = match entry.file_type() {
+                Ok(t) => t,
+                Err(_) => continue,
+            };
+            if ft.is_dir() {
+                if depth + 1 <= SEARCH_MAX_DEPTH {
+                    stack.push((entry.path(), depth + 1));
+                }
+                continue;
+            }
+            if !has_allowed_ext(&name) || files_scanned >= SEARCH_MAX_FILES {
+                continue;
+            }
+            // 符号链接不跟随（ft.is_dir 对 symlink 为 false，读内容即安全）
+            let meta = match entry.metadata() {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            if meta.len() > SEARCH_MAX_FILE_BYTES || meta.len() == 0 {
+                continue;
+            }
+            files_scanned += 1;
+            let bytes = match fs::read(entry.path()) {
+                Ok(b) => b,
+                Err(_) => continue,
+            };
+            let text = String::from_utf8_lossy(&bytes).to_lowercase();
+            for (i, line) in text.lines().enumerate() {
+                if hits.len() >= SEARCH_MAX_HITS {
+                    break;
+                }
+                if line.contains(&q) {
+                    let mut shown = line.trim().to_string();
+                    if shown.chars().count() > 120 {
+                        // 按字符截（中文安全），不按字节
+                        shown = shown.chars().take(120).collect();
+                    }
+                    hits.push(serde_json::json!({
+                        "file": entry.path().to_string_lossy(),
+                        "line_no": i + 1,
+                        "line_text": shown,
+                    }));
+                }
+            }
+        }
+    }
+    Ok(hits)
+}
+
 // ===== v0.3.0 导出中心 + 粘贴截图落地 =====
 
 /// 写二进制文件（PNG/DOCX 等导出产物；前端传 base64）
@@ -902,6 +1025,8 @@ pub fn run() {
             save_paste_image,
             export_selftest_dir,
             save_ui_state,
+            list_md_dir,
+            search_md_files,
             dnd_selftest_enabled,
             print_webview
         ])
@@ -967,6 +1092,44 @@ mod tests {
         let args = vec!["prog.exe".to_string(), "notexist.md".to_string(), md_str.clone()];
         assert_eq!(extract_md_from_args(args.into_iter()), Some(md_str));
         assert_eq!(extract_md_from_args(vec!["prog.exe".to_string()].into_iter()), None);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn list_md_dir_layers_and_skips() {
+        let dir = std::env::temp_dir().join("md_verify_listdir");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join("sub")).unwrap();
+        fs::create_dir_all(dir.join(".git")).unwrap();
+        fs::create_dir_all(dir.join("node_modules")).unwrap();
+        fs::write(dir.join("b.md"), "x").unwrap();
+        fs::write(dir.join("a.md"), "x").unwrap();
+        fs::write(dir.join("img.png"), "x").unwrap();
+        let out = list_md_dir(dir.to_string_lossy().to_string()).unwrap();
+        let names: Vec<(String, bool)> = out
+            .iter()
+            .map(|v| (v["name"].as_str().unwrap().to_string(), v["is_dir"].as_bool().unwrap()))
+            .collect();
+        // 目录在前；隐藏/node_modules 排除；png 不在白名单
+        assert_eq!(names, vec![("sub".to_string(), true), ("a.md".to_string(), false), ("b.md".to_string(), false)]);
+        assert!(list_md_dir(dir.join("不存在").to_string_lossy().to_string()).is_err());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn search_hits_lines_and_case() {
+        let dir = std::env::temp_dir().join("md_verify_search");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join("sub")).unwrap();
+        fs::write(dir.join("one.md"), "# 标题\n\nHello 需求词 Alpha\n").unwrap();
+        fs::write(dir.join("sub/two.md"), "需求词 second\n别的\n").unwrap();
+        fs::write(dir.join("sub/other.txt"), "需求词 in txt\n").unwrap();
+        let out = search_md_files(dir.to_string_lossy().to_string(), "需求词".to_uppercase()).unwrap();
+        // 大小写不敏感；递归命中子目录；txt 白名单内也命中
+        assert_eq!(out.len(), 3, "hits={out:?}");
+        assert!(out.iter().all(|h| h["line_no"].as_u64().unwrap() >= 1));
+        let empty = search_md_files(dir.to_string_lossy().to_string(), "".to_string()).unwrap();
+        assert!(empty.is_empty());
         let _ = fs::remove_dir_all(&dir);
     }
 

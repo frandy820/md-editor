@@ -59,6 +59,15 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     histBtn: "🕘 历史", histTitle: "版本历史（保存时自动归档，每文件留 50 版/30 天）", histEmpty: "暂无历史版本——本文件保存覆盖旧版后才会产生归档",
     histRestore: "恢复此版本", histRestored: "已载入所选版本（未保存），确认内容后 Ctrl+S 保存落盘", histRestoreFail: "恢复失败：", histNoDoc: "（请先打开一个已保存的文档）", histPreview: "（预览）",
     tblRowUp: "整行上移", tblRowDown: "整行下移",
+    sideOutline: "大纲", sideFiles: "文件",
+    outlineFilterPh: "过滤大纲…",
+    recentTitle: "最近", fileTreeTitle: "文件树", treeRefreshTip: "刷新目录",
+    gsearchPh: "搜全目录 .md，回车执行（Ctrl+Shift+F）", gsearchNone: "（无匹配）",
+    gsearchNoDoc: "（打开文件后可搜其所在目录）", gsearchEmpty: "（输入关键词）",
+    quickOpenTitle: "快速打开", quickOpenPh: "输入文件名过滤，↑↓选择，回车打开…", quickOpenEmpty: "（暂无最近文件）",
+    treeNoDoc: "（打开文件后显示其所在目录）",
+    themeToDarkTip: "切换暗色主题", themeToLightTip: "切换亮色主题",
+    cntZh: "字", cntEn: "词", cntMin: "分钟",
     appName: "MD 编辑器",
   },
   "zh-TW": {
@@ -91,6 +100,15 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     histBtn: "🕘 歷史", histTitle: "版本歷史（儲存時自動歸檔，每文件留 50 版/30 天）", histEmpty: "暫無歷史版本——本文件儲存覆蓋舊版後才會產生歸檔",
     histRestore: "恢復此版本", histRestored: "已載入所選版本（未儲存），確認內容後 Ctrl+S 儲存落盤", histRestoreFail: "恢復失敗：", histNoDoc: "（請先開啟一個已儲存的文件）", histPreview: "（預覽）",
     tblRowUp: "整行上移", tblRowDown: "整行下移",
+    sideOutline: "大綱", sideFiles: "檔案",
+    outlineFilterPh: "過濾大綱…",
+    recentTitle: "最近", fileTreeTitle: "檔案樹", treeRefreshTip: "重新整理目錄",
+    gsearchPh: "搜全目錄 .md，Enter 執行（Ctrl+Shift+F）", gsearchNone: "（無符合）",
+    gsearchNoDoc: "（開啟檔案後可搜其所在目錄）", gsearchEmpty: "（輸入關鍵詞）",
+    quickOpenTitle: "快速開啟", quickOpenPh: "輸入檔名過濾，↑↓選擇，Enter 開啟…", quickOpenEmpty: "（暫無最近檔案）",
+    treeNoDoc: "（開啟檔案後顯示其所在目錄）",
+    themeToDarkTip: "切換暗色主題", themeToLightTip: "切換亮色主題",
+    cntZh: "字", cntEn: "詞", cntMin: "分鐘",
     appName: "MD 編輯器",
   },
   "en": {
@@ -123,6 +141,15 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     histBtn: "🕘 History", histTitle: "Version history (auto-archived on save, 50 versions / 30 days per file)", histEmpty: "No versions yet — archives appear after this file is saved over an older version",
     histRestore: "Restore this version", histRestored: "Version loaded (unsaved). Review and press Ctrl+S to write to disk", histRestoreFail: "Restore failed: ", histNoDoc: "(Open a saved document first)", histPreview: "(preview)",
     tblRowUp: "Move row up", tblRowDown: "Move row down",
+    sideOutline: "Outline", sideFiles: "Files",
+    outlineFilterPh: "Filter outline…",
+    recentTitle: "Recent", fileTreeTitle: "File tree", treeRefreshTip: "Refresh folder",
+    gsearchPh: "Search all .md in folder, Enter (Ctrl+Shift+F)", gsearchNone: "(no match)",
+    gsearchNoDoc: "(open a file to search its folder)", gsearchEmpty: "(type a keyword)",
+    quickOpenTitle: "Quick open", quickOpenPh: "Type to filter, ↑↓ select, Enter open…", quickOpenEmpty: "(no recent files)",
+    treeNoDoc: "(open a file to show its folder)",
+    themeToDarkTip: "Switch to dark theme", themeToLightTip: "Switch to light theme",
+    cntZh: "chars", cntEn: "words", cntMin: "min",
     appName: "MD Editor",
   },
 };
@@ -401,6 +428,7 @@ function rebuildOutline() {
     });
     ul.appendChild(li);
   });
+  applyOutlineFilter(); // 重建后重放过滤态（大纲随编辑实时重建，不清过滤框）
 }
 
 function scheduleOutline() {
@@ -549,6 +577,7 @@ function switchDoc(id: string) {
   rebuildOutline();
   renderTabs();
   updateTitle();
+  markTreeCurrent(); // 文件树当前文件高亮随标签切换（树不重载，保住展开态）
 }
 
 // 全部标签关闭后的空状态（允许关闭欢迎页）：遮住编辑区，提示打开文件
@@ -606,6 +635,306 @@ function openDoc(path: string | null, content: string, name?: string, encoding?:
   };
   docs.push(doc);
   switchDoc(doc.id);
+  if (path) {
+    pushRecent(path);
+    const dir = docDirOf(path);
+    if (dir !== ftreeRoot) refreshFileTree(); // 换目录才整树重建，同目录只挪高亮
+    else markTreeCurrent();
+  }
+}
+
+// ===== v0.3.14 侧栏文件页（文件树/最近/跨文件搜索）+ 快速打开 + 暗色主题 =====
+
+// ui-state.json 全量合并读写：zoom/theme/recent 共住一文件。此前 persistZoom 只写 {zoom}
+// 单键覆盖，加 theme/recent 后必须合并写，否则互相清空对方的键。
+let uiStateAll: Record<string, unknown> = {};
+let uiStateSaveTimer = 0;
+let uiStateLoaded = false; // load_ui_state 返回前不写盘（避免 boot 期 applyZoom 用 {zoom:1} 覆盖掉磁盘 theme/recent）
+function saveUiStateKey(key: string, val: unknown): void {
+  uiStateAll[key] = val;
+  if (!uiStateLoaded) return;
+  window.clearTimeout(uiStateSaveTimer);
+  uiStateSaveTimer = window.setTimeout(() => {
+    invoke("save_ui_state", { v: { ...uiStateAll } }).catch(() => { /* 保存失败不阻塞 UI */ });
+  }, 150);
+}
+
+// ----- 最近文件（打开即记，去重置顶，留 10 条；侧栏显示前 8） -----
+function recentList(): string[] {
+  const r = uiStateAll.recent;
+  return Array.isArray(r) ? (r as unknown[]).filter((x): x is string => typeof x === "string") : [];
+}
+function pushRecent(path: string): void {
+  const list = recentList().filter((p) => p !== path);
+  list.unshift(path);
+  saveUiStateKey("recent", list.slice(0, 10));
+  renderRecent();
+}
+function renderRecent(): void {
+  const ul = document.getElementById("recent-list");
+  if (!ul) return;
+  ul.innerHTML = "";
+  const list = recentList().slice(0, 8);
+  if (list.length === 0) {
+    ul.innerHTML = `<li class="empty">${esc(t("quickOpenEmpty"))}</li>`;
+    return;
+  }
+  for (const p of list) {
+    const li = document.createElement("li");
+    const name = p.split(/[\\/]/).pop() || p;
+    li.innerHTML = `<span class="rn">${esc(name)}</span><span class="rp">${esc(p)}</span>`;
+    li.title = p;
+    li.addEventListener("click", () => loadFile(p));
+    ul.appendChild(li);
+  }
+}
+
+// ----- 文件树：根=当前文档所在目录；目录节点懒展开（点击才列子层，大目录不卡启动） -----
+type TreeEntry = { name: string; path: string; is_dir: boolean };
+function docDirOf(p: string | null): string | null {
+  if (!p) return null;
+  const i = Math.max(p.lastIndexOf("\\"), p.lastIndexOf("/"));
+  return i > 0 ? p.slice(0, i) : null;
+}
+let ftreeToken = 0; // 并发防护：慢目录返回时若已发起新刷新则丢弃
+let ftreeRoot: string | null = null; // 当前树根；换目录打开文件时整树重建
+async function ftreeKids(container: HTMLElement, dirPath: string, depth: number): Promise<void> {
+  const tok = ftreeToken;
+  let entries: TreeEntry[] = [];
+  try {
+    entries = await invoke<TreeEntry[]>("list_md_dir", { path: dirPath });
+  } catch { /* 无权限/已删除：留空 */ }
+  if (tok !== ftreeToken) return;
+  container.innerHTML = "";
+  if (entries.length === 0) {
+    container.innerHTML = `<div class="empty">${esc(t("gsearchNone"))}</div>`;
+    return;
+  }
+  for (const e of entries) {
+    const node = document.createElement("div");
+    node.className = "node " + (e.is_dir ? "dir" : "file");
+    node.dataset.path = e.path;
+    node.style.paddingLeft = 6 + depth * 14 + "px";
+    node.innerHTML =
+      `<span class="caret">${e.is_dir ? "▸" : ""}</span>` +
+      `<span class="nname" title="${esc(e.path)}">${esc(e.name)}</span>`;
+    node.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      if (!e.is_dir) { loadFile(e.path); return; }
+      const open = node.classList.toggle("open");
+      node.querySelector(".caret")!.textContent = open ? "▾" : "▸";
+      let kids = node.nextElementSibling as HTMLElement | null;
+      if (!kids || !kids.classList.contains("kids")) {
+        kids = document.createElement("div");
+        kids.className = "kids";
+        node.after(kids);
+      }
+      kids.hidden = !open;
+      if (open && !kids.dataset.loaded) { kids.dataset.loaded = "1"; ftreeKids(kids, e.path, depth + 1); }
+    });
+    container.appendChild(node);
+  }
+  markTreeCurrent();
+}
+function refreshFileTree(): void {
+  const box = document.getElementById("ftree");
+  if (!box) return;
+  const dir = docDirOf(activeDoc()?.path || null);
+  ftreeToken++;
+  ftreeRoot = dir;
+  if (!dir) {
+    box.innerHTML = `<div class="empty">${esc(t("treeNoDoc"))}</div>`;
+    return;
+  }
+  const head = document.createElement("div");
+  head.className = "node dir";
+  head.innerHTML = `<span class="caret">▾</span><span class="nname" title="${esc(dir)}">${esc(dir)}</span>`;
+  const kids = document.createElement("div");
+  kids.className = "kids";
+  box.innerHTML = "";
+  box.appendChild(head);
+  box.appendChild(kids);
+  ftreeKids(kids, dir, 1);
+}
+// 当前文件高亮：切换标签只挪高亮 class，不重载树（保住展开态）
+function markTreeCurrent(): void {
+  const cur = activeDoc()?.path || "";
+  document.querySelectorAll("#ftree .node.file").forEach((n) => {
+    n.classList.toggle("cur", (n as HTMLElement).dataset.path === cur);
+  });
+}
+
+// ----- 跨文件搜索：Ctrl+Shift+F 聚焦输入，回车搜当前文档目录全部文本文件 -----
+type SearchHit = { file: string; line_no: number; line_text: string };
+let gsearchToken = 0;
+function runGlobalSearch(): void {
+  const inp = document.getElementById("gsearch-input") as HTMLInputElement | null;
+  const ul = document.getElementById("gsearch-results");
+  if (!inp || !ul) return;
+  const q = inp.value.trim();
+  const dir = docDirOf(activeDoc()?.path || null);
+  ul.innerHTML = "";
+  if (!q) { ul.innerHTML = `<li class="empty">${esc(t("gsearchEmpty"))}</li>`; return; }
+  if (!dir) { ul.innerHTML = `<li class="empty">${esc(t("gsearchNoDoc"))}</li>`; return; }
+  ul.innerHTML = `<li class="empty">…</li>`;
+  const tok = ++gsearchToken;
+  invoke<SearchHit[]>("search_md_files", { root: dir, query: q }).then((hits) => {
+    if (tok !== gsearchToken) return;
+    ul.innerHTML = "";
+    if (hits.length === 0) {
+      ul.innerHTML = `<li class="empty">${esc(t("gsearchNone"))}</li>`;
+      return;
+    }
+    const rx = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+    for (const h of hits) {
+      const li = document.createElement("li");
+      const name = h.file.split(/[\\/]/).pop() || h.file;
+      const marked = esc(h.line_text).replace(rx, (m) => `<mark>${m}</mark>`);
+      li.innerHTML = `<span class="gf">${esc(name)}</span><span class="gl">${h.line_no}</span><span class="gt">${marked}</span>`;
+      li.title = h.file + ":" + h.line_no;
+      li.addEventListener("click", () => {
+        // 打开目标文件后复用查找条定位首个匹配（高亮/跳转/替换链路全复用）
+        const go = () => {
+          openFind(false);
+          const fi = document.getElementById("find-input") as HTMLInputElement;
+          fi.value = q;
+          refreshFind(true);
+          gotoMatch(0);
+          fi.focus();
+          fi.select();
+        };
+        if (activeDoc()?.path === h.file) go();
+        else loadFile(h.file).then(go);
+      });
+      ul.appendChild(li);
+    }
+  }).catch((e) => {
+    if (tok !== gsearchToken) return;
+    ul.innerHTML = `<li class="empty">${esc(String(e)).slice(0, 80)}</li>`;
+  });
+}
+
+// ----- 快速打开（Ctrl+Shift+O）：最近文件模糊过滤，↑↓ 选择回车打开 -----
+let qoSel = 0;
+let qoFiltered: string[] = [];
+function renderQoList(): void {
+  const ul = document.getElementById("qo-list");
+  if (!ul) return;
+  ul.innerHTML = "";
+  if (qoFiltered.length === 0) {
+    ul.innerHTML = `<li class="empty">${esc(t("quickOpenEmpty"))}</li>`;
+    return;
+  }
+  qoSel = Math.min(Math.max(qoSel, 0), qoFiltered.length - 1);
+  qoFiltered.forEach((p, i) => {
+    const li = document.createElement("li");
+    if (i === qoSel) li.classList.add("sel");
+    const name = p.split(/[\\/]/).pop() || p;
+    li.innerHTML = `<span class="rn">${esc(name)}</span><span class="rp">${esc(p)}</span>`;
+    li.title = p;
+    li.addEventListener("click", () => { closeQuickOpen(); loadFile(p); });
+    ul.appendChild(li);
+  });
+  ul.querySelector("li.sel")?.scrollIntoView({ block: "nearest" });
+}
+function openQuickOpen(): void {
+  (document.getElementById("quickopen-modal") as HTMLElement).hidden = false;
+  const inp = document.getElementById("qo-input") as HTMLInputElement;
+  qoFiltered = recentList().filter((p) => p.toLowerCase().includes(inp.value.trim().toLowerCase()));
+  qoSel = 0;
+  renderQoList();
+  inp.focus();
+  inp.select();
+}
+function closeQuickOpen(): void {
+  (document.getElementById("quickopen-modal") as HTMLElement).hidden = true;
+}
+
+// ----- 暗色主题：外壳走 CSS 变量（html[data-theme]），Vditor 编辑区走 setTheme 换 content-theme -----
+let themeDark = false;
+function applyTheme(dark: boolean, persist = true): void {
+  themeDark = dark;
+  document.documentElement.dataset.theme = dark ? "dark" : "light";
+  const btn = document.getElementById("btn-theme");
+  if (btn) {
+    btn.textContent = dark ? "☀️" : "🌙";
+    btn.title = t(dark ? "themeToLightTip" : "themeToDarkTip");
+  }
+  if (vditor) {
+    try { vditor.setTheme(dark ? "dark" : "classic", "/vditor-assets", dark ? "dark" : "light"); } catch { /* 未就绪：重建时随 options.theme 生效 */ }
+  }
+  if (persist) saveUiStateKey("theme", dark ? "dark" : "light");
+}
+function initTheme(): void {
+  // 未选过（磁盘无 theme 键）→ 跟随系统，且不写盘（选过才固定）
+  const v = uiStateAll.theme;
+  const saved = typeof v === "string" ? v : null;
+  const dark = saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+  applyTheme(dark, saved !== null);
+}
+
+// ----- 大纲过滤：输入即时隐藏不匹配项；rebuildOutline 重建后需重放（否则过滤态丢失） -----
+function applyOutlineFilter(): void {
+  const of = document.getElementById("outline-filter") as HTMLInputElement | null;
+  if (!of) return;
+  const q = of.value.trim().toLowerCase();
+  document.querySelectorAll("#outline .outline-item").forEach((li) => {
+    const txt = (li.textContent || "").toLowerCase();
+    (li as HTMLElement).style.display = !q || txt.includes(q) ? "" : "none";
+  });
+}
+
+// ----- 侧栏页签切换（大纲 | 文件） -----
+function switchSidePane(which: "outline" | "files"): void {
+  const isOutline = which === "outline";
+  document.getElementById("side-tab-outline")!.classList.toggle("active", isOutline);
+  document.getElementById("side-tab-files")!.classList.toggle("active", !isOutline);
+  (document.getElementById("side-pane-outline") as HTMLElement).hidden = !isOutline;
+  (document.getElementById("side-pane-files") as HTMLElement).hidden = isOutline;
+  if (!isOutline && !ftreeRoot) refreshFileTree(); // 首次进文件页才建树（省启动开销）
+}
+
+function initSidePanels(): void {
+  document.getElementById("side-tab-outline")!.addEventListener("click", () => switchSidePane("outline"));
+  document.getElementById("side-tab-files")!.addEventListener("click", () => switchSidePane("files"));
+  document.getElementById("ftree-refresh")!.addEventListener("click", () => { ftreeRoot = null; refreshFileTree(); });
+  refreshFileTree();
+  (document.getElementById("outline-filter") as HTMLInputElement).addEventListener("input", applyOutlineFilter);
+  // 跨文件搜索：回车执行（跨文件 invoke 有 IO 成本，不逐键搜）
+  (document.getElementById("gsearch-input") as HTMLInputElement).addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); runGlobalSearch(); }
+  });
+  // 快速打开 modal
+  const qoMask = document.getElementById("quickopen-modal")!;
+  const qoInp = document.getElementById("qo-input") as HTMLInputElement;
+  qoMask.addEventListener("mousedown", (e) => { if (e.target === qoMask) closeQuickOpen(); });
+  qoInp.addEventListener("input", () => {
+    qoFiltered = recentList().filter((p) => p.toLowerCase().includes(qoInp.value.trim().toLowerCase()));
+    qoSel = 0;
+    renderQoList();
+  });
+  qoInp.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown") { e.preventDefault(); qoSel++; renderQoList(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); qoSel--; renderQoList(); }
+    else if (e.key === "Enter") {
+      e.preventDefault();
+      const p = qoFiltered[qoSel];
+      if (p) { closeQuickOpen(); loadFile(p); }
+    } else if (e.key === "Escape") { e.preventDefault(); closeQuickOpen(); }
+  });
+  // 全局快捷键：Ctrl+Shift+O 快开 / Ctrl+Shift+F 跨文件搜索（Ctrl+F 单文件查找不受影响）
+  window.addEventListener("keydown", (e) => {
+    if (!(e.ctrlKey || e.metaKey) || !e.shiftKey) return;
+    const k = e.key.toLowerCase();
+    if (k === "o") { e.preventDefault(); openQuickOpen(); }
+    else if (k === "f") {
+      e.preventDefault();
+      closeFind();
+      switchSidePane("files");
+      (document.getElementById("gsearch-input") as HTMLInputElement).focus();
+    }
+  });
+  document.getElementById("btn-theme")!.addEventListener("click", () => applyTheme(!themeDark));
 }
 
 function updateTitle() {
@@ -690,14 +1019,24 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
     lang: VDITOR_LANG[currentLang],
     i18n: VDITOR_I18N[currentLang], // 注入本地 i18n（当前语言），工具栏 tooltip 自动走 i18n
     cdn: "/vditor-assets", // lute(markdown 引擎)/icons/method 等本地加载，符合 CSP，不依赖 unpkg
+    // v0.3.14 暗色主题：重建（模式/语言切换）时随当前主题；运行中切换走 vditor.setTheme
+    theme: themeDark ? ("dark" as const) : ("classic" as const),
     height: "100%",
     cache: { enable: false },
-    // 字数统计（type text = 按渲染后文本统计，符合中文字数直觉；after 补三语单位，样式由 styles.css 钉右下角）
+    // 字数统计（v0.3.14 升级中英分统+阅读时长，Typora 只有总字/词/行——写作者对"中文字数"与
+    // "英文词数"分开计更实感）：中文按字、英文/数字按词，时长=中文400字/分+英文200词/分
     counter: {
       enable: true, type: "text",
-      after: (len: number) => {
+      after: (_len: number) => {
         const el = document.querySelector<HTMLElement>(".vditor-counter");
-        if (el) el.innerText = `${len} ${t("wordCount")}`;
+        if (!el) return;
+        const root = document.querySelector<HTMLElement>("#editor .vditor-reset");
+        const txt = root ? (root.innerText || "").trim() : "";
+        if (!txt) { el.innerText = ""; return; }
+        const zh = (txt.match(/[一-鿿]/g) || []).length;
+        const en = (txt.match(/[A-Za-z0-9]+/g) || []).length;
+        const min = Math.max(1, Math.ceil(zh / 400 + en / 200));
+        el.innerText = `${zh} ${t("cntZh")} · ${en} ${t("cntEn")} · ≈${min} ${t("cntMin")}`;
       },
     },
     // :emoji: 补全的表情图片走本地资源（默认 unpkg CDN，CSP 禁外联且离线不可用）
@@ -767,6 +1106,8 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
       });
     },
     preview: {
+      // v0.3.14 内容主题随暗色切换（工具栏/外壳由 options.theme + CSS 变量管）
+      theme: { current: themeDark ? "dark" : "light", path: "/vditor-assets/dist/css/content-theme" },
       hljs: { lineNumber: true, style: "github" },
       // 数学公式 KaTeX（引擎资源已本地化；inlineDigit 允许行内 $ 后跟数字，兼容中文排版场景）
       math: { engine: "KaTeX", inlineDigit: true },
@@ -923,6 +1264,18 @@ function applyAllText() {
   const ro = document.getElementById("replace-one"); if (ro) ro.textContent = t("replaceOne");
   const ra = document.getElementById("replace-all"); if (ra) ra.textContent = t("replaceAll");
   const pt = document.getElementById("panel-title"); if (pt) pt.textContent = t("panelTitle");
+  // v0.3.14 侧栏文件页 + 快开 + 主题
+  const sto = document.getElementById("side-tab-outline"); if (sto) sto.textContent = t("sideOutline");
+  const stf = document.getElementById("side-tab-files"); if (stf) stf.textContent = t("sideFiles");
+  const ofi = document.getElementById("outline-filter") as HTMLInputElement | null; if (ofi) ofi.placeholder = t("outlineFilterPh");
+  const rt = document.getElementById("recent-title"); if (rt) rt.textContent = t("recentTitle");
+  const ft = document.getElementById("ftree-title"); if (ft) ft.textContent = t("fileTreeTitle");
+  const fr = document.getElementById("ftree-refresh"); if (fr) fr.title = t("treeRefreshTip");
+  const gsi = document.getElementById("gsearch-input") as HTMLInputElement | null; if (gsi) gsi.placeholder = t("gsearchPh");
+  const qot = document.getElementById("qo-title"); if (qot) qot.textContent = t("quickOpenTitle");
+  const qoi = document.getElementById("qo-input") as HTMLInputElement | null; if (qoi) qoi.placeholder = t("quickOpenPh");
+  const bt = document.getElementById("btn-theme"); if (bt) bt.title = t(themeDark ? "themeToLightTip" : "themeToDarkTip");
+  renderRecent();
   const eh = document.getElementById("empty-hint"); if (eh) eh.textContent = t("emptyHint");
   const cmsg = document.getElementById("cc-msg"); if (cmsg) cmsg.textContent = t("closeSaveMsg");
   const csave = document.getElementById("cc-save"); if (csave) csave.textContent = t("closeSave");
@@ -1385,50 +1738,36 @@ function replaceCurrent() {
 // 当年弃用 DOM 快照的根因（execCommand 后 Vditor 重渲染使快照节点失效）用"每轮重扫"化解。
 // 语义注记：单替/全替统一作用于渲染文本（含 md 标记的关键词命中一致）；
 // insertText 原样插入替换串，字面 rep 含 $&/$1 不展开（String.replace 隐患不再存在）。
+// 全部替换：源码层一次性替换 + setValue 不清 undo 栈（v0.3.14 定稿）。
+// 历史教训：v0.3.13 曾用"逐处 execCommand 循环"（每处一个 undo 步），但 Vditor 每处
+// 替换后全量重渲染会把选区锚点重置到元素级，"已处理边界"过滤随之失效——替换产物自身
+// 含匹配时（(\d+)→#$1# 产 #123#，其中的 123 再命中）滚雪球死循环，e2e B4 实锤 1500 轮
+// guard 跑满、文档被毁容（find-count 1502）。两轮位置型修补（节点相等/FOLLOWING 位、
+// compareBoundaryPoints）都被"重渲染重置锚点"击穿后，改为与 Typora/VSCode 同构的
+// 源码层单遍替换：一次 setValue 写回（第二参不传=不清 undo 栈），Ctrl+Z 一次回退整个
+// 全替（Word 同语义）。字面模式 split/join（$ 不展开）；正则模式原生 $1/$& 语义。
+// 口径注记：查找高亮数的是渲染文本，全替按源码替换——跨语法标记的匹配两者计数可差，
+// 纯内容场景一致（Typora 全替亦为源码层）。
 function replaceAllMatches() {
   if (!vditor) return;
   const q = (document.getElementById("find-input") as HTMLInputElement).value;
   if (!q) return;
   const repRaw = (document.getElementById("replace-input") as HTMLInputElement).value;
-  let guard = 1500; // 防跑飞（>500 处入口已有确认弹窗，留重扫余量）
-  let done = 0;
-  // 起点重置到文档头：清选区（execCommand 后选区塌缩在插入末尾，是天然的"已处理边界"）
-  getSelection()?.removeAllRanges();
-  refreshFind(true);
-  while (guard-- > 0) {
-    // 只处理"当前选区（上一替换插入点）之后"的匹配：替换产物自身含匹配内容时
-    // （如 #1# 里的 1 再命中 (\d+)）不回头重替换，防滚雪球死循环
-    const sel = getSelection();
-    const an = sel?.anchorNode ?? null, ao = sel?.anchorOffset ?? 0;
-    const ms = (!an) ? findMatches : findMatches.filter((m) => {
-      if (m.node === an) return m.start >= ao;
-      // an 在 m.node 之前（m 已过）→ an 是 m.node 的 FOLLOWING → 排除
-      return !(m.node.compareDocumentPosition(an) & Node.DOCUMENT_POSITION_FOLLOWING);
-    });
-    const m = ms[0];
-    if (!m) break;
-    let rep = repRaw;
-    if (findRegexOn) {
-      const hit = m.node.data.slice(m.start, m.end);
-      try { rep = hit.replace(new RegExp(q, "i"), repRaw); } catch { /* 无效正则按字面 */ }
-    }
-    const root = document.querySelector(".vditor-wysiwyg pre.vditor-reset, .vditor-ir pre.vditor-reset") as HTMLElement | null;
-    try {
-      const r = document.createRange();
-      r.setStart(m.node, m.start); r.setEnd(m.node, m.end);
-      root?.focus();
-      const sel2 = getSelection(); sel2!.removeAllRanges(); sel2!.addRange(r);
-      if (!document.execCommand("insertText", false, rep)) break;
-    } catch { break; }
-    done++;
-    refreshFind(true); // DOM 已重渲染，重扫取新快照（旧 findMatches 全部作废）
+  const src = mdValue();
+  let out: string;
+  if (findRegexOn) {
+    let re: RegExp | null = null;
+    try { re = new RegExp(q, "gi"); } catch { return; } // 无效正则：不动作（find-count 已示"无效"）
+    out = src.replace(re, repRaw);
+  } else {
+    out = src.split(q).join(repRaw);
   }
-  if (done > 0) {
-    const doc = activeDoc();
-    if (doc) { doc.content = mdValue(); doc.dirty = true; } // input 回调也会做，双保险
-    scheduleOutline(); updateTitle();
-  }
-  refreshFind(true);
+  if (out === src) { refreshFind(true); return; } // 0 处命中
+  suppressInput = true;
+  try { vditor.setValue(out); } finally { suppressInput = false; }
+  const doc = activeDoc();
+  if (doc) { doc.content = out; doc.dirty = true; }
+  scheduleOutline(); updateTitle(); refreshFind(true);
 }
 
 let findInputDebounce: number | undefined;
@@ -1489,7 +1828,7 @@ function bindFindBar() {
   // Vditor 内置 toolbar headings 按钮的 hotkey 是 ⌘H（Ctrl+H 弹"一级~六级标题"下拉），
   // 其 keydown 绑在编辑器元素上，先于 window 冒泡 handler 执行——不拦截就会替换框+标题菜单双弹。
   window.addEventListener("keydown", (e) => {
-    if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "f" || e.key === "F")) {
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === "f" || e.key === "F")) {
       e.preventDefault(); e.stopPropagation(); openFind(false);
     } else if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "h" || e.key === "H")) {
       e.preventDefault(); e.stopPropagation(); openFind(true);
@@ -2747,19 +3086,15 @@ async function boot() {
     if (localStorage.getItem(FOCUS_KEY) === "1") setFocusMode(true);
     localStorage.removeItem("md-editor-typewriter");
   } catch { /* 存储禁用 */ }
+  // v0.3.14 侧栏文件页（文件树/最近/跨文件搜索）+ 快开 + 主题按钮绑定
+  initSidePanels();
   // Word 式显示比例：Ctrl+滚轮 / Ctrl+加减 / Ctrl+0 复位 / 右下角拉杆——只缩正文内容区
   // （.vditor-content），格式工具条(.vditor-toolbar)/应用工具栏/大纲/标签页都不缩。
   // 实现=挂载点 CSS 变量 --doc-zoom（Vditor 模式/语言重建子树不丢）；zoom 参与布局，
   // rect/选区/查找高亮层坐标自洽，文档内容不变。范围 0.5~2.0、10% 档。
   // 持久化=Rust 侧 ui-state.json（%APPDATA%）：localStorage 磁盘刷盘异步，强杀即丢。
   let zoomLevel = 1.0;
-  let zoomSaveTimer = 0;
-  const persistZoom = () => {
-    window.clearTimeout(zoomSaveTimer);
-    zoomSaveTimer = window.setTimeout(() => {
-      invoke("save_ui_state", { v: { zoom: zoomLevel } }).catch(() => { /* 保存失败不阻塞 UI */ });
-    }, 150);
-  };
+  const persistZoom = () => { saveUiStateKey("zoom", zoomLevel); };
   const applyZoom = () => {
     document.getElementById("editor")?.style.setProperty("--doc-zoom", String(zoomLevel));
     const zb = document.getElementById("zoom-badge");
@@ -2768,10 +3103,23 @@ async function boot() {
     if (zs) zs.value = String(Math.round(zoomLevel * 100));
     persistZoom();
   };
+  // ui-state.json 统一入口（v0.3.14）：zoom/theme/recent 合并读写；load 返回前 saveUiStateKey 不落盘
   invoke<Record<string, unknown> | null>("load_ui_state").then((s) => {
-    const z = s && typeof s.zoom === "number" ? s.zoom : NaN;
+    const disk = s || {};
+    // recent 特殊合并：startup 开文件先于 load 返回，pushRecent 已写内存的条目不能被磁盘旧值
+    // 覆盖（否则重复/丢条目）；zoom/theme 只在 load 后才写，直接用磁盘值
+    const memRecent = Array.isArray(uiStateAll.recent) ? (uiStateAll.recent as unknown[]).filter((x): x is string => typeof x === "string") : [];
+    uiStateAll = disk;
+    if (memRecent.length > 0) {
+      const diskRecent = recentList();
+      uiStateAll.recent = [...memRecent, ...diskRecent.filter((p) => !memRecent.includes(p))].slice(0, 10);
+    }
+    uiStateLoaded = true;
+    initTheme();    // 主题：磁盘有选择用选择，没有跟随系统（不写盘）
+    renderRecent(); // 最近文件列表
+    const z = typeof uiStateAll.zoom === "number" ? (uiStateAll.zoom as number) : NaN;
     if (z >= 0.5 && z <= 2.0) { zoomLevel = z; applyZoom(); }
-  }).catch(() => { /* 读失败默认 100% */ });
+  }).catch(() => { uiStateLoaded = true; initTheme(); });
   const zoomBy = (d: number) => {
     zoomLevel = Math.min(2.0, Math.max(0.5, Math.round((zoomLevel + d) * 100) / 100));
     applyZoom();

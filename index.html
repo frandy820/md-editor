@@ -29,6 +29,7 @@
       <button id="btn-mode" type="button" title="切回即时渲染模式（Ctrl+Alt+M）">切回即时渲染</button>
       <span id="mode-badge" class="mode-badge wysiwyg" title="当前：所见即所得模式（可直接编辑表格）">所见即所得</span>
       <input id="font-size-select" type="number" min="8" max="72" step="1" value="16" title="编辑区字号" style="width: 4em" />
+      <button id="btn-theme" type="button" title="切换暗色/亮色主题">🌙</button>
       <select id="lang-select" title="Language / 语言">
         <option value="zh-CN">简体中文</option>
         <option value="zh-TW">繁體中文</option>
@@ -36,13 +37,30 @@
       </select>
       <span id="file-title">（未命名）</span>
       <span id="encoding-badge"></span>
-      <span id="app-version" title="软件版本（报问题时先看这里）">v0.3.13</span>
+      <span id="app-version" title="软件版本（报问题时先看这里）">v0.3.14</span>
     </div>
     <div id="tabs"></div>
     <div id="main">
       <aside id="outline-panel">
-        <div class="panel-title" id="panel-title">大纲 · 点击定位 · ✕删除 · 拖动重排</div>
-        <ul id="outline"></ul>
+        <div class="side-tabs">
+          <button id="side-tab-outline" class="side-tab active" type="button">大纲</button>
+          <button id="side-tab-files" class="side-tab" type="button">文件</button>
+        </div>
+        <div id="side-pane-outline" class="side-pane">
+          <input id="outline-filter" type="text" placeholder="过滤大纲…" autocomplete="off" spellcheck="false" />
+          <ul id="outline"></ul>
+        </div>
+        <div id="side-pane-files" class="side-pane" hidden>
+          <div class="recent-title" id="recent-title">最近</div>
+          <ul id="recent-list"></ul>
+          <div class="ftree-head">
+            <span id="ftree-title">文件树</span>
+            <button id="ftree-refresh" type="button" title="刷新目录">⟳</button>
+          </div>
+          <div class="ftree" id="ftree"></div>
+          <input id="gsearch-input" type="text" placeholder="搜全目录 .md，回车执行（Ctrl+Shift+F）" autocomplete="off" spellcheck="false" />
+          <ul id="gsearch-results"></ul>
+        </div>
       </aside>
       <main id="editor-wrap">
         <div id="editor"></div>
@@ -99,6 +117,14 @@
           <button id="hist-restore" type="button" disabled>恢复此版本</button>
           <button id="hist-close" type="button">关闭</button>
         </div>
+      </div>
+    </div>
+    <div id="quickopen-modal" class="modal-mask" hidden>
+      <div class="modal quickopen-modal">
+        <div class="modal-msg" id="qo-title">快速打开</div>
+        <input id="qo-input" type="text" placeholder="输入文件名过滤，↑↓选择，回车打开…" autocomplete="off" spellcheck="false" />
+        <ul id="qo-list"></ul>
+        <div class="qo-hint">↑↓ 选择 · Enter 打开 · Esc 关闭</div>
       </div>
     </div>
   </body>
