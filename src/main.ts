@@ -60,14 +60,15 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     histRestore: "恢复此版本", histRestored: "已载入所选版本（未保存），确认内容后 Ctrl+S 保存落盘", histRestoreFail: "恢复失败：", histNoDoc: "（请先打开一个已保存的文档）", histPreview: "（预览）",
     tblRowUp: "整行上移", tblRowDown: "整行下移",
     sideOutline: "大纲", sideFiles: "文件",
-    outlineFilterPh: "过滤大纲…",
-    recentTitle: "最近", fileTreeTitle: "文件树", treeRefreshTip: "刷新目录",
-    gsearchPh: "搜全目录 .md，回车执行（Ctrl+Shift+F）", gsearchNone: "（无匹配）",
+    outlineFilterPh: "过滤大纲…", filterFilesPh: "过滤文件名…",
+    recentTitle: "最近", clearRecentTip: "清空最近文件列表", clearRecent: "🗑 清空",
+    treeUpTip: "上一级目录", treePathPh: "路径，回车跳转", treeRefreshTip: "刷新目录",
+    gsearchPh: "搜全目录内容，回车执行（Ctrl+Shift+F）", gsearchNone: "（无匹配）",
     gsearchNoDoc: "（打开文件后可搜其所在目录）", gsearchEmpty: "（输入关键词）",
     quickOpenTitle: "快速打开", quickOpenPh: "输入文件名过滤，↑↓选择，回车打开…", quickOpenEmpty: "（暂无最近文件）",
-    treeNoDoc: "（打开文件后显示其所在目录）",
-    themeToDarkTip: "切换暗色主题", themeToLightTip: "切换亮色主题",
-    cntZh: "字", cntEn: "词", cntMin: "分钟",
+    treeNoDoc: "（打开文件后显示其所在目录）", treeBadPath: "路径不存在或无法访问：",
+    tabClose: "关闭", tabCloseOthers: "关闭其它", tabCloseRight: "关闭右侧", tabCloseAll: "全部关闭", tabCloseSelected: "关闭选中",
+    themeTip: "界面主题：浅色 / 深色 / 护眼（未选过跟随系统）",
     appName: "MD 编辑器",
   },
   "zh-TW": {
@@ -101,14 +102,15 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     histRestore: "恢復此版本", histRestored: "已載入所選版本（未儲存），確認內容後 Ctrl+S 儲存落盤", histRestoreFail: "恢復失敗：", histNoDoc: "（請先開啟一個已儲存的文件）", histPreview: "（預覽）",
     tblRowUp: "整行上移", tblRowDown: "整行下移",
     sideOutline: "大綱", sideFiles: "檔案",
-    outlineFilterPh: "過濾大綱…",
-    recentTitle: "最近", fileTreeTitle: "檔案樹", treeRefreshTip: "重新整理目錄",
-    gsearchPh: "搜全目錄 .md，Enter 執行（Ctrl+Shift+F）", gsearchNone: "（無符合）",
+    outlineFilterPh: "過濾大綱…", filterFilesPh: "過濾檔名…",
+    recentTitle: "最近", clearRecentTip: "清空最近檔案列表", clearRecent: "🗑 清空",
+    treeUpTip: "上一級目錄", treePathPh: "路徑，Enter 跳轉", treeRefreshTip: "重新整理目錄",
+    gsearchPh: "搜全目錄內容，Enter 執行（Ctrl+Shift+F）", gsearchNone: "（無符合）",
     gsearchNoDoc: "（開啟檔案後可搜其所在目錄）", gsearchEmpty: "（輸入關鍵詞）",
     quickOpenTitle: "快速開啟", quickOpenPh: "輸入檔名過濾，↑↓選擇，Enter 開啟…", quickOpenEmpty: "（暫無最近檔案）",
-    treeNoDoc: "（開啟檔案後顯示其所在目錄）",
-    themeToDarkTip: "切換暗色主題", themeToLightTip: "切換亮色主題",
-    cntZh: "字", cntEn: "詞", cntMin: "分鐘",
+    treeNoDoc: "（開啟檔案後顯示其所在目錄）", treeBadPath: "路徑不存在或無法存取：",
+    tabClose: "關閉", tabCloseOthers: "關閉其它", tabCloseRight: "關閉右側", tabCloseAll: "全部關閉", tabCloseSelected: "關閉選中",
+    themeTip: "介面主題：淺色 / 深色 / 護眼（未選過跟隨系統）",
     appName: "MD 編輯器",
   },
   "en": {
@@ -142,14 +144,15 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     histRestore: "Restore this version", histRestored: "Version loaded (unsaved). Review and press Ctrl+S to write to disk", histRestoreFail: "Restore failed: ", histNoDoc: "(Open a saved document first)", histPreview: "(preview)",
     tblRowUp: "Move row up", tblRowDown: "Move row down",
     sideOutline: "Outline", sideFiles: "Files",
-    outlineFilterPh: "Filter outline…",
-    recentTitle: "Recent", fileTreeTitle: "File tree", treeRefreshTip: "Refresh folder",
-    gsearchPh: "Search all .md in folder, Enter (Ctrl+Shift+F)", gsearchNone: "(no match)",
+    outlineFilterPh: "Filter outline…", filterFilesPh: "Filter file names…",
+    recentTitle: "Recent", clearRecentTip: "Clear recent files", clearRecent: "🗑 Clear",
+    treeUpTip: "Parent folder", treePathPh: "Path, Enter to go", treeRefreshTip: "Refresh folder",
+    gsearchPh: "Search content in folder, Enter (Ctrl+Shift+F)", gsearchNone: "(no match)",
     gsearchNoDoc: "(open a file to search its folder)", gsearchEmpty: "(type a keyword)",
     quickOpenTitle: "Quick open", quickOpenPh: "Type to filter, ↑↓ select, Enter open…", quickOpenEmpty: "(no recent files)",
-    treeNoDoc: "(open a file to show its folder)",
-    themeToDarkTip: "Switch to dark theme", themeToLightTip: "Switch to light theme",
-    cntZh: "chars", cntEn: "words", cntMin: "min",
+    treeNoDoc: "(open a file to show its folder)", treeBadPath: "Path not accessible: ",
+    tabClose: "Close", tabCloseOthers: "Close others", tabCloseRight: "Close to the right", tabCloseAll: "Close all", tabCloseSelected: "Close selected",
+    themeTip: "Theme: light / dark / eye-care (follows system until chosen)",
     appName: "MD Editor",
   },
 };
@@ -530,12 +533,15 @@ function fixToolbarTooltipDirection() {
 }
 
 // ---- 标签页 ----
+// v0.3.15 标签多选（Notepad++ 范式）：Ctrl+Click 加减选中，选中集可被右键"关闭选中"批量关
+const tabSel = new Set<string>();
 function renderTabs() {
   const bar = document.getElementById("tabs")!;
   bar.innerHTML = "";
   docs.forEach((doc) => {
     const tab = document.createElement("div");
-    tab.className = "tab" + (doc.id === activeId ? " active" : "");
+    tab.className = "tab" + (doc.id === activeId ? " active" : "") + (tabSel.has(doc.id) ? " sel" : "");
+    tab.dataset.docId = doc.id;
     const name = document.createElement("span");
     name.className = "tab-name";
     name.textContent = (doc.dirty ? "● " : "") + doc.name;
@@ -545,12 +551,74 @@ function renderTabs() {
     close.title = t("closeTab");
     tab.appendChild(name);
     tab.appendChild(close);
-    tab.addEventListener("click", () => switchDoc(doc.id));
+    tab.addEventListener("click", (e) => {
+      if (e.ctrlKey || e.metaKey) {
+        // Ctrl+Click：多选加减（不切换文档，Notepad++ 式选中集）
+        if (tabSel.has(doc.id)) { tabSel.delete(doc.id); tab.classList.remove("sel"); }
+        else { tabSel.add(doc.id); tab.classList.add("sel"); }
+        return;
+      }
+      tabSel.clear();
+      bar.querySelectorAll(".tab.sel").forEach((x) => x.classList.remove("sel"));
+      switchDoc(doc.id);
+    });
     close.addEventListener("click", (e) => {
       e.stopPropagation();
       closeDoc(doc.id);
     });
+    tab.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      openTabMenu(doc.id, e.clientX, e.clientY);
+    });
     bar.appendChild(tab);
+  });
+}
+
+// 标签右键菜单（Notepad++：关闭/关闭其它/关闭右侧/全部关闭；Ctrl+Click 多选时加"关闭选中"）
+let tabMenuTarget: string | null = null;
+function openTabMenu(docId: string, x: number, y: number): void {
+  const menu = document.getElementById("tab-menu")!;
+  tabMenuTarget = docId;
+  const selBtn = menu.querySelector<HTMLButtonElement>('[data-act="close-selected"]')!;
+  const multi = tabSel.has(docId) && tabSel.size > 1;
+  selBtn.hidden = !multi;
+  selBtn.textContent = t("tabCloseSelected") + `(${tabSel.size})`;
+  menu.hidden = false;
+  const mw = menu.offsetWidth, mh = menu.offsetHeight;
+  menu.style.left = Math.min(x, window.innerWidth - mw - 4) + "px";
+  menu.style.top = Math.min(y, window.innerHeight - mh - 4) + "px";
+}
+function hideTabMenu(): void {
+  const m = document.getElementById("tab-menu");
+  if (m) m.hidden = true;
+  tabMenuTarget = null;
+}
+function initTabMenu(): void {
+  const menu = document.getElementById("tab-menu")!;
+  menu.addEventListener("click", async (e) => {
+    const btn = (e.target as HTMLElement).closest("button[data-act]") as HTMLButtonElement | null;
+    if (!btn || !tabMenuTarget) return;
+    const act = btn.dataset.act!;
+    const target = tabMenuTarget; // 先取再 hide（hideTabMenu 会置 null，先 hide 后取=关空气）
+    hideTabMenu();
+    // 批量关闭按标签栏顺序逐个走 closeDoc（dirty 的逐个弹确认，Notepad++ 同行为）
+    const idsInOrder = Array.from(document.querySelectorAll("#tabs .tab")).map(
+      (el) => (el as HTMLElement).dataset.docId!
+    );
+    let toClose: string[];
+    if (act === "close") toClose = [target];
+    else if (act === "close-others") toClose = idsInOrder.filter((id) => id !== target);
+    else if (act === "close-right") toClose = idsInOrder.slice(idsInOrder.indexOf(target) + 1);
+    else if (act === "close-all") toClose = idsInOrder;
+    else if (act === "close-selected") toClose = idsInOrder.filter((id) => tabSel.has(id));
+    else return;
+    for (const id of toClose) await closeDoc(id);
+    tabSel.clear();
+    renderTabs();
+  });
+  // 点菜单外任意处收起（含滚动/右键别处）
+  window.addEventListener("mousedown", (e) => {
+    if (!menu.hidden && !menu.contains(e.target as Node)) hideTabMenu();
   });
 }
 
@@ -622,6 +690,10 @@ function openDoc(path: string | null, content: string, name?: string, encoding?:
     const existing = docs.find((d) => d.path === path);
     if (existing) {
       switchDoc(existing.id);
+      // 已打开的文件也要树联动：点"最近"里已开过的文件（如其它目录），树根得跟着切
+      const dir = docDirOf(path);
+      if (dir && dir !== ftreeRoot) setTreeRoot(dir);
+      else markTreeCurrent();
       return;
     }
   }
@@ -637,8 +709,9 @@ function openDoc(path: string | null, content: string, name?: string, encoding?:
   switchDoc(doc.id);
   if (path) {
     pushRecent(path);
+    // 树根联动：换目录才整树重建（含点"最近"里其它目录的文件），同目录只挪高亮
     const dir = docDirOf(path);
-    if (dir !== ftreeRoot) refreshFileTree(); // 换目录才整树重建，同目录只挪高亮
+    if (dir && dir !== ftreeRoot) setTreeRoot(dir);
     else markTreeCurrent();
   }
 }
@@ -689,7 +762,9 @@ function renderRecent(): void {
   }
 }
 
-// ----- 文件树：根=当前文档所在目录；目录节点懒展开（点击才列子层，大目录不卡启动） -----
+// ----- 文件树（v0.3.15 导航化）：根=可导航的独立状态（↑ 上级/地址栏回车跳转/刷新），
+// 初始=当前文档目录；打开文件时联动切到该文件所在目录（点"最近"里的文件树跟着走的诉求）。
+// 目录节点懒展开（点击才列子层，大目录不卡启动）。 -----
 type TreeEntry = { name: string; path: string; is_dir: boolean };
 function docDirOf(p: string | null): string | null {
   if (!p) return null;
@@ -697,7 +772,7 @@ function docDirOf(p: string | null): string | null {
   return i > 0 ? p.slice(0, i) : null;
 }
 let ftreeToken = 0; // 并发防护：慢目录返回时若已发起新刷新则丢弃
-let ftreeRoot: string | null = null; // 当前树根；换目录打开文件时整树重建
+let ftreeRoot: string | null = null; // 当前树根；换目录（导航/打开文件联动）时整树重建
 async function ftreeKids(container: HTMLElement, dirPath: string, depth: number): Promise<void> {
   const tok = ftreeToken;
   let entries: TreeEntry[] = [];
@@ -734,18 +809,27 @@ async function ftreeKids(container: HTMLElement, dirPath: string, depth: number)
     });
     container.appendChild(node);
   }
+  applyTreeFilter();
   markTreeCurrent();
 }
-function refreshFileTree(): void {
-  const box = document.getElementById("ftree");
-  if (!box) return;
-  const dir = docDirOf(activeDoc()?.path || null);
-  ftreeToken++;
+/** 文件名过滤（树重载后重放，不清过滤框——同大纲过滤行为） */
+function applyTreeFilter(): void {
+  const fi = document.getElementById("ftree-filter") as HTMLInputElement | null;
+  if (!fi) return;
+  const q = fi.value.trim().toLowerCase();
+  document.querySelectorAll("#ftree .node").forEach((n) => {
+    const txt = (n.textContent || "").toLowerCase();
+    (n as HTMLElement).style.display = !q || txt.includes(q) ? "" : "none";
+  });
+}
+/** 切树根：重建整树+地址栏回填（导航入口：↑ 上级 / 地址栏回车 / 打开文件联动 / 刷新） */
+function setTreeRoot(dir: string): void {
   ftreeRoot = dir;
-  if (!dir) {
-    box.innerHTML = `<div class="empty">${esc(t("treeNoDoc"))}</div>`;
-    return;
-  }
+  const box = document.getElementById("ftree");
+  const pathInp = document.getElementById("ftree-path") as HTMLInputElement | null;
+  if (pathInp) pathInp.value = dir;
+  if (!box) return;
+  ftreeToken++;
   const head = document.createElement("div");
   head.className = "node dir";
   head.innerHTML = `<span class="caret">▾</span><span class="nname" title="${esc(dir)}">${esc(dir)}</span>`;
@@ -755,6 +839,20 @@ function refreshFileTree(): void {
   box.appendChild(head);
   box.appendChild(kids);
   ftreeKids(kids, dir, 1);
+}
+function refreshFileTree(): void {
+  const box = document.getElementById("ftree");
+  if (!box) return;
+  const dir = docDirOf(activeDoc()?.path || null);
+  if (!dir) {
+    ftreeToken++;
+    ftreeRoot = null;
+    const pathInp = document.getElementById("ftree-path") as HTMLInputElement | null;
+    if (pathInp && !pathInp.value) pathInp.placeholder = t("treePathPh");
+    box.innerHTML = `<div class="empty">${esc(t("treeNoDoc"))}</div>`;
+    return;
+  }
+  setTreeRoot(dir);
 }
 // 当前文件高亮：切换标签只挪高亮 class，不重载树（保住展开态）
 function markTreeCurrent(): void {
@@ -772,14 +870,18 @@ function runGlobalSearch(): void {
   const ul = document.getElementById("gsearch-results");
   if (!inp || !ul) return;
   const q = inp.value.trim();
-  const dir = docDirOf(activeDoc()?.path || null);
+  // 搜索目录跟随树根（用户导航到哪搜哪），未建树时回落当前文档目录
+  const dir = ftreeRoot || docDirOf(activeDoc()?.path || null);
   ul.innerHTML = "";
-  if (!q) { ul.innerHTML = `<li class="empty">${esc(t("gsearchEmpty"))}</li>`; return; }
-  if (!dir) { ul.innerHTML = `<li class="empty">${esc(t("gsearchNoDoc"))}</li>`; return; }
+  ul.hidden = !q; // 无关键词时整块收起（不占树上方空间）
+  if (!q) return;
+  if (!dir) { ul.hidden = false; ul.innerHTML = `<li class="empty">${esc(t("gsearchNoDoc"))}</li>`; return; }
+  ul.hidden = false;
   ul.innerHTML = `<li class="empty">…</li>`;
   const tok = ++gsearchToken;
   invoke<SearchHit[]>("search_md_files", { root: dir, query: q }).then((hits) => {
     if (tok !== gsearchToken) return;
+    ul.hidden = false;
     ul.innerHTML = "";
     if (hits.length === 0) {
       ul.innerHTML = `<li class="empty">${esc(t("gsearchNone"))}</li>`;
@@ -850,27 +952,28 @@ function closeQuickOpen(): void {
   (document.getElementById("quickopen-modal") as HTMLElement).hidden = true;
 }
 
-// ----- 暗色主题：外壳走 CSS 变量（html[data-theme]），Vditor 编辑区走 setTheme 换 content-theme -----
-let themeDark = false;
-function applyTheme(dark: boolean, persist = true): void {
-  themeDark = dark;
-  document.documentElement.dataset.theme = dark ? "dark" : "light";
-  const btn = document.getElementById("btn-theme");
-  if (btn) {
-    btn.textContent = dark ? "☀️" : "🌙";
-    btn.title = t(dark ? "themeToLightTip" : "themeToDarkTip");
-  }
+// ----- 主题三态（v0.3.15：浅色/深色/护眼豆沙绿）。外壳走 CSS 变量（html[data-theme]），
+// Vditor 编辑区内容主题走 content-theme/<name>.css（light/dark/eye，eye 为自建）。
+// ⚠ setTheme 真实签名=(theme, contentTheme, codeTheme, contentThemePath)：v0.3.14 曾把
+// cdn 误传到第二参——界面主题切了但内容主题仍 light（暗色下表格发白的根因）。
+type ThemeName = "light" | "dark" | "eye";
+let themeName: ThemeName = "light";
+function applyTheme(name: ThemeName, persist = true): void {
+  themeName = name;
+  document.documentElement.dataset.theme = name;
+  const sel = document.getElementById("theme-select") as HTMLSelectElement | null;
+  if (sel) sel.value = name;
   if (vditor) {
-    try { vditor.setTheme(dark ? "dark" : "classic", "/vditor-assets", dark ? "dark" : "light"); } catch { /* 未就绪：重建时随 options.theme 生效 */ }
+    try { vditor.setTheme(name === "dark" ? "dark" : "classic", name, undefined, "/vditor-assets/dist/css/content-theme"); } catch { /* 未就绪：重建时随 options 生效 */ }
   }
-  if (persist) saveUiStateKey("theme", dark ? "dark" : "light");
+  if (persist) saveUiStateKey("theme", name);
 }
 function initTheme(): void {
-  // 未选过（磁盘无 theme 键）→ 跟随系统，且不写盘（选过才固定）
+  // 未选过（磁盘无合法 theme 值）→ 跟随系统，且不写盘（选过才固定）
   const v = uiStateAll.theme;
-  const saved = typeof v === "string" ? v : null;
-  const dark = saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
-  applyTheme(dark, saved !== null);
+  const saved = (typeof v === "string" && ["light", "dark", "eye"].includes(v)) ? (v as ThemeName) : null;
+  const name: ThemeName = saved ?? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  applyTheme(name, saved !== null);
 }
 
 // ----- 大纲过滤：输入即时隐藏不匹配项；rebuildOutline 重建后需重放（否则过滤态丢失） -----
@@ -897,7 +1000,30 @@ function switchSidePane(which: "outline" | "files"): void {
 function initSidePanels(): void {
   document.getElementById("side-tab-outline")!.addEventListener("click", () => switchSidePane("outline"));
   document.getElementById("side-tab-files")!.addEventListener("click", () => switchSidePane("files"));
-  document.getElementById("ftree-refresh")!.addEventListener("click", () => { ftreeRoot = null; refreshFileTree(); });
+  // 文件树导航三件套：↑ 上级 / 地址栏回车跳转 / ⟳ 刷新（资源管理器范式）
+  document.getElementById("ftree-up")!.addEventListener("click", () => {
+    if (!ftreeRoot) return;
+    const up = docDirOf(ftreeRoot);
+    if (up) setTreeRoot(up);
+  });
+  const pathInp = document.getElementById("ftree-path") as HTMLInputElement;
+  pathInp.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const v = pathInp.value.trim();
+    if (!v) return;
+    invoke<TreeEntry[]>("list_md_dir", { path: v }).then(() => setTreeRoot(v)).catch(() => {
+      pathInp.value = ftreeRoot || "";
+      alert(t("treeBadPath") + v);
+    });
+  });
+  document.getElementById("ftree-refresh")!.addEventListener("click", () => { if (ftreeRoot) setTreeRoot(ftreeRoot); });
+  // 文件名过滤 + 最近文件清空（用户诉求：最近要能手动清理）
+  (document.getElementById("ftree-filter") as HTMLInputElement).addEventListener("input", applyTreeFilter);
+  document.getElementById("recent-clear")!.addEventListener("click", () => {
+    saveUiStateKey("recent", []);
+    renderRecent();
+  });
   refreshFileTree();
   (document.getElementById("outline-filter") as HTMLInputElement).addEventListener("input", applyOutlineFilter);
   // 跨文件搜索：回车执行（跨文件 invoke 有 IO 成本，不逐键搜）
@@ -922,19 +1048,24 @@ function initSidePanels(): void {
       if (p) { closeQuickOpen(); loadFile(p); }
     } else if (e.key === "Escape") { e.preventDefault(); closeQuickOpen(); }
   });
-  // 全局快捷键：Ctrl+Shift+O 快开 / Ctrl+Shift+F 跨文件搜索（Ctrl+F 单文件查找不受影响）
+  // 主题下拉（三态选择）
+  document.getElementById("theme-select")!.addEventListener("change", (e) => {
+    applyTheme((e.target as HTMLSelectElement).value as ThemeName);
+  });
+  // 全局快捷键：Ctrl+Shift+O 快开 / Ctrl+Shift+F 跨文件搜索（Ctrl+F 单文件查找不受影响）。
+  // ⚠ 必须 capture：焦点在编辑区时 Vditor 的 keydown 在元素层 stopPropagation，
+  // 冒泡阶段的 window 监听收不到——真机"按了没反应"（e2e 焦点不在编辑区测不出）的根因
   window.addEventListener("keydown", (e) => {
     if (!(e.ctrlKey || e.metaKey) || !e.shiftKey) return;
     const k = e.key.toLowerCase();
-    if (k === "o") { e.preventDefault(); openQuickOpen(); }
+    if (k === "o") { e.preventDefault(); e.stopPropagation(); openQuickOpen(); }
     else if (k === "f") {
-      e.preventDefault();
+      e.preventDefault(); e.stopPropagation();
       closeFind();
       switchSidePane("files");
       (document.getElementById("gsearch-input") as HTMLInputElement).focus();
     }
-  });
-  document.getElementById("btn-theme")!.addEventListener("click", () => applyTheme(!themeDark));
+  }, true);
 }
 
 function updateTitle() {
@@ -1019,24 +1150,17 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
     lang: VDITOR_LANG[currentLang],
     i18n: VDITOR_I18N[currentLang], // 注入本地 i18n（当前语言），工具栏 tooltip 自动走 i18n
     cdn: "/vditor-assets", // lute(markdown 引擎)/icons/method 等本地加载，符合 CSP，不依赖 unpkg
-    // v0.3.14 暗色主题：重建（模式/语言切换）时随当前主题；运行中切换走 vditor.setTheme
-    theme: themeDark ? ("dark" as const) : ("classic" as const),
+    // v0.3.14+ 主题：重建（模式/语言切换）时随当前主题；运行中切换走 vditor.setTheme
+    theme: themeName === "dark" ? ("dark" as const) : ("classic" as const),
     height: "100%",
     cache: { enable: false },
-    // 字数统计（v0.3.14 升级中英分统+阅读时长，Typora 只有总字/词/行——写作者对"中文字数"与
-    // "英文词数"分开计更实感）：中文按字、英文/数字按词，时长=中文400字/分+英文200词/分
+    // 字数统计（type text = 按渲染后文本统计，符合中文字数直觉；after 补三语单位）。
+    // v0.3.15 按用户反馈撤掉中英分统+阅读时长（"复杂了，用户得想字和词的区别"）恢复单一总数
     counter: {
       enable: true, type: "text",
-      after: (_len: number) => {
+      after: (len: number) => {
         const el = document.querySelector<HTMLElement>(".vditor-counter");
-        if (!el) return;
-        const root = document.querySelector<HTMLElement>("#editor .vditor-reset");
-        const txt = root ? (root.innerText || "").trim() : "";
-        if (!txt) { el.innerText = ""; return; }
-        const zh = (txt.match(/[一-鿿]/g) || []).length;
-        const en = (txt.match(/[A-Za-z0-9]+/g) || []).length;
-        const min = Math.max(1, Math.ceil(zh / 400 + en / 200));
-        el.innerText = `${zh} ${t("cntZh")} · ${en} ${t("cntEn")} · ≈${min} ${t("cntMin")}`;
+        if (el) el.innerText = `${len} ${t("wordCount")}`;
       },
     },
     // :emoji: 补全的表情图片走本地资源（默认 unpkg CDN，CSP 禁外联且离线不可用）
@@ -1106,8 +1230,8 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
       });
     },
     preview: {
-      // v0.3.14 内容主题随暗色切换（工具栏/外壳由 options.theme + CSS 变量管）
-      theme: { current: themeDark ? "dark" : "light", path: "/vditor-assets/dist/css/content-theme" },
+      // 内容主题随主题切换（light/dark/eye 三态；eye=自建护眼豆沙绿）
+      theme: { current: themeName, path: "/vditor-assets/dist/css/content-theme" },
       hljs: { lineNumber: true, style: "github" },
       // 数学公式 KaTeX（引擎资源已本地化；inlineDigit 允许行内 $ 后跟数字，兼容中文排版场景）
       math: { engine: "KaTeX", inlineDigit: true },
@@ -1264,17 +1388,29 @@ function applyAllText() {
   const ro = document.getElementById("replace-one"); if (ro) ro.textContent = t("replaceOne");
   const ra = document.getElementById("replace-all"); if (ra) ra.textContent = t("replaceAll");
   const pt = document.getElementById("panel-title"); if (pt) pt.textContent = t("panelTitle");
-  // v0.3.14 侧栏文件页 + 快开 + 主题
+  // v0.3.14/15 侧栏文件页 + 快开 + 主题 + 标签右键菜单
   const sto = document.getElementById("side-tab-outline"); if (sto) sto.textContent = t("sideOutline");
   const stf = document.getElementById("side-tab-files"); if (stf) stf.textContent = t("sideFiles");
   const ofi = document.getElementById("outline-filter") as HTMLInputElement | null; if (ofi) ofi.placeholder = t("outlineFilterPh");
-  const rt = document.getElementById("recent-title"); if (rt) rt.textContent = t("recentTitle");
-  const ft = document.getElementById("ftree-title"); if (ft) ft.textContent = t("fileTreeTitle");
+  const ffi = document.getElementById("ftree-filter") as HTMLInputElement | null; if (ffi) ffi.placeholder = t("filterFilesPh");
+  const rt = document.getElementById("recent-title"); const rts = rt ? rt.querySelector("span") : null; if (rts) rts.textContent = t("recentTitle");
+  const rc = document.getElementById("recent-clear"); if (rc) { rc.title = t("clearRecentTip"); rc.textContent = t("clearRecent"); }
+  const fu = document.getElementById("ftree-up"); if (fu) fu.title = t("treeUpTip");
+  const fp = document.getElementById("ftree-path") as HTMLInputElement | null; if (fp) fp.placeholder = t("treePathPh");
   const fr = document.getElementById("ftree-refresh"); if (fr) fr.title = t("treeRefreshTip");
   const gsi = document.getElementById("gsearch-input") as HTMLInputElement | null; if (gsi) gsi.placeholder = t("gsearchPh");
   const qot = document.getElementById("qo-title"); if (qot) qot.textContent = t("quickOpenTitle");
   const qoi = document.getElementById("qo-input") as HTMLInputElement | null; if (qoi) qoi.placeholder = t("quickOpenPh");
-  const bt = document.getElementById("btn-theme"); if (bt) bt.title = t(themeDark ? "themeToLightTip" : "themeToDarkTip");
+  const ts = document.getElementById("theme-select"); if (ts) ts.title = t("themeTip");
+  const tm = document.getElementById("tab-menu");
+  if (tm) {
+    const setTxt = (act: string, key: string) => {
+      const b = tm.querySelector(`button[data-act="${act}"]`);
+      if (b && act !== "close-selected") b.textContent = t(key); // 关闭选中项动态带数量，打开时刷新
+    };
+    setTxt("close", "tabClose"); setTxt("close-others", "tabCloseOthers");
+    setTxt("close-right", "tabCloseRight"); setTxt("close-all", "tabCloseAll");
+  }
   renderRecent();
   const eh = document.getElementById("empty-hint"); if (eh) eh.textContent = t("emptyHint");
   const cmsg = document.getElementById("cc-msg"); if (cmsg) cmsg.textContent = t("closeSaveMsg");
@@ -2123,31 +2259,29 @@ const OUTLINE_W_KEY = "mded-outline-w-v1";
 const OUTLINE_W_MIN = 180, OUTLINE_W_MAX = 520;
 function initOutlineResize(): void {
   const panel = document.getElementById("outline-panel");
-  if (!panel || panel.dataset.mdedResizable) return;
-  panel.dataset.mdedResizable = "1";
+  const gutter = document.getElementById("side-gutter");
+  if (!panel || !gutter) return;
   const clamp = (w: number): number =>
     Math.min(OUTLINE_W_MAX, Math.max(OUTLINE_W_MIN, Math.min(w, Math.floor(window.innerWidth / 2))));
   try {
     const saved = parseInt(localStorage.getItem(OUTLINE_W_KEY) || "", 10);
     if (!isNaN(saved)) panel.style.width = clamp(saved) + "px";
   } catch { /* 存储禁用则用 CSS 默认宽 */ }
-  panel.addEventListener("mousemove", (e) => {
-    const r = panel.getBoundingClientRect();
-    panel.style.cursor = (e.clientX > r.right - 5) ? "col-resize" : "";
-  });
-  panel.addEventListener("mouseleave", () => { panel.style.cursor = ""; });
-  panel.addEventListener("mousedown", (e) => {
-    const r = panel.getBoundingClientRect();
-    if (e.clientX <= r.right - 5) return;
+  // v0.3.15：事件挂独立把手（不再用面板近缘判定）——大纲/文件列表内容溢出时右缘被
+  // 原生滚动条占据，真机 mousedown 被滚动条消费=拖不动（CDP e2e 看不见非 DOM 层测不到）
+  gutter.addEventListener("mousedown", (e) => {
     e.preventDefault();
-    const startX = e.clientX, w0 = r.width;
+    e.stopPropagation();
+    gutter.classList.add("dragging");
+    const startX = e.clientX, w0 = panel.getBoundingClientRect().width;
     const onMove = (ev: MouseEvent): void => {
       panel.style.width = clamp(w0 + (ev.clientX - startX)) + "px";
     };
     const onUp = (): void => {
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
-      try { localStorage.setItem(OUTLINE_W_KEY, String(Math.round(panel.getBoundingClientRect().width))); } catch { /* 同上 */ }
+      gutter.classList.remove("dragging");
+      try { localStorage.setItem(OUTLINE_W_KEY, String(Math.round(panel.getBoundingClientRect().width))); } catch { /* 存储禁用则仅本会话 */ }
     };
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
@@ -3086,8 +3220,9 @@ async function boot() {
     if (localStorage.getItem(FOCUS_KEY) === "1") setFocusMode(true);
     localStorage.removeItem("md-editor-typewriter");
   } catch { /* 存储禁用 */ }
-  // v0.3.14 侧栏文件页（文件树/最近/跨文件搜索）+ 快开 + 主题按钮绑定
+  // v0.3.14 侧栏文件页（文件树/最近/跨文件搜索）+ 快开 + 主题；v0.3.15 标签右键菜单
   initSidePanels();
+  initTabMenu();
   // Word 式显示比例：Ctrl+滚轮 / Ctrl+加减 / Ctrl+0 复位 / 右下角拉杆——只缩正文内容区
   // （.vditor-content），格式工具条(.vditor-toolbar)/应用工具栏/大纲/标签页都不缩。
   // 实现=挂载点 CSS 变量 --doc-zoom（Vditor 模式/语言重建子树不丢）；zoom 参与布局，

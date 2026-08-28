@@ -29,7 +29,11 @@
       <button id="btn-mode" type="button" title="切回即时渲染模式（Ctrl+Alt+M）">切回即时渲染</button>
       <span id="mode-badge" class="mode-badge wysiwyg" title="当前：所见即所得模式（可直接编辑表格）">所见即所得</span>
       <input id="font-size-select" type="number" min="8" max="72" step="1" value="16" title="编辑区字号" style="width: 4em" />
-      <button id="btn-theme" type="button" title="切换暗色/亮色主题">🌙</button>
+      <select id="theme-select" title="界面主题：浅色 / 深色 / 护眼（未选过跟随系统）">
+        <option value="light">🌙 浅色</option>
+        <option value="dark">☀️ 深色</option>
+        <option value="eye">🌿 护眼</option>
+      </select>
       <select id="lang-select" title="Language / 语言">
         <option value="zh-CN">简体中文</option>
         <option value="zh-TW">繁體中文</option>
@@ -37,11 +41,12 @@
       </select>
       <span id="file-title">（未命名）</span>
       <span id="encoding-badge"></span>
-      <span id="app-version" title="软件版本（报问题时先看这里）">v0.3.14</span>
+      <span id="app-version" title="软件版本（报问题时先看这里）">v0.3.15</span>
     </div>
     <div id="tabs"></div>
     <div id="main">
       <aside id="outline-panel">
+        <div id="side-gutter" title="拖动调整侧栏宽度"></div>
         <div class="side-tabs">
           <button id="side-tab-outline" class="side-tab active" type="button">大纲</button>
           <button id="side-tab-files" class="side-tab" type="button">文件</button>
@@ -51,15 +56,17 @@
           <ul id="outline"></ul>
         </div>
         <div id="side-pane-files" class="side-pane" hidden>
-          <div class="recent-title" id="recent-title">最近</div>
-          <ul id="recent-list"></ul>
-          <div class="ftree-head">
-            <span id="ftree-title">文件树</span>
+          <div class="ftree-bar">
+            <button id="ftree-up" type="button" title="上一级目录">↑</button>
+            <input id="ftree-path" type="text" placeholder="路径，回车跳转" autocomplete="off" spellcheck="false" />
             <button id="ftree-refresh" type="button" title="刷新目录">⟳</button>
           </div>
+          <input id="gsearch-input" type="text" placeholder="搜全目录内容，回车执行（Ctrl+Shift+F）" autocomplete="off" spellcheck="false" />
+          <ul id="gsearch-results" hidden></ul>
+          <input id="ftree-filter" type="text" placeholder="过滤文件名…" autocomplete="off" spellcheck="false" />
           <div class="ftree" id="ftree"></div>
-          <input id="gsearch-input" type="text" placeholder="搜全目录 .md，回车执行（Ctrl+Shift+F）" autocomplete="off" spellcheck="false" />
-          <ul id="gsearch-results"></ul>
+          <div class="recent-title"><span id="recent-title">最近</span><button id="recent-clear" type="button" title="清空最近文件列表">🗑 清空</button></div>
+          <ul id="recent-list"></ul>
         </div>
       </aside>
       <main id="editor-wrap">
@@ -126,6 +133,13 @@
         <ul id="qo-list"></ul>
         <div class="qo-hint">↑↓ 选择 · Enter 打开 · Esc 关闭</div>
       </div>
+    </div>
+    <div id="tab-menu" hidden>
+      <button data-act="close" type="button">关闭</button>
+      <button data-act="close-others" type="button">关闭其它</button>
+      <button data-act="close-right" type="button">关闭右侧</button>
+      <button data-act="close-selected" type="button" hidden>关闭选中</button>
+      <button data-act="close-all" type="button">全部关闭</button>
     </div>
   </body>
 </html>

@@ -37,6 +37,27 @@ html[data-theme="dark"] {
   color-scheme: dark; /* 原生控件（input/select/scrollbar）跟暗 */
 }
 
+/* ===== v0.3.15 护眼主题（WPS/Word 护眼模式同款豆沙绿 #C7EDCC，编辑区主底） ===== */
+html[data-theme="eye"] {
+  --bg: #d9ecdd;            /* 应用工具栏：浅一档的绿，与编辑区拉开层次 */
+  --bg-elem: #cfe6d4; --bg-panel: #e3f1e6; --bg-panel2: #d9ecdd;
+  --bg-input: #cfe6d4; --bg-surface: #eaf5ec; --bg-float: rgba(234,245,236,0.95);
+  --bg-hover: #c4e3cb; --bg-hover2: #cde7d3; --bg-active: #b8ddc1;
+  --accent: #3e8e51; --accent2: #357a45; --accent-soft: #cdebd4; --accent-border: #8fc49c;
+  --border: #a8cdb1; --border2: #b5d7be; --border3: #bedcc5; --border4: #c8e2ce;
+  --text: #2b3a2e; --text2: #3a4c3e; --text3: #4c5f50;
+  --muted: #6b8271; --muted2: #7a9080; --muted3: #8b9f91; --muted4: #9aac9f;
+  --danger: #c33;
+  --shadow: 0 4px 16px rgba(62,142,81,.18);
+}
+/* 护眼主底=编辑区豆沙绿（WPS 同款视觉焦点在正文），外壳浅绿衬托 */
+html[data-theme="eye"] #editor,
+html[data-theme="eye"] #editor .vditor,
+html[data-theme="eye"] #editor .vditor-content { background-color: #C7EDCC; }
+/* 正文层（pre.vditor-reset）白底来自 Vditor 运行时动态插入的 css，晚于本文件加载
+   会覆盖普通优先级——!important 对抗，护眼必须渗透到光标所在的内容层 */
+html[data-theme="eye"] .vditor-reset { background-color: transparent !important; }
+
 #toolbar {
   height: 42px; flex: 0 0 auto;
   display: flex; align-items: center; gap: 8px;
@@ -68,7 +89,7 @@ html[data-theme="dark"] {
 #export-menu button:disabled:hover { background: none; }
 #export-menu .menu-sep { border-top: 1px solid var(--border4); margin: 4px 6px; }
 #export-menu .menu-label { font-size: 11px; color: var(--muted2); padding: 4px 12px 2px; }
-#lang-select, #font-size-select { padding: 4px 6px; font-size: 13px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-surface); color: var(--text); cursor: pointer; }
+#lang-select, #font-size-select, #theme-select { padding: 4px 6px; font-size: 13px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-surface); color: var(--text); cursor: pointer; }
 #file-title { margin-left: 8px; font-size: 13px; color: var(--text); }
 #encoding-badge { color: var(--muted2); font-size: 12px; }
 #app-version { color: var(--muted4); font-size: 11px; margin-left: 2px; white-space: nowrap; }
@@ -81,6 +102,21 @@ html[data-theme="dark"] {
 .tab { display: flex; align-items: center; gap: 6px; padding: 0 10px; height: 100%; cursor: pointer; font-size: 13px; border-right: 1px solid var(--border2); white-space: nowrap; }
 .tab:hover { background: var(--bg-panel); }
 .tab.active { background: var(--bg-surface); border-bottom: 2px solid var(--accent); }
+.tab.sel { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent-border); } /* Ctrl+Click 多选态（Notepad++ 式批量关闭） */
+
+/* ===== v0.3.15 标签右键菜单（Notepad++：关闭/关闭其它/关闭右侧/全部；Ctrl+Click 多选加"关闭选中"） ===== */
+#tab-menu {
+  position: fixed; z-index: 2147483646; min-width: 150px;
+  background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px;
+  box-shadow: var(--shadow); padding: 4px;
+}
+#tab-menu[hidden] { display: none; }
+#tab-menu button {
+  display: block; width: 100%; text-align: left; padding: 6px 12px;
+  border: none; background: none; border-radius: 4px; font-size: 13px;
+  color: var(--text); cursor: pointer;
+}
+#tab-menu button:hover { background: var(--bg-hover); }
 .tab-name { color: var(--text); }
 .tab-close { color: var(--muted2); padding: 0 2px; }
 .tab-close:hover { color: var(--danger); }
@@ -92,7 +128,17 @@ html[data-theme="dark"] {
   border-right: 1px solid var(--border2);
   background: var(--bg-panel);
   display: flex; flex-direction: column; overflow: hidden;
+  position: relative;
 }
+/* v0.3.15 拖宽把手：绝对定位右缘 6px 竖条。此前近缘判定挂面板 mousemove/mousedown，
+   大纲/文件列表内容溢出时右缘被原生滚动条占据（elementFromPoint 看不见的非 DOM层），
+   真机 mousedown 被滚动条消费=拖不动（CDP e2e 测不到，用户实锤）。独立把手 z-index
+   盖在滚动条前 6px 上，事件挂把手本身——滚动条剩余区域仍可正常拖滚。 */
+#side-gutter {
+  position: absolute; right: 0; top: 0; bottom: 0; width: 6px;
+  cursor: col-resize; z-index: 40; user-select: none; -webkit-user-select: none;
+}
+#side-gutter:hover, #side-gutter.dragging { background: var(--accent); opacity: 0.35; }
 /* ===== v0.3.14 侧栏页签：大纲 | 文件（文件树/最近/跨文件搜索共住一栏） ===== */
 .side-tabs {
   flex: 0 0 auto; display: flex;
@@ -107,11 +153,30 @@ html[data-theme="dark"] {
 .side-tab:hover { color: var(--text2); }
 .side-pane { flex: 1 1 auto; display: flex; flex-direction: column; overflow: hidden; }
 .side-pane[hidden] { display: none; }
-#outline-filter, #gsearch-input {
+#outline-filter, #gsearch-input, #ftree-filter {
   flex: 0 0 auto; margin: 6px 8px 4px; padding: 4px 8px; font-size: 12px;
   border: 1px solid var(--border); border-radius: 4px; background: var(--bg-surface); color: var(--text);
 }
-#outline-filter:focus, #gsearch-input:focus { outline: none; border-color: var(--accent); }
+#outline-filter:focus, #gsearch-input:focus, #ftree-filter:focus { outline: none; border-color: var(--accent); }
+#gsearch-results[hidden] { display: none; }
+/* 地址栏（资源管理器式：↑ 上一级 + 路径输入回车跳转 + ⟳ 刷新） */
+.ftree-bar {
+  flex: 0 0 auto; display: flex; gap: 4px; align-items: center;
+  margin: 6px 8px 0; padding: 0;
+}
+.ftree-bar button {
+  flex: 0 0 auto; width: 24px; height: 24px; line-height: 1; cursor: pointer;
+  border: 1px solid var(--border); background: var(--bg-input); color: var(--text);
+  border-radius: 4px; font-size: 13px;
+  display: flex; align-items: center; justify-content: center;
+}
+.ftree-bar button:hover { background: var(--bg-hover); }
+#ftree-path {
+  flex: 1 1 auto; min-width: 0; padding: 3px 6px; font-size: 12px;
+  border: 1px solid var(--border); border-radius: 4px;
+  background: var(--bg-surface); color: var(--text);
+}
+#ftree-path:focus { outline: none; border-color: var(--accent); }
 
 .panel-title {
   padding: 8px 10px; font-size: 12px; color: var(--muted);
@@ -133,12 +198,18 @@ html[data-theme="dark"] {
 .outline-item:hover .odel { opacity: 0.8; }
 .empty { color: var(--muted3); padding: 12px; font-size: 12px; }
 
-/* ===== 文件页签：最近文件 + 文件树 + 跨文件搜索 ===== */
-.recent-title, .ftree-head {
+/* ===== 文件页签：地址栏 + 文件树（主） + 最近（辅，树下方） ===== */
+.recent-title {
   flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
   padding: 6px 10px 2px; font-size: 11px; color: var(--muted2);
+  border-top: 1px solid var(--border4);
 }
-#recent-list { flex: 0 0 auto; list-style: none; max-height: 168px; overflow: auto; }
+#recent-clear {
+  border: none; background: none; color: var(--muted2); cursor: pointer;
+  font-size: 11px; padding: 1px 4px; border-radius: 3px;
+}
+#recent-clear:hover { color: var(--danger); background: var(--bg-hover); }
+#recent-list { flex: 0 0 auto; list-style: none; max-height: 130px; overflow: auto; }
 #recent-list li {
   padding: 4px 10px; font-size: 12px; cursor: pointer; color: var(--text2);
   display: flex; gap: 6px; align-items: baseline;
@@ -163,7 +234,7 @@ html[data-theme="dark"] {
 .ftree .node.file.cur { color: var(--accent); font-weight: 600; background: var(--accent-soft); }
 .ftree .node.dir { font-weight: 600; }
 .ftree .kids { margin: 0; padding: 0; list-style: none; }
-#gsearch-results { flex: 0 0 auto; list-style: none; max-height: 260px; overflow: auto; border-top: 1px solid var(--border4); }
+#gsearch-results { flex: 0 0 auto; list-style: none; max-height: 200px; overflow: auto; margin: 0 8px; border: 1px solid var(--border4); border-radius: 4px; }
 #gsearch-results li {
   padding: 5px 10px; font-size: 12px; cursor: pointer; color: var(--text2);
   border-left: 3px solid transparent;
