@@ -42,6 +42,12 @@ fn open_file(path: String) -> Result<(String, String), String> {
     if !has_allowed_ext(&path) {
         return Err("不支持的文件类型（仅 md/markdown/mdown/txt）".into());
     }
+    // 硬上限 2MB：超大文件读入+IPC 传输本身就慢，先在源头拒绝（渲染层 256KB 防线在前端）
+    if let Ok(meta) = fs::metadata(&path) {
+        if meta.len() > 2 * 1024 * 1024 {
+            return Err(format!("文件过大（{} KB，上限 2048 KB），已阻止打开以免卡死", meta.len() / 1024));
+        }
+    }
     let bytes = fs::read(&path).map_err(|e| e.to_string())?;
     let (content, enc) = if bytes.starts_with(&[0xEF, 0xBB, 0xBF]) {
         (
@@ -700,7 +706,21 @@ fn save_ui_state(app: AppHandle, v: serde_json::Value) -> Result<(), String> {
     fs::write(&p, serde_json::to_string(&v).map_err(|e| e.to_string())?).map_err(|e| e.to_string())
 }
 
-// ===== v0.3.14 文件树侧栏 + 全局跨文件搜索 =====
+// ===== v0.3.14 文件树侧栏 + 全局跨文件搜索；v0.3.16 盘符根 =====
+
+/// 列本机所有盘符（文件树"此电脑"根用）：C..Z 逐个探测，零依赖不用 Win32 API。
+#[tauri::command]
+fn list_drives() -> Vec<serde_json::Value> {
+    let mut out = vec![];
+    for c in b'C'..=b'Z' {
+        let root = format!("{}:\\", c as char);
+        if fs::metadata(&root).is_ok() {
+            out.push(serde_json::json!({ "name": root.clone(), "path": root, "is_dir": true }));
+        }
+    }
+    out
+}
+
 
 /// 目录树忽略的子目录名（隐藏目录「.」开头另行判断）
 const TREE_SKIP_DIRS: &[&str] = &["node_modules", "target", "dist", "__pycache__"];
@@ -1026,6 +1046,7 @@ pub fn run() {
             export_selftest_dir,
             save_ui_state,
             list_md_dir,
+            list_drives,
             search_md_files,
             dnd_selftest_enabled,
             print_webview
@@ -1092,6 +1113,34 @@ mod tests {
         let args = vec!["prog.exe".to_string(), "notexist.md".to_string(), md_str.clone()];
         assert_eq!(extract_md_from_args(args.into_iter()), Some(md_str));
         assert_eq!(extract_md_from_args(vec!["prog.exe".to_string()].into_iter()), None);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn list_drives_returns_existing_roots() {
+        // 本机至少有 C:；每项 path 均为 "X:\" 形态且 is_dir=true
+        let out = list_drives();
+        assert!(!out.is_empty(), "本机至少一个盘符");
+        assert!(out.iter().any(|v| v["path"].as_str().unwrap() == "C:\\"));
+        for v in &out {
+            let p = v["path"].as_str().unwrap();
+            assert!(p.len() == 3 && p.ends_with(":\\"), "盘符形态: {p}");
+            assert!(v["is_dir"].as_bool().unwrap());
+        }
+    }
+
+    #[test]
+    fn open_file_rejects_oversize() {
+        // >2MB 在读文件前就被拒（不读内容，Err 文案含"文件过大"）
+        let dir = std::env::temp_dir().join("md_verify_oversize");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let big = dir.join("big.md");
+        let mut buf = vec![b'a'; 2 * 1024 * 1024 + 1];
+        buf[0] = b'#';
+        fs::write(&big, &buf).unwrap();
+        let err = open_file(big.to_string_lossy().to_string()).unwrap_err();
+        assert!(err.contains("文件过大"), "err={err}");
         let _ = fs::remove_dir_all(&dir);
     }
 

@@ -63,11 +63,11 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     outlineFilterPh: "过滤大纲…", filterFilesPh: "过滤文件名…",
     recentTitle: "最近", clearRecentTip: "清空最近文件列表", clearRecent: "🗑 清空",
     treeUpTip: "上一级目录", treePathPh: "路径，回车跳转", treeRefreshTip: "刷新目录",
-    gsearchPh: "搜全目录内容，回车执行（Ctrl+Shift+F）", gsearchNone: "（无匹配）",
+    gsearchPh: "在本文件夹中搜索，回车执行（Ctrl+Shift+F）", gsearchNone: "（无匹配）",
     gsearchNoDoc: "（打开文件后可搜其所在目录）", gsearchEmpty: "（输入关键词）",
     quickOpenTitle: "快速打开", quickOpenPh: "输入文件名过滤，↑↓选择，回车打开…", quickOpenEmpty: "（暂无最近文件）",
-    treeNoDoc: "（打开文件后显示其所在目录）", treeBadPath: "路径不存在或无法访问：",
-    tabClose: "关闭", tabCloseOthers: "关闭其它", tabCloseRight: "关闭右侧", tabCloseAll: "全部关闭", tabCloseSelected: "关闭选中",
+    treeNoDoc: "（打开文件后显示其所在目录）", treeBadPath: "路径不存在或无法访问：", drivesRoot: "此电脑", fileTooBig: "文件过大（约 ", fileTooBigSuf: " KB，上限 256 KB），为避免卡死已阻止打开，请用记事本等工具查看。",
+    tabClose: "关闭", tabCloseOthers: "关闭其它", tabCloseRight: "关闭右侧", tabCloseLeft: "关闭左侧", tabCloseAll: "全部关闭", tabCloseSelected: "关闭选中",
     themeTip: "界面主题：浅色 / 深色 / 护眼（未选过跟随系统）",
     appName: "MD 编辑器",
   },
@@ -105,11 +105,11 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     outlineFilterPh: "過濾大綱…", filterFilesPh: "過濾檔名…",
     recentTitle: "最近", clearRecentTip: "清空最近檔案列表", clearRecent: "🗑 清空",
     treeUpTip: "上一級目錄", treePathPh: "路徑，Enter 跳轉", treeRefreshTip: "重新整理目錄",
-    gsearchPh: "搜全目錄內容，Enter 執行（Ctrl+Shift+F）", gsearchNone: "（無符合）",
+    gsearchPh: "在本資料夾中搜尋，Enter 執行（Ctrl+Shift+F）", gsearchNone: "（無符合）",
     gsearchNoDoc: "（開啟檔案後可搜其所在目錄）", gsearchEmpty: "（輸入關鍵詞）",
     quickOpenTitle: "快速開啟", quickOpenPh: "輸入檔名過濾，↑↓選擇，Enter 開啟…", quickOpenEmpty: "（暫無最近檔案）",
-    treeNoDoc: "（開啟檔案後顯示其所在目錄）", treeBadPath: "路徑不存在或無法存取：",
-    tabClose: "關閉", tabCloseOthers: "關閉其它", tabCloseRight: "關閉右側", tabCloseAll: "全部關閉", tabCloseSelected: "關閉選中",
+    treeNoDoc: "（開啟檔案後顯示其所在目錄）", treeBadPath: "路徑不存在或無法存取：", drivesRoot: "本機", fileTooBig: "檔案過大（約 ", fileTooBigSuf: " KB，上限 256 KB），為避免卡死已阻止開啟，請用記事本等工具查看。",
+    tabClose: "關閉", tabCloseOthers: "關閉其它", tabCloseRight: "關閉右側", tabCloseLeft: "關閉左側", tabCloseAll: "全部關閉", tabCloseSelected: "關閉選中",
     themeTip: "介面主題：淺色 / 深色 / 護眼（未選過跟隨系統）",
     appName: "MD 編輯器",
   },
@@ -147,11 +147,11 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     outlineFilterPh: "Filter outline…", filterFilesPh: "Filter file names…",
     recentTitle: "Recent", clearRecentTip: "Clear recent files", clearRecent: "🗑 Clear",
     treeUpTip: "Parent folder", treePathPh: "Path, Enter to go", treeRefreshTip: "Refresh folder",
-    gsearchPh: "Search content in folder, Enter (Ctrl+Shift+F)", gsearchNone: "(no match)",
+    gsearchPh: "Search in this folder, Enter (Ctrl+Shift+F)", gsearchNone: "(no match)",
     gsearchNoDoc: "(open a file to search its folder)", gsearchEmpty: "(type a keyword)",
     quickOpenTitle: "Quick open", quickOpenPh: "Type to filter, ↑↓ select, Enter open…", quickOpenEmpty: "(no recent files)",
-    treeNoDoc: "(open a file to show its folder)", treeBadPath: "Path not accessible: ",
-    tabClose: "Close", tabCloseOthers: "Close others", tabCloseRight: "Close to the right", tabCloseAll: "Close all", tabCloseSelected: "Close selected",
+    treeNoDoc: "(open a file to show its folder)", treeBadPath: "Path not accessible: ", drivesRoot: "This PC", fileTooBig: "File too large (about ", fileTooBigSuf: " KB, limit 256 KB). Opening blocked to avoid freezing; use Notepad instead.",
+    tabClose: "Close", tabCloseOthers: "Close others", tabCloseRight: "Close to the right", tabCloseLeft: "Close to the left", tabCloseAll: "Close all", tabCloseSelected: "Close selected",
     themeTip: "Theme: light / dark / eye-care (follows system until chosen)",
     appName: "MD Editor",
   },
@@ -580,9 +580,17 @@ function openTabMenu(docId: string, x: number, y: number): void {
   const menu = document.getElementById("tab-menu")!;
   tabMenuTarget = docId;
   const selBtn = menu.querySelector<HTMLButtonElement>('[data-act="close-selected"]')!;
-  const multi = tabSel.has(docId) && tabSel.size > 1;
+  // 选中集>1 即显示（右键谁都可以批量关选中集，不要求右键目标本身在选中集内）
+  const multi = tabSel.size > 1;
   selBtn.hidden = !multi;
-  selBtn.textContent = t("tabCloseSelected") + `(${tabSel.size})`;
+  selBtn.textContent = t("tabCloseSelected"); // v0.3.16 按用户要求去掉计数后缀
+  // 目标是最右标签时"关闭右侧"没东西可关——换成"关闭左侧"（资源管理器/Notepad++ 同语义自适应）
+  // 按钮的 data-act 会被动态改写（close-right ↔ close-left），两种都查才找得到
+  const rightBtn = menu.querySelector<HTMLButtonElement>('[data-act="close-right"], [data-act="close-left"]')!;
+  const tabs = Array.from(document.querySelectorAll("#tabs .tab")) as HTMLElement[];
+  const isLast = tabs.length > 0 && tabs[tabs.length - 1].dataset.docId === docId;
+  rightBtn.dataset.act = isLast ? "close-left" : "close-right";
+  rightBtn.textContent = isLast ? t("tabCloseLeft") : t("tabCloseRight");
   menu.hidden = false;
   const mw = menu.offsetWidth, mh = menu.offsetHeight;
   menu.style.left = Math.min(x, window.innerWidth - mw - 4) + "px";
@@ -609,6 +617,7 @@ function initTabMenu(): void {
     if (act === "close") toClose = [target];
     else if (act === "close-others") toClose = idsInOrder.filter((id) => id !== target);
     else if (act === "close-right") toClose = idsInOrder.slice(idsInOrder.indexOf(target) + 1);
+    else if (act === "close-left") toClose = idsInOrder.slice(0, idsInOrder.indexOf(target));
     else if (act === "close-all") toClose = idsInOrder;
     else if (act === "close-selected") toClose = idsInOrder.filter((id) => tabSel.has(id));
     else return;
@@ -685,6 +694,12 @@ async function closeDoc(id: string) {
 function openDoc(path: string | null, content: string, name?: string, encoding?: string) {
   hideEmptyState(); // 打开文档时隐藏空状态
   closeFind(); // 文档切换后旧匹配节点失效，收起查找条
+  // 大文件防线（v0.3.16）：实测 300KB 秒开、500KB 起渲染冻结（Vditor wysiwyg 超线性），
+  // 用户双击大 TXT 卡死即此因。所有打开路径（树/最近/快开/dnd/命令行）统一在此拦截。
+  if (content.length > 262144) {
+    alert(t("fileTooBig") + Math.round(content.length / 1024) + t("fileTooBigSuf"));
+    return;
+  }
   // 同路径已打开 → 直接切换过去，不重复开
   if (path) {
     const existing = docs.find((d) => d.path === path);
@@ -791,13 +806,12 @@ async function ftreeKids(container: HTMLElement, dirPath: string, depth: number)
     node.dataset.path = e.path;
     node.style.paddingLeft = 6 + depth * 14 + "px";
     node.innerHTML =
-      `<span class="caret">${e.is_dir ? "▸" : ""}</span>` +
+      `<span class="caret"></span>` + // v0.3.16 箭头改 CSS 三角（字形渲染环境差异）
       `<span class="nname" title="${esc(e.path)}">${esc(e.name)}</span>`;
     node.addEventListener("click", (ev) => {
       ev.stopPropagation();
       if (!e.is_dir) { loadFile(e.path); return; }
-      const open = node.classList.toggle("open");
-      node.querySelector(".caret")!.textContent = open ? "▾" : "▸";
+      const open = node.classList.toggle("open"); // 展开/收起：CSS 按 .open 旋转三角
       let kids = node.nextElementSibling as HTMLElement | null;
       if (!kids || !kids.classList.contains("kids")) {
         kids = document.createElement("div");
@@ -832,7 +846,7 @@ function setTreeRoot(dir: string): void {
   ftreeToken++;
   const head = document.createElement("div");
   head.className = "node dir";
-  head.innerHTML = `<span class="caret">▾</span><span class="nname" title="${esc(dir)}">${esc(dir)}</span>`;
+  head.innerHTML = `<span class="caret open"></span><span class="nname" title="${esc(dir)}">${esc(dir)}</span>`;
   const kids = document.createElement("div");
   kids.className = "kids";
   box.innerHTML = "";
@@ -841,18 +855,43 @@ function setTreeRoot(dir: string): void {
   ftreeKids(kids, dir, 1);
 }
 function refreshFileTree(): void {
+  const dir = docDirOf(activeDoc()?.path || null);
+  if (!dir) showDrivesRoot(); // v0.3.16：无文档=「此电脑」盘符列表（不再空提示）
+  else setTreeRoot(dir);
+}
+/** 盘符根态（资源管理器"此电脑"）：ftreeRoot=null，地址栏清空，盘符可逐级展开 */
+function showDrivesRoot(): void {
   const box = document.getElementById("ftree");
   if (!box) return;
-  const dir = docDirOf(activeDoc()?.path || null);
-  if (!dir) {
-    ftreeToken++;
-    ftreeRoot = null;
-    const pathInp = document.getElementById("ftree-path") as HTMLInputElement | null;
-    if (pathInp && !pathInp.value) pathInp.placeholder = t("treePathPh");
-    box.innerHTML = `<div class="empty">${esc(t("treeNoDoc"))}</div>`;
-    return;
-  }
-  setTreeRoot(dir);
+  ftreeToken++;
+  ftreeRoot = null;
+  const pathInp = document.getElementById("ftree-path") as HTMLInputElement | null;
+  if (pathInp) pathInp.value = "";
+  const head = document.createElement("div");
+  head.className = "node dir open";
+  head.innerHTML = `<span class="caret open"></span><span class="nname">${esc(t("drivesRoot"))}</span>`;
+  const kids = document.createElement("div");
+  kids.className = "kids";
+  box.innerHTML = "";
+  box.appendChild(head);
+  box.appendChild(kids);
+  const tok = ftreeToken;
+  invoke<TreeEntry[]>("list_drives").then((drives) => {
+    if (tok !== ftreeToken) return;
+    for (const d of drives) {
+      const node = document.createElement("div");
+      node.className = "node dir";
+      node.dataset.path = d.path;
+      node.style.paddingLeft = 6 + 14 + "px";
+      node.innerHTML = `<span class="caret"></span><span class="nname" title="${esc(d.path)}">${esc(d.name)}</span>`;
+      node.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        setTreeRoot(d.path); // 点盘符=以该盘为根（与资源管理器一致）
+      });
+      kids.appendChild(node);
+    }
+    markTreeCurrent();
+  }).catch(() => { /* 枚举失败留空 */ });
 }
 // 当前文件高亮：切换标签只挪高亮 class，不重载树（保住展开态）
 function markTreeCurrent(): void {
@@ -994,7 +1033,8 @@ function switchSidePane(which: "outline" | "files"): void {
   document.getElementById("side-tab-files")!.classList.toggle("active", !isOutline);
   (document.getElementById("side-pane-outline") as HTMLElement).hidden = !isOutline;
   (document.getElementById("side-pane-files") as HTMLElement).hidden = isOutline;
-  if (!isOutline && !ftreeRoot) refreshFileTree(); // 首次进文件页才建树（省启动开销）
+  // 首次进文件页才建树（省启动开销）；drives 态 ftreeRoot=null，以树内无节点判"未建"
+  if (!isOutline && !ftreeRoot && !document.querySelector("#ftree .node")) refreshFileTree();
 }
 
 function initSidePanels(): void {
@@ -1002,9 +1042,10 @@ function initSidePanels(): void {
   document.getElementById("side-tab-files")!.addEventListener("click", () => switchSidePane("files"));
   // 文件树导航三件套：↑ 上级 / 地址栏回车跳转 / ⟳ 刷新（资源管理器范式）
   document.getElementById("ftree-up")!.addEventListener("click", () => {
-    if (!ftreeRoot) return;
+    if (!ftreeRoot) return; // 已是「此电脑」盘符态，再上没有了
+    if (/^[A-Za-z]:\\\\?$/i.test(ftreeRoot)) { showDrivesRoot(); return; } // 盘符根 → 此电脑
     const up = docDirOf(ftreeRoot);
-    if (up) setTreeRoot(up);
+    if (up) setTreeRoot(up); else showDrivesRoot(); // "X:" 无反斜杠等边界也回盘符态
   });
   const pathInp = document.getElementById("ftree-path") as HTMLInputElement;
   pathInp.addEventListener("keydown", (e) => {
@@ -1069,10 +1110,8 @@ function initSidePanels(): void {
 }
 
 function updateTitle() {
-  const doc = activeDoc();
-  const el = document.getElementById("file-title")!;
-  el.textContent = doc ? (doc.dirty ? "● " : "") + doc.name : t("noDoc");
-  document.getElementById("encoding-badge")!.textContent = doc && doc.encoding ? ` ${doc.encoding}` : "";
+  // v0.3.16 按用户要求撤掉工具栏文件名显示（标签页已承载）；编码徽标保留
+  document.getElementById("encoding-badge")!.textContent = activeDoc()?.encoding ? ` ${activeDoc()!.encoding}` : "";
 }
 
 async function loadFile(path: string) {
@@ -1409,7 +1448,7 @@ function applyAllText() {
       if (b && act !== "close-selected") b.textContent = t(key); // 关闭选中项动态带数量，打开时刷新
     };
     setTxt("close", "tabClose"); setTxt("close-others", "tabCloseOthers");
-    setTxt("close-right", "tabCloseRight"); setTxt("close-all", "tabCloseAll");
+    setTxt("close-all", "tabCloseAll"); // close-right/left 文案由 openTabMenu 按标签位置动态定
   }
   renderRecent();
   const eh = document.getElementById("empty-hint"); if (eh) eh.textContent = t("emptyHint");
@@ -3223,6 +3262,7 @@ async function boot() {
   // v0.3.14 侧栏文件页（文件树/最近/跨文件搜索）+ 快开 + 主题；v0.3.15 标签右键菜单
   initSidePanels();
   initTabMenu();
+  switchSidePane("files"); // v0.3.16 默认显示文件页（一打开就能看到文件树/盘符）
   // Word 式显示比例：Ctrl+滚轮 / Ctrl+加减 / Ctrl+0 复位 / 右下角拉杆——只缩正文内容区
   // （.vditor-content），格式工具条(.vditor-toolbar)/应用工具栏/大纲/标签页都不缩。
   // 实现=挂载点 CSS 变量 --doc-zoom（Vditor 模式/语言重建子树不丢）；zoom 参与布局，

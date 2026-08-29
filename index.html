@@ -39,23 +39,22 @@
         <option value="zh-TW">繁體中文</option>
         <option value="en">English</option>
       </select>
-      <span id="file-title">（未命名）</span>
       <span id="encoding-badge"></span>
-      <span id="app-version" title="软件版本（报问题时先看这里）">v0.3.15</span>
+      <span id="app-version" title="软件版本（报问题时先看这里）">v0.3.16</span>
     </div>
     <div id="tabs"></div>
     <div id="main">
       <aside id="outline-panel">
         <div id="side-gutter" title="拖动调整侧栏宽度"></div>
         <div class="side-tabs">
-          <button id="side-tab-outline" class="side-tab active" type="button">大纲</button>
-          <button id="side-tab-files" class="side-tab" type="button">文件</button>
+          <button id="side-tab-files" class="side-tab active" type="button">文件</button>
+          <button id="side-tab-outline" class="side-tab" type="button">大纲</button>
         </div>
-        <div id="side-pane-outline" class="side-pane">
+        <div id="side-pane-outline" class="side-pane" hidden>
           <input id="outline-filter" type="text" placeholder="过滤大纲…" autocomplete="off" spellcheck="false" />
           <ul id="outline"></ul>
         </div>
-        <div id="side-pane-files" class="side-pane" hidden>
+        <div id="side-pane-files" class="side-pane">
           <div class="ftree-bar">
             <button id="ftree-up" type="button" title="上一级目录">↑</button>
             <input id="ftree-path" type="text" placeholder="路径，回车跳转" autocomplete="off" spellcheck="false" />
