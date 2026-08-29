@@ -863,6 +863,94 @@ fn read_binary_file(path: String) -> Result<String, String> {
     Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
 }
 
+// ===== v0.3.17 文件树右键管理（新建/重命名/删除/资源管理器定位） =====
+
+/// 名字合法性：非空且不含 Windows 路径非法字符
+fn valid_entry_name(name: &str) -> Result<(), String> {
+    let n = name.trim();
+    if n.is_empty() {
+        return Err("名称不能为空".into());
+    }
+    if n.chars().any(|c| "\\/:*?\"<>|".contains(c)) {
+        return Err("名称不能包含 \\ / : * ? \" < > |".into());
+    }
+    Ok(())
+}
+
+/// 防误删/误改名盘符根（"C:\" 形态）与根以下直接操作
+fn guard_not_drive_root(path: &str) -> Result<(), String> {
+    let p = path.trim_end_matches('\\');
+    if p.len() <= 2 && p.ends_with(':') {
+        return Err("不能对盘符根执行此操作".into());
+    }
+    Ok(())
+}
+
+/// 新建文本文件（dir 下）：kind = "md" | "txt"；name 已带扩展名则原样用，否则按 kind 补。
+/// 返回新建文件完整路径（前端打开+刷新树用）。
+#[tauri::command]
+fn create_text_file(dir: String, name: String, kind: String) -> Result<String, String> {
+    valid_entry_name(&name)?;
+    let mut n = name.trim().to_string();
+    let lower = n.to_lowercase();
+    if !lower.ends_with(".md") && !lower.ends_with(".txt") && !lower.ends_with(".markdown") {
+        n.push_str(if kind == "txt" { ".txt" } else { ".md" });
+    }
+    let full = std::path::Path::new(&dir).join(&n);
+    if full.exists() {
+        return Err(format!("已存在同名文件：{n}"));
+    }
+    fs::write(&full, "").map_err(|e| e.to_string())?;
+    Ok(full.to_string_lossy().to_string())
+}
+
+/// 新建文件夹（dir 下）。返回完整路径。
+#[tauri::command]
+fn create_dir(dir: String, name: String) -> Result<String, String> {
+    valid_entry_name(&name)?;
+    let full = std::path::Path::new(&dir).join(name.trim());
+    if full.exists() {
+        return Err(format!("已存在同名项：{}", name.trim()));
+    }
+    fs::create_dir(&full).map_err(|e| e.to_string())?;
+    Ok(full.to_string_lossy().to_string())
+}
+
+/// 重命名（同目录改名）：old=完整路径，new_name=新名字（不含目录）。
+/// 用 fs::rename（同盘原子；跨盘不会发生——同目录）。
+#[tauri::command]
+fn rename_entry(old: String, new_name: String) -> Result<String, String> {
+    guard_not_drive_root(&old)?;
+    valid_entry_name(&new_name)?;
+    let dst = std::path::Path::new(&old)
+        .parent()
+        .ok_or("无父目录")?
+        .join(new_name.trim());
+    if dst.exists() {
+        return Err(format!("目标已存在：{}", new_name.trim()));
+    }
+    fs::rename(&old, &dst).map_err(|e| e.to_string())?;
+    Ok(dst.to_string_lossy().to_string())
+}
+
+/// 删除：文件 remove_file / 目录递归 remove_dir_all（前端已 confirm，这里再拒盘符根）
+#[tauri::command]
+fn delete_entry(path: String) -> Result<(), String> {
+    guard_not_drive_root(&path)?;
+    let p = std::path::Path::new(&path);
+    if p.is_dir() {
+        fs::remove_dir_all(p).map_err(|e| e.to_string())
+    } else {
+        fs::remove_file(p).map_err(|e| e.to_string())
+    }
+}
+
+/// 在资源管理器中定位显示（explorer /select,路径）。路径不存在时 explorer 自行处理。
+#[tauri::command]
+fn reveal_path(path: String) {
+    let _ = std::process::Command::new("explorer").arg(format!("/select,{path}")).spawn();
+}
+
 /// 写导出用文本文件（HTML 等）。与 save_file 分离：导出产物不受 md/txt 白名单限制，
 /// 也不做空内容覆盖防护（导出内容来自渲染管线而非编辑器取值）。
 #[tauri::command]
@@ -1047,6 +1135,11 @@ pub fn run() {
             save_ui_state,
             list_md_dir,
             list_drives,
+            create_text_file,
+            create_dir,
+            rename_entry,
+            delete_entry,
+            reveal_path,
             search_md_files,
             dnd_selftest_enabled,
             print_webview
@@ -1113,6 +1206,41 @@ mod tests {
         let args = vec!["prog.exe".to_string(), "notexist.md".to_string(), md_str.clone()];
         assert_eq!(extract_md_from_args(args.into_iter()), Some(md_str));
         assert_eq!(extract_md_from_args(vec!["prog.exe".to_string()].into_iter()), None);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn ftree_entry_ops_roundtrip() {
+        let dir = std::env::temp_dir().join("md_verify_ftree_ops");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let d = dir.to_string_lossy().to_string();
+
+        // 新建 md（补扩展名）→ 打开内容空 → txt 同理
+        let f1 = create_text_file(d.clone(), "笔记".into(), "md".into()).unwrap();
+        assert!(f1.ends_with("笔记.md") && std::path::Path::new(&f1).is_file());
+        // 已存在拒绝
+        assert!(create_text_file(d.clone(), "笔记.md".into(), "md".into()).is_err());
+        // 非法字符拒绝
+        assert!(create_text_file(d.clone(), "a<b".into(), "md".into()).is_err());
+        // 新建文件夹
+        let sub = create_dir(d.clone(), "子夹".into()).unwrap();
+        assert!(std::path::Path::new(&sub).is_dir());
+        // 重命名：文件与目录各一
+        let f2 = rename_entry(f1.clone(), "改名.md".into()).unwrap();
+        assert!(!std::path::Path::new(&f1).exists() && std::path::Path::new(&f2).exists());
+        let sub2 = rename_entry(sub.clone(), "子夹2".into()).unwrap();
+        assert!(std::path::Path::new(&sub2).is_dir());
+        // 目标已存在拒绝
+        let _ = create_text_file(d.clone(), "占用.md".into(), "md".into()).unwrap();
+        assert!(rename_entry(f2.clone(), "占用.md".into()).is_err());
+        // 删除：文件与目录（递归）
+        delete_entry(f2).unwrap();
+        let _ = create_text_file(sub2.clone(), "内.txt".into(), "txt".into()).unwrap();
+        delete_entry(sub2).unwrap();
+        // 盘符根防护
+        assert!(delete_entry("C:\\".into()).is_err());
+        assert!(rename_entry("F:\\".into(), "x".into()).is_err());
         let _ = fs::remove_dir_all(&dir);
     }
 

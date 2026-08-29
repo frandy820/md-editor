@@ -60,7 +60,7 @@
             <input id="ftree-path" type="text" placeholder="路径，回车跳转" autocomplete="off" spellcheck="false" />
             <button id="ftree-refresh" type="button" title="刷新目录">⟳</button>
           </div>
-          <input id="gsearch-input" type="text" placeholder="搜全目录内容，回车执行（Ctrl+Shift+F）" autocomplete="off" spellcheck="false" />
+          <input id="gsearch-input" type="text" placeholder="搜同级文件内容，回车执行（Ctrl+Shift+F）" autocomplete="off" spellcheck="false" />
           <ul id="gsearch-results" hidden></ul>
           <input id="ftree-filter" type="text" placeholder="过滤文件名…" autocomplete="off" spellcheck="false" />
           <div class="ftree" id="ftree"></div>
@@ -139,6 +139,27 @@
       <button data-act="close-right" type="button">关闭右侧</button>
       <button data-act="close-selected" type="button" hidden>关闭选中</button>
       <button data-act="close-all" type="button">全部关闭</button>
+    </div>
+    <div id="ftree-menu" hidden>
+      <button data-act="open" type="button">打开</button>
+      <button data-act="new-md" type="button">新建 Markdown 文件</button>
+      <button data-act="new-txt" type="button">新建 TXT 文件</button>
+      <button data-act="new-dir" type="button">新建文件夹</button>
+      <button data-act="rename" type="button">重命名</button>
+      <button data-act="delete" type="button">删除</button>
+      <button data-act="reveal" type="button">在资源管理器中显示</button>
+      <button data-act="copy-path" type="button">复制路径</button>
+    </div>
+    <div id="ftree-modal" class="modal-mask" hidden>
+      <div class="modal">
+        <div class="modal-msg" id="ftree-modal-title">重命名</div>
+        <div class="modal-msg" id="ftree-modal-msg" hidden style="font-size:13px;color:var(--muted2);margin-top:-10px;margin-bottom:12px;"></div>
+        <input id="ftree-modal-input" type="text" placeholder="输入名称…" autocomplete="off" spellcheck="false" />
+        <div class="modal-btns">
+          <button id="ftree-modal-ok" type="button">确定</button>
+          <button id="ftree-modal-cancel" type="button">取消</button>
+        </div>
+      </div>
     </div>
   </body>
 </html>

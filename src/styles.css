@@ -104,18 +104,18 @@ html[data-theme="eye"] .vditor-reset { background-color: transparent !important;
 .tab.sel { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent-border); } /* Ctrl+Click 多选态（Notepad++ 式批量关闭） */
 
 /* ===== v0.3.15 标签右键菜单（Notepad++：关闭/关闭其它/关闭右侧/全部；Ctrl+Click 多选加"关闭选中"） ===== */
-#tab-menu {
+#tab-menu, #ftree-menu {
   position: fixed; z-index: 2147483646; min-width: 150px;
   background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px;
   box-shadow: var(--shadow); padding: 4px;
 }
-#tab-menu[hidden] { display: none; }
-#tab-menu button {
+#tab-menu[hidden], #ftree-menu[hidden] { display: none; }
+#tab-menu button, #ftree-menu button {
   display: block; width: 100%; text-align: left; padding: 6px 12px;
   border: none; background: none; border-radius: 4px; font-size: 13px;
   color: var(--text); cursor: pointer;
 }
-#tab-menu button:hover { background: var(--bg-hover); }
+#tab-menu button:hover, #ftree-menu button:hover { background: var(--bg-hover); }
 .tab-name { color: var(--text); }
 .tab-close { color: var(--muted2); padding: 0 2px; }
 .tab-close:hover { color: var(--danger); }
@@ -238,6 +238,7 @@ html[data-theme="eye"] .vditor-reset { background-color: transparent !important;
 .ftree .node.dir.open > .caret::before { transform: rotate(90deg); }
 .ftree .node .nname { overflow: hidden; text-overflow: ellipsis; }
 .ftree .node.file.cur { color: var(--accent); font-weight: 600; background: var(--accent-soft); }
+.ftree .node.dir.cur-dir > .nname { font-weight: 600; color: var(--accent); }
 .ftree .node.dir { font-weight: 600; }
 .ftree .kids { margin: 0; padding: 0; list-style: none; }
 #gsearch-results { flex: 0 0 auto; list-style: none; max-height: 200px; overflow: auto; margin: 0 8px; border: 1px solid var(--border4); border-radius: 4px; }
@@ -399,6 +400,8 @@ body.focus-mode .vditor-reset > .fw-current { opacity: 1; }
   background: var(--bg-surface); color: var(--text);
 }
 #qo-input:focus { outline: none; border-color: var(--accent); }
+#ftree-modal-input { width: 100%; box-sizing: border-box; padding: 8px 10px; font-size: 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-surface); color: var(--text); }
+#ftree-modal-input:focus { outline: none; border-color: var(--accent); }
 #qo-list { list-style: none; margin-top: 8px; max-height: 300px; overflow: auto; }
 #qo-list li {
   padding: 7px 10px; font-size: 13px; cursor: pointer; color: var(--text);

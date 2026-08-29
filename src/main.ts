@@ -63,10 +63,15 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     outlineFilterPh: "过滤大纲…", filterFilesPh: "过滤文件名…",
     recentTitle: "最近", clearRecentTip: "清空最近文件列表", clearRecent: "🗑 清空",
     treeUpTip: "上一级目录", treePathPh: "路径，回车跳转", treeRefreshTip: "刷新目录",
-    gsearchPh: "在本文件夹中搜索，回车执行（Ctrl+Shift+F）", gsearchNone: "（无匹配）",
+    gsearchPh: "搜同级文件内容，回车执行（Ctrl+Shift+F）", gsearchNone: "（无匹配）",
     gsearchNoDoc: "（打开文件后可搜其所在目录）", gsearchEmpty: "（输入关键词）",
     quickOpenTitle: "快速打开", quickOpenPh: "输入文件名过滤，↑↓选择，回车打开…", quickOpenEmpty: "（暂无最近文件）",
-    treeNoDoc: "（打开文件后显示其所在目录）", treeBadPath: "路径不存在或无法访问：", drivesRoot: "此电脑", fileTooBig: "文件过大（约 ", fileTooBigSuf: " KB，上限 256 KB），为避免卡死已阻止打开，请用记事本等工具查看。",
+    treeNoDoc: "（打开文件后显示其所在目录）", treeBadPath: "路径不存在或无法访问：", drivesRoot: "此电脑", fileTooBig: "文件过大（约 ",
+    fmOpen: "打开", fmNewMd: "新建 Markdown 文件", fmNewTxt: "新建 TXT 文件", fmNewDir: "新建文件夹",
+    fmRename: "重命名", fmDelete: "删除", fmReveal: "在资源管理器中显示", fmCopyPath: "复制路径",
+    fmNewIn: "在当前位置新建", fmNamePh: "输入名称…", fmRenameTitle: "重命名为：", fmNewMdTitle: "新建 Markdown 文件：", fmNewTxtTitle: "新建 TXT 文件：", fmNewDirTitle: "新建文件夹：",
+    fmDelTitle: "删除确认", fmDelFileMsg: "确定删除该文件？不可恢复。", fmDelDirMsg: "确定删除该文件夹及其全部内容？不可恢复。",
+    fmNoBase: "请先打开文件或在树中定位一个目录", untitledMd: "未命名.md", untitledDir: "新建文件夹", fmCopyDone: "已复制", fmOk: "确定", fileTooBigSuf: " KB，上限 256 KB），为避免卡死已阻止打开，请用记事本等工具查看。",
     tabClose: "关闭", tabCloseOthers: "关闭其它", tabCloseRight: "关闭右侧", tabCloseLeft: "关闭左侧", tabCloseAll: "全部关闭", tabCloseSelected: "关闭选中",
     themeTip: "界面主题：浅色 / 深色 / 护眼（未选过跟随系统）",
     appName: "MD 编辑器",
@@ -105,10 +110,15 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     outlineFilterPh: "過濾大綱…", filterFilesPh: "過濾檔名…",
     recentTitle: "最近", clearRecentTip: "清空最近檔案列表", clearRecent: "🗑 清空",
     treeUpTip: "上一級目錄", treePathPh: "路徑，Enter 跳轉", treeRefreshTip: "重新整理目錄",
-    gsearchPh: "在本資料夾中搜尋，Enter 執行（Ctrl+Shift+F）", gsearchNone: "（無符合）",
+    gsearchPh: "搜同層檔案內容，Enter 執行（Ctrl+Shift+F）", gsearchNone: "（無符合）",
     gsearchNoDoc: "（開啟檔案後可搜其所在目錄）", gsearchEmpty: "（輸入關鍵詞）",
     quickOpenTitle: "快速開啟", quickOpenPh: "輸入檔名過濾，↑↓選擇，Enter 開啟…", quickOpenEmpty: "（暫無最近檔案）",
-    treeNoDoc: "（開啟檔案後顯示其所在目錄）", treeBadPath: "路徑不存在或無法存取：", drivesRoot: "本機", fileTooBig: "檔案過大（約 ", fileTooBigSuf: " KB，上限 256 KB），為避免卡死已阻止開啟，請用記事本等工具查看。",
+    treeNoDoc: "（開啟檔案後顯示其所在目錄）", treeBadPath: "路徑不存在或無法存取：", drivesRoot: "本機", fileTooBig: "檔案過大（約 ",
+    fmOpen: "開啟", fmNewMd: "新增 Markdown 檔案", fmNewTxt: "新增 TXT 檔案", fmNewDir: "新增資料夾",
+    fmRename: "重新命名", fmDelete: "刪除", fmReveal: "在檔案總管中顯示", fmCopyPath: "複製路徑",
+    fmNewIn: "在目前位置新增", fmNamePh: "輸入名稱…", fmRenameTitle: "重新命名為：", fmNewMdTitle: "新增 Markdown 檔案：", fmNewTxtTitle: "新增 TXT 檔案：", fmNewDirTitle: "新增資料夾：",
+    fmDelTitle: "刪除確認", fmDelFileMsg: "確定刪除該檔案？無法復原。", fmDelDirMsg: "確定刪除該資料夾及其全部內容？無法復原。",
+    fmNoBase: "請先開啟檔案或在樹中定位一個目錄", untitledMd: "未命名.md", untitledDir: "新增資料夾", fmCopyDone: "已複製", fmOk: "確定", fileTooBigSuf: " KB，上限 256 KB），為避免卡死已阻止開啟，請用記事本等工具查看。",
     tabClose: "關閉", tabCloseOthers: "關閉其它", tabCloseRight: "關閉右側", tabCloseLeft: "關閉左側", tabCloseAll: "全部關閉", tabCloseSelected: "關閉選中",
     themeTip: "介面主題：淺色 / 深色 / 護眼（未選過跟隨系統）",
     appName: "MD 編輯器",
@@ -147,10 +157,15 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     outlineFilterPh: "Filter outline…", filterFilesPh: "Filter file names…",
     recentTitle: "Recent", clearRecentTip: "Clear recent files", clearRecent: "🗑 Clear",
     treeUpTip: "Parent folder", treePathPh: "Path, Enter to go", treeRefreshTip: "Refresh folder",
-    gsearchPh: "Search in this folder, Enter (Ctrl+Shift+F)", gsearchNone: "(no match)",
+    gsearchPh: "Search sibling files here, Enter (Ctrl+Shift+F)", gsearchNone: "(no match)",
     gsearchNoDoc: "(open a file to search its folder)", gsearchEmpty: "(type a keyword)",
     quickOpenTitle: "Quick open", quickOpenPh: "Type to filter, ↑↓ select, Enter open…", quickOpenEmpty: "(no recent files)",
-    treeNoDoc: "(open a file to show its folder)", treeBadPath: "Path not accessible: ", drivesRoot: "This PC", fileTooBig: "File too large (about ", fileTooBigSuf: " KB, limit 256 KB). Opening blocked to avoid freezing; use Notepad instead.",
+    treeNoDoc: "(open a file to show its folder)", treeBadPath: "Path not accessible: ", drivesRoot: "This PC", fileTooBig: "File too large (about ",
+    fmOpen: "Open", fmNewMd: "New Markdown file", fmNewTxt: "New TXT file", fmNewDir: "New folder",
+    fmRename: "Rename", fmDelete: "Delete", fmReveal: "Reveal in Explorer", fmCopyPath: "Copy path",
+    fmNewIn: "New item here", fmNamePh: "Enter a name…", fmRenameTitle: "Rename to:", fmNewMdTitle: "New Markdown file:", fmNewTxtTitle: "New TXT file:", fmNewDirTitle: "New folder:",
+    fmDelTitle: "Delete", fmDelFileMsg: "Delete this file? This cannot be undone.", fmDelDirMsg: "Delete this folder and ALL its contents? This cannot be undone.",
+    fmNoBase: "Open a file or locate a folder in the tree first", untitledMd: "Untitled.md", untitledDir: "New folder", fmCopyDone: "Copied", fmOk: "OK", fileTooBigSuf: " KB, limit 256 KB). Opening blocked to avoid freezing; use Notepad instead.",
     tabClose: "Close", tabCloseOthers: "Close others", tabCloseRight: "Close to the right", tabCloseLeft: "Close to the left", tabCloseAll: "Close all", tabCloseSelected: "Close selected",
     themeTip: "Theme: light / dark / eye-care (follows system until chosen)",
     appName: "MD Editor",
@@ -707,7 +722,7 @@ function openDoc(path: string | null, content: string, name?: string, encoding?:
       switchDoc(existing.id);
       // 已打开的文件也要树联动：点"最近"里已开过的文件（如其它目录），树根得跟着切
       const dir = docDirOf(path);
-      if (dir && dir !== ftreeRoot) setTreeRoot(dir);
+      if (dir && dir.toLowerCase() !== (ftreeRoot || "").toLowerCase()) void locateTreeAt(dir);
       else markTreeCurrent();
       return;
     }
@@ -726,7 +741,7 @@ function openDoc(path: string | null, content: string, name?: string, encoding?:
     pushRecent(path);
     // 树根联动：换目录才整树重建（含点"最近"里其它目录的文件），同目录只挪高亮
     const dir = docDirOf(path);
-    if (dir && dir !== ftreeRoot) setTreeRoot(dir);
+    if (dir && dir.toLowerCase() !== (ftreeRoot || "").toLowerCase()) void locateTreeAt(dir);
     else markTreeCurrent();
   }
 }
@@ -777,9 +792,9 @@ function renderRecent(): void {
   }
 }
 
-// ----- 文件树（v0.3.15 导航化）：根=可导航的独立状态（↑ 上级/地址栏回车跳转/刷新），
-// 初始=当前文档目录；打开文件时联动切到该文件所在目录（点"最近"里的文件树跟着走的诉求）。
-// 目录节点懒展开（点击才列子层，大目录不卡启动）。 -----
+// ----- 文件树（v0.3.17 常驻树=资源管理器左侧范式）："此电脑"+盘符列表恒在树顶，
+// 点盘符/目录=原位懒展开（不再整树替换——用户反馈"进入某盘后其它盘符看不到、退不回去"）；
+// 地址栏/↑/打开联动 = 定位展开（沿路径逐层展开到目标目录）。 -----
 type TreeEntry = { name: string; path: string; is_dir: boolean };
 function docDirOf(p: string | null): string | null {
   if (!p) return null;
@@ -788,6 +803,49 @@ function docDirOf(p: string | null): string | null {
 }
 let ftreeToken = 0; // 并发防护：慢目录返回时若已发起新刷新则丢弃
 let ftreeRoot: string | null = null; // 当前树根；换目录（导航/打开文件联动）时整树重建
+function makeTreeNode(e: TreeEntry, depth: number): HTMLElement {
+  const node = document.createElement("div");
+  node.className = "node " + (e.is_dir ? "dir" : "file");
+  node.dataset.path = e.path;
+  node.dataset.depth = String(depth);
+  node.style.paddingLeft = 6 + depth * 14 + "px";
+  node.innerHTML =
+    `<span class="caret"></span>` + // v0.3.16 箭头改 CSS 三角（字形渲染环境差异）
+    `<span class="nname" title="${esc(e.path)}">${esc(e.name)}</span>`;
+  node.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    if (!e.is_dir) { loadFile(e.path); return; }
+    if (node.classList.contains("open")) collapseNode(node);
+    else void expandNode(node);
+  });
+  node.addEventListener("contextmenu", (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    openFtreeMenu(e.path, e.is_dir, ev.clientX, ev.clientY);
+  });
+  return node;
+}
+/** 收起目录节点 */
+function collapseNode(node: HTMLElement): void {
+  node.classList.remove("open");
+  const kids = node.nextElementSibling as HTMLElement | null;
+  if (kids && kids.classList.contains("kids")) kids.hidden = true;
+}
+/** 展开目录节点（懒加载子层；force=已加载也重读——新建/删除/改名后刷新用） */
+async function expandNode(node: HTMLElement, force = false): Promise<void> {
+  node.classList.add("open");
+  let kids = node.nextElementSibling as HTMLElement | null;
+  if (!kids || !kids.classList.contains("kids")) {
+    kids = document.createElement("div");
+    kids.className = "kids";
+    node.after(kids);
+  }
+  kids.hidden = false;
+  if (!kids.dataset.loaded || force) {
+    kids.dataset.loaded = "1";
+    await ftreeKids(kids, node.dataset.path!, parseInt(node.dataset.depth || "1", 10) + 1);
+  }
+}
 async function ftreeKids(container: HTMLElement, dirPath: string, depth: number): Promise<void> {
   const tok = ftreeToken;
   let entries: TreeEntry[] = [];
@@ -800,31 +858,18 @@ async function ftreeKids(container: HTMLElement, dirPath: string, depth: number)
     container.innerHTML = `<div class="empty">${esc(t("gsearchNone"))}</div>`;
     return;
   }
-  for (const e of entries) {
-    const node = document.createElement("div");
-    node.className = "node " + (e.is_dir ? "dir" : "file");
-    node.dataset.path = e.path;
-    node.style.paddingLeft = 6 + depth * 14 + "px";
-    node.innerHTML =
-      `<span class="caret"></span>` + // v0.3.16 箭头改 CSS 三角（字形渲染环境差异）
-      `<span class="nname" title="${esc(e.path)}">${esc(e.name)}</span>`;
-    node.addEventListener("click", (ev) => {
-      ev.stopPropagation();
-      if (!e.is_dir) { loadFile(e.path); return; }
-      const open = node.classList.toggle("open"); // 展开/收起：CSS 按 .open 旋转三角
-      let kids = node.nextElementSibling as HTMLElement | null;
-      if (!kids || !kids.classList.contains("kids")) {
-        kids = document.createElement("div");
-        kids.className = "kids";
-        node.after(kids);
-      }
-      kids.hidden = !open;
-      if (open && !kids.dataset.loaded) { kids.dataset.loaded = "1"; ftreeKids(kids, e.path, depth + 1); }
-    });
-    container.appendChild(node);
-  }
+  for (const e of entries) container.appendChild(makeTreeNode(e, depth));
   applyTreeFilter();
   markTreeCurrent();
+}
+/** 大小写不敏感找树里的目录/文件节点 */
+function findTreeNode(path: string): HTMLElement | null {
+  const low = path.toLowerCase();
+  let hit: HTMLElement | null = null;
+  document.querySelectorAll("#ftree .node").forEach((n) => {
+    if (!hit && (n as HTMLElement).dataset.path && (n as HTMLElement).dataset.path!.toLowerCase() === low) hit = n as HTMLElement;
+  });
+  return hit;
 }
 /** 文件名过滤（树重载后重放，不清过滤框——同大纲过滤行为） */
 function applyTreeFilter(): void {
@@ -836,31 +881,8 @@ function applyTreeFilter(): void {
     (n as HTMLElement).style.display = !q || txt.includes(q) ? "" : "none";
   });
 }
-/** 切树根：重建整树+地址栏回填（导航入口：↑ 上级 / 地址栏回车 / 打开文件联动 / 刷新） */
-function setTreeRoot(dir: string): void {
-  ftreeRoot = dir;
-  const box = document.getElementById("ftree");
-  const pathInp = document.getElementById("ftree-path") as HTMLInputElement | null;
-  if (pathInp) pathInp.value = dir;
-  if (!box) return;
-  ftreeToken++;
-  const head = document.createElement("div");
-  head.className = "node dir";
-  head.innerHTML = `<span class="caret open"></span><span class="nname" title="${esc(dir)}">${esc(dir)}</span>`;
-  const kids = document.createElement("div");
-  kids.className = "kids";
-  box.innerHTML = "";
-  box.appendChild(head);
-  box.appendChild(kids);
-  ftreeKids(kids, dir, 1);
-}
-function refreshFileTree(): void {
-  const dir = docDirOf(activeDoc()?.path || null);
-  if (!dir) showDrivesRoot(); // v0.3.16：无文档=「此电脑」盘符列表（不再空提示）
-  else setTreeRoot(dir);
-}
-/** 盘符根态（资源管理器"此电脑"）：ftreeRoot=null，地址栏清空，盘符可逐级展开 */
-function showDrivesRoot(): void {
+/** 树顶常驻结构（只建一次；盘符节点=普通 dir 节点，可原位懒展开） */
+function buildPcTree(): void {
   const box = document.getElementById("ftree");
   if (!box) return;
   ftreeToken++;
@@ -879,25 +901,260 @@ function showDrivesRoot(): void {
   invoke<TreeEntry[]>("list_drives").then((drives) => {
     if (tok !== ftreeToken) return;
     for (const d of drives) {
-      const node = document.createElement("div");
-      node.className = "node dir";
-      node.dataset.path = d.path;
-      node.style.paddingLeft = 6 + 14 + "px";
-      node.innerHTML = `<span class="caret"></span><span class="nname" title="${esc(d.path)}">${esc(d.name)}</span>`;
-      node.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        setTreeRoot(d.path); // 点盘符=以该盘为根（与资源管理器一致）
-      });
+      const node = makeTreeNode({ name: d.name, path: d.path, is_dir: true }, 1);
       kids.appendChild(node);
     }
     markTreeCurrent();
   }).catch(() => { /* 枚举失败留空 */ });
+}
+let locateSeq = 0; // 定位并发守卫：后发起的定位作废先前的展开链
+/** 定位展开（导航入口：↑ 上级 / 地址栏回车 / 打开文件联动 / 刷新）：
+ *  沿路径从盘符层逐层展开到目标目录，地址栏回填，目标目录高亮滚入视口。 */
+async function locateTreeAt(dir: string): Promise<void> {
+  const seq = ++locateSeq;
+  ftreeRoot = dir;
+  const pathInp = document.getElementById("ftree-path") as HTMLInputElement | null;
+  if (pathInp) pathInp.value = dir;
+  // 树未建（理论上 boot 已建，兜底）先建等盘符节点
+  if (!document.querySelector("#ftree .node.dir[data-path]")) buildPcTree();
+  for (let i = 0; i < 40; i++) {
+    if (locateSeq !== seq) return;
+    if (document.querySelector("#ftree .node.dir[data-path]")) break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  const norm = dir.replace(/\//g, "\\").replace(/\\+$/, "");
+  const segs = norm.split("\\");
+  let cur = segs[0] + "\\"; // 盘符根
+  let node = findTreeNode(cur);
+  if (!node) return; // 盘符不存在（已拔出等）
+  await expandNode(node);
+  for (let i = 1; i < segs.length; i++) {
+    if (locateSeq !== seq) return;
+    cur += segs[i];
+    const next = findTreeNode(cur);
+    if (!next) break; // 中途某层缺失（无权限/已删）：停在能到达的层
+    await expandNode(next);
+    node = next;
+    cur += "\\";
+  }
+  if (locateSeq !== seq) return;
+  document.querySelectorAll("#ftree .node.cur-dir").forEach((n) => n.classList.remove("cur-dir"));
+  node.classList.add("cur-dir");
+  node.scrollIntoView({ block: "nearest" });
+}
+/** 目录内容重载（新建/删除/改名后）：节点在=强制重读其 kids；不在=定位展开（顺带展开父链） */
+async function reloadDir(dir: string): Promise<void> {
+  const node = findTreeNode(dir);
+  if (node && node.classList.contains("dir")) await expandNode(node, true);
+  else await locateTreeAt(dir);
+}
+function refreshFileTree(): void {
+  const dir = docDirOf(activeDoc()?.path || null);
+  buildPcTree(); // 常驻树重建（丢弃旧展开态，盘符层起步）
+  if (dir) void locateTreeAt(dir); // 有文档=定位到其目录
 }
 // 当前文件高亮：切换标签只挪高亮 class，不重载树（保住展开态）
 function markTreeCurrent(): void {
   const cur = activeDoc()?.path || "";
   document.querySelectorAll("#ftree .node.file").forEach((n) => {
     n.classList.toggle("cur", (n as HTMLElement).dataset.path === cur);
+  });
+}
+
+// ===== v0.3.17 文件树右键操作：新建 MD/TXT/文件夹、重命名、删除、资源管理器、复制路径 =====
+let ftreeMenuPath: string | null = null; // 右键目标；null=树空白区（新建基准=当前定位目录 ftreeRoot）
+let ftreeMenuIsDir = false;
+function hideFtreeMenu(): void {
+  const m = document.getElementById("ftree-menu");
+  if (m) m.hidden = true;
+  ftreeMenuPath = null;
+}
+function openFtreeMenu(path: string | null, isDir: boolean, x: number, y: number): void {
+  const menu = document.getElementById("ftree-menu")!;
+  ftreeMenuPath = path;
+  ftreeMenuIsDir = isDir;
+  const show = (act: string, on: boolean) => {
+    const b = menu.querySelector<HTMLButtonElement>(`[data-act="${act}"]`);
+    if (b) b.hidden = !on;
+  };
+  const isDriveRoot = !!path && /^[A-Za-z]:\\?$/.test(path);
+  show("open", !!path && !isDir); // 仅文件
+  show("new-md", !path || isDir); // 目录/空白：在其内新建（盘符根=在盘根新建，合法）
+  show("new-txt", !path || isDir);
+  show("new-dir", !path || isDir);
+  show("rename", !!path && !isDriveRoot); // 盘符根不可改名/删除
+  show("delete", !!path && !isDriveRoot);
+  show("reveal", !!path);
+  show("copy-path", !!path);
+  menu.hidden = false;
+  const mw = menu.offsetWidth, mh = menu.offsetHeight;
+  menu.style.left = Math.min(x, window.innerWidth - mw - 4) + "px";
+  menu.style.top = Math.min(y, window.innerHeight - mh - 4) + "px";
+}
+/** #ftree-modal 两用：输入名（input=true，Enter 确定/Esc 取消）或确认（input=false）。resolve null=取消 */
+function ftreeAsk(opts: { title: string; msg?: string; input?: boolean; initial?: string; okText?: string }): Promise<string | null> {
+  return new Promise((resolve) => {
+    const mask = document.getElementById("ftree-modal")!;
+    const input = document.getElementById("ftree-modal-input") as HTMLInputElement;
+    const msg = document.getElementById("ftree-modal-msg")!;
+    const okBtn = document.getElementById("ftree-modal-ok") as HTMLButtonElement;
+    const cancelBtn = document.getElementById("ftree-modal-cancel") as HTMLButtonElement;
+    document.getElementById("ftree-modal-title")!.textContent = opts.title;
+    okBtn.textContent = opts.okText || t("fmOk");
+    msg.hidden = !opts.msg;
+    if (opts.msg) msg.textContent = opts.msg;
+    input.hidden = !opts.input;
+    if (opts.input) {
+      input.value = opts.initial || "";
+      input.placeholder = t("fmNamePh");
+    }
+    mask.hidden = false;
+    if (opts.input) { input.focus(); input.select(); }
+    const done = (v: string | null) => {
+      mask.hidden = true;
+      okBtn.onclick = null;
+      cancelBtn.onclick = null;
+      input.onkeydown = null;
+      resolve(v);
+    };
+    input.onkeydown = (e) => {
+      if (e.key === "Enter") { e.preventDefault(); done(opts.input ? input.value.trim() : ""); }
+      else if (e.key === "Escape") { e.preventDefault(); done(null); }
+    };
+    okBtn.onclick = () => done(opts.input ? input.value.trim() : "");
+    cancelBtn.onclick = () => done(null);
+  });
+}
+/** 强制关闭（不弹保存确认）：文件已被删除，内容无从保存 */
+function forceCloseDoc(id: string): void {
+  const idx = docs.findIndex((d) => d.id === id);
+  if (idx < 0) return;
+  docs.splice(idx, 1);
+  if (activeId === id) {
+    activeId = null;
+    const next = docs[idx] || docs[idx - 1] || null;
+    if (next) switchDoc(next.id);
+    else showEmptyState();
+  }
+  renderTabs();
+}
+/** 关闭路径==目标 或位于目标目录之下 的全部文档（删除目录时级联） */
+function forceCloseDocsUnder(path: string): void {
+  const low = path.toLowerCase();
+  const dead = docs.filter((d) => {
+    if (!d.path) return false;
+    const p = d.path.toLowerCase();
+    return p === low || p.startsWith(low + "\\");
+  });
+  for (const d of dead) forceCloseDoc(d.id);
+  markTreeCurrent();
+}
+/** 重命名联动打开中的文档：路径/名更新（目录改名=前缀替换，子文件跟随），dirty 保留（内容没变，存盘走新路径） */
+function handleRenamed(oldPath: string, newPath: string): void {
+  const low = oldPath.toLowerCase();
+  for (const d of docs) {
+    if (!d.path) continue;
+    const p = d.path.toLowerCase();
+    if (p === low) {
+      d.path = newPath;
+      d.name = newPath.split(/[\\/]/).pop()!;
+    } else if (p.startsWith(low + "\\")) {
+      d.path = newPath + d.path.slice(oldPath.length);
+    }
+  }
+  // 定位目录本身或其祖先被改名：地址栏跟随
+  const fr = (ftreeRoot || "").toLowerCase();
+  if (fr === low) ftreeRoot = newPath;
+  else if (fr.startsWith(low + "\\")) ftreeRoot = newPath + (ftreeRoot || "").slice(oldPath.length);
+  const pathInp = document.getElementById("ftree-path") as HTMLInputElement | null;
+  if (pathInp && ftreeRoot) pathInp.value = ftreeRoot;
+  renderTabs();
+  updateTitle();
+  const dir = docDirOf(newPath);
+  if (dir) void reloadDir(dir);
+  markTreeCurrent();
+}
+function copyTextToClipboard(text: string): void {
+  const done = () => alert(t("fmCopyDone") + " " + text);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
+  } else fallbackCopy(text, done);
+}
+function fallbackCopy(text: string, done: () => void): void {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand("copy"); done(); } catch { /* 静默 */ }
+  ta.remove();
+}
+function initFtreeMenu(): void {
+  const menu = document.getElementById("ftree-menu")!;
+  // 树空白区右键：新建（基准=当前定位目录）
+  const box = document.getElementById("ftree");
+  if (box) box.addEventListener("contextmenu", (e) => {
+    if ((e.target as HTMLElement).closest(".node")) return; // 节点自身已处理
+    e.preventDefault();
+    openFtreeMenu(null, false, e.clientX, e.clientY);
+  });
+  menu.addEventListener("click", async (e) => {
+    const btn = (e.target as HTMLElement).closest("button[data-act]") as HTMLButtonElement | null;
+    if (!btn || btn.hidden) return;
+    const path = ftreeMenuPath; // 先取再 hide
+    const isDir = ftreeMenuIsDir;
+    hideFtreeMenu();
+    const act = btn.dataset.act!;
+    // 各动作的目录基准：目录右键=其内部；文件右键=所在目录；空白=定位目录
+    const baseDir = path ? (isDir ? path : docDirOf(path)) : ftreeRoot;
+    const parentDir = path ? docDirOf(path) : null;
+    try {
+      if (act === "open" && path) { loadFile(path); return; }
+      if (act === "new-md" || act === "new-txt") {
+        if (!baseDir) { alert(t("fmNoBase")); return; }
+        const kind = act === "new-txt" ? "txt" : "md";
+        const title = kind === "txt" ? t("fmNewTxtTitle") : t("fmNewMdTitle");
+        const name = await ftreeAsk({ title, input: true, initial: kind === "txt" ? "未命名.txt" : t("untitledMd") });
+        if (!name) return;
+        const full = await invoke<string>("create_text_file", { dir: baseDir, name, kind });
+        await reloadDir(baseDir);
+        loadFile(full); // 新建的文件直接打开编辑
+        return;
+      }
+      if (act === "new-dir") {
+        if (!baseDir) { alert(t("fmNoBase")); return; }
+        const name = await ftreeAsk({ title: t("fmNewDirTitle"), input: true, initial: t("untitledDir") });
+        if (!name) return;
+        await invoke<string>("create_dir", { dir: baseDir, name });
+        await reloadDir(baseDir);
+        return;
+      }
+      if (act === "rename" && path) {
+        const cur = path.split(/[\\/]/).pop()!;
+        const newName = await ftreeAsk({ title: t("fmRenameTitle"), input: true, initial: cur });
+        if (!newName || newName === cur) return;
+        const newPath = await invoke<string>("rename_entry", { old: path, newName });
+        handleRenamed(path, newPath);
+        return;
+      }
+      if (act === "delete" && path) {
+        const okGo = await ftreeAsk({ title: t("fmDelTitle"), msg: isDir ? t("fmDelDirMsg") : t("fmDelFileMsg"), okText: t("fmDelete") });
+        if (okGo === null) return; // null=取消；""=确认（无输入模式确定返回空串）
+        await invoke("delete_entry", { path });
+        forceCloseDocsUnder(path);
+        if (parentDir) await reloadDir(parentDir);
+        return;
+      }
+      if (act === "reveal" && path) { invoke("reveal_path", { path }); return; }
+      if (act === "copy-path" && path) { copyTextToClipboard(path); return; }
+    } catch (err) {
+      alert(String(err)); // Rust 侧 Err（重名/非法名/权限等）直接展示
+    }
+  });
+  // 点菜单外任意处收起
+  window.addEventListener("mousedown", (e) => {
+    if (!menu.hidden && !menu.contains(e.target as Node)) hideFtreeMenu();
   });
 }
 
@@ -909,8 +1166,8 @@ function runGlobalSearch(): void {
   const ul = document.getElementById("gsearch-results");
   if (!inp || !ul) return;
   const q = inp.value.trim();
-  // 搜索目录跟随树根（用户导航到哪搜哪），未建树时回落当前文档目录
-  const dir = ftreeRoot || docDirOf(activeDoc()?.path || null);
+  // v0.3.17 按用户语义："同级文件"=当前打开文件所在目录优先；无文档回落树定位目录
+  const dir = docDirOf(activeDoc()?.path || null) || ftreeRoot;
   ul.innerHTML = "";
   ul.hidden = !q; // 无关键词时整块收起（不占树上方空间）
   if (!q) return;
@@ -1043,9 +1300,13 @@ function initSidePanels(): void {
   // 文件树导航三件套：↑ 上级 / 地址栏回车跳转 / ⟳ 刷新（资源管理器范式）
   document.getElementById("ftree-up")!.addEventListener("click", () => {
     if (!ftreeRoot) return; // 已是「此电脑」盘符态，再上没有了
-    if (/^[A-Za-z]:\\\\?$/i.test(ftreeRoot)) { showDrivesRoot(); return; } // 盘符根 → 此电脑
+    if (/^[A-Za-z]:\\?$/i.test(ftreeRoot)) { // 已在盘符根：↑=回盘符态（此电脑常驻可见，仅清定位）
+      ftreeRoot = null;
+      (document.getElementById("ftree-path") as HTMLInputElement).value = "";
+      return;
+    }
     const up = docDirOf(ftreeRoot);
-    if (up) setTreeRoot(up); else showDrivesRoot(); // "X:" 无反斜杠等边界也回盘符态
+    if (up) void locateTreeAt(up);
   });
   const pathInp = document.getElementById("ftree-path") as HTMLInputElement;
   pathInp.addEventListener("keydown", (e) => {
@@ -1053,12 +1314,12 @@ function initSidePanels(): void {
     e.preventDefault();
     const v = pathInp.value.trim();
     if (!v) return;
-    invoke<TreeEntry[]>("list_md_dir", { path: v }).then(() => setTreeRoot(v)).catch(() => {
+    invoke<TreeEntry[]>("list_md_dir", { path: v }).then(() => void locateTreeAt(v)).catch(() => {
       pathInp.value = ftreeRoot || "";
       alert(t("treeBadPath") + v);
     });
   });
-  document.getElementById("ftree-refresh")!.addEventListener("click", () => { if (ftreeRoot) setTreeRoot(ftreeRoot); });
+  document.getElementById("ftree-refresh")!.addEventListener("click", () => { refreshFileTree(); });
   // 文件名过滤 + 最近文件清空（用户诉求：最近要能手动清理）
   (document.getElementById("ftree-filter") as HTMLInputElement).addEventListener("input", applyTreeFilter);
   document.getElementById("recent-clear")!.addEventListener("click", () => {
@@ -3262,6 +3523,7 @@ async function boot() {
   // v0.3.14 侧栏文件页（文件树/最近/跨文件搜索）+ 快开 + 主题；v0.3.15 标签右键菜单
   initSidePanels();
   initTabMenu();
+  initFtreeMenu();
   switchSidePane("files"); // v0.3.16 默认显示文件页（一打开就能看到文件树/盘符）
   // Word 式显示比例：Ctrl+滚轮 / Ctrl+加减 / Ctrl+0 复位 / 右下角拉杆——只缩正文内容区
   // （.vditor-content），格式工具条(.vditor-toolbar)/应用工具栏/大纲/标签页都不缩。
