@@ -951,6 +951,95 @@ fn reveal_path(path: String) {
     let _ = std::process::Command::new("explorer").arg(format!("/select,{path}")).spawn();
 }
 
+/// v0.3.18 Everything 全盘文件名搜索：调 es.exe（voidtools 官方 CLI，本地 IPC 查询
+/// 运行中的 Everything，毫秒级）。语法透传（空格=AND、ext:md、path:、通配符、regex:）。
+/// es.exe 输出为系统 ANSI 代码页（中文系统=GBK），用 MultiByteToWideChar 解码。
+/// 探测链（OnceLock 缓存）：本 exe 同目录 → PATH → Everything 标准安装目录。
+#[tauri::command]
+fn es_search(query: String, limit: u32) -> Result<Vec<EsHit>, String> {
+    let q = query.trim().to_string();
+    if q.is_empty() {
+        return Ok(vec![]);
+    }
+    let es = find_es_exe().ok_or("ES_NOT_FOUND")?;
+    use std::os::windows::process::CommandExt;
+    use std::process::Stdio;
+    // -timeout 3000：Everything 数据库冷加载时 es 最多等 3s；-s 按完整路径排序（结果稳定）
+    // 关键：搜索词按空白拆成多参数传——es.exe 对单参数内部的空格不做语法拆分
+    //（"md-editor ext:md" 整串=字面子串匹配，0 命中；拆开传=语法生效）
+    let terms: Vec<String> = q.split_whitespace().map(str::to_string).collect();
+    let out = Command::new(&es)
+        .args(["-n", &limit.clamp(1, 500).to_string(), "-s", "-timeout", "3000"])
+        .args(&terms)
+        .creation_flags(0x0800_0000) // CREATE_NO_WINDOW：防 console 闪窗
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+        .map_err(|e| format!("spawn es.exe: {e}"))?;
+    if !out.status.success() {
+        // Everything 未运行等：es 非零退出，统一给前端一个可识别语义
+        return Err("ES_QUERY_FAILED".into());
+    }
+    // es.exe 输出不带文件/目录标记：逐条 metadata 判（NTFS 上 50 次 stat 毫秒级）
+    Ok(ansi_to_lines(&out.stdout)
+        .into_iter()
+        .map(|path| EsHit { is_dir: std::path::Path::new(&path).is_dir(), path })
+        .collect())
+}
+
+/// Everything 命中项（path=完整路径；is_dir=是否目录，前端点击分流用）
+#[derive(serde::Serialize, Debug)]
+struct EsHit {
+    path: String,
+    is_dir: bool,
+}
+
+/// es.exe 路径探测（进程生命周期内缓存一次）
+fn find_es_exe() -> Option<&'static PathBuf> {
+    static ES: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
+    ES.get_or_init(|| {
+        let mut cands: Vec<PathBuf> = vec![];
+        if let Ok(exe) = std::env::current_exe() {
+            if let Some(d) = exe.parent() {
+                cands.push(d.join("es.exe"));
+            }
+        }
+        if let Some(p) = std::env::var_os("PATH") {
+            cands.extend(std::env::split_paths(&p).map(|d| d.join("es.exe")));
+        }
+        for b in [r"C:\Program Files\Everything", r"C:\Program Files (x86)\Everything"] {
+            cands.push(PathBuf::from(b).join("es.exe"));
+        }
+        cands.into_iter().find(|p| p.is_file())
+    })
+    .as_ref()
+}
+
+/// ANSI(GBK) 字节 → 按行拆的 String 列表（es.exe stdout 解码；解码失败回落 lossy）
+fn ansi_to_lines(bytes: &[u8]) -> Vec<String> {
+    let text = {
+        #[cfg(windows)]
+        unsafe {
+            use windows::Win32::Globalization::MultiByteToWideChar;
+            // None=只询所需 wchar 数；再取缓冲转换（windows 0.61 切片化签名）
+            let n = MultiByteToWideChar(936, Default::default(), bytes, None);
+            if n > 0 {
+                let mut w = vec![0u16; n as usize];
+                MultiByteToWideChar(936, Default::default(), bytes, Some(&mut w));
+                String::from_utf16_lossy(&w)
+            } else {
+                String::from_utf8_lossy(bytes).into_owned()
+            }
+        }
+        #[cfg(not(windows))]
+        String::from_utf8_lossy(bytes).into_owned()
+    };
+    text.lines()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect()
+}
+
 /// 写导出用文本文件（HTML 等）。与 save_file 分离：导出产物不受 md/txt 白名单限制，
 /// 也不做空内容覆盖防护（导出内容来自渲染管线而非编辑器取值）。
 #[tauri::command]
@@ -1140,6 +1229,7 @@ pub fn run() {
             rename_entry,
             delete_entry,
             reveal_path,
+            es_search,
             search_md_files,
             dnd_selftest_enabled,
             print_webview
@@ -1154,6 +1244,24 @@ mod tests {
     use super::*;
     use std::fs;
 
+    #[test]
+    fn ansi_to_lines_decodes_gbk() {
+        // "报告 md-editor" 的 GBK 字节（b1a8b8e6 20 6d642d656469746f72）
+        let gbk: Vec<u8> = vec![0xb1, 0xa8, 0xb8, 0xe6, 0x20, 0x6d, 0x64, 0x2d, 0x65, 0x64, 0x69, 0x74, 0x6f, 0x72, 0x0d, 0x0a];
+        assert_eq!(ansi_to_lines(&gbk), vec!["报告 md-editor".to_string()]);
+    }
+    #[test]
+    fn es_search_integration_or_skip() {
+        // 本机集成：es.exe+Everything 在则应命中 .md；es.exe 缺失的机器跳过（不算失败）
+        match es_search("md-editor ext:md".into(), 20) {
+            Ok(list) => assert!(
+                list.iter().any(|h| h.path.to_lowercase().ends_with(".md")),
+                "es 命中应含 .md 文件，实际: {list:?}"
+            ),
+            Err(e) if e == "ES_NOT_FOUND" => eprintln!("skip: 本机无 es.exe"),
+            Err(e) => panic!("es_search 错误: {e}"),
+        }
+    }
     #[test]
     fn ext_whitelist_normal() {
         for e in ["a.md", "a.markdown", "a.mdown", "a.txt"] {

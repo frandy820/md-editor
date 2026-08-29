@@ -1,6 +1,6 @@
 [package]
 name = "md-editor"
-version = "0.3.17"
+version = "0.3.18"
 description = "A Tauri App"
 authors = ["frandy820"]
 edition = "2021"
@@ -22,7 +22,7 @@ tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 webview2-com = "0.38"
-windows = "0.61"
+windows = { version = "0.61", features = ["Win32_Globalization"] }
 tauri-plugin-single-instance = "2"
 encoding_rs = "0.8"
 serde = { version = "1", features = ["derive"] }

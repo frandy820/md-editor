@@ -400,6 +400,14 @@ body.focus-mode .vditor-reset > .fw-current { opacity: 1; }
   background: var(--bg-surface); color: var(--text);
 }
 #qo-input:focus { outline: none; border-color: var(--accent); }
+/* v0.3.18 Everything 全盘搜索结果（过滤框双轨：树过滤+全盘命中） */
+#es-results { list-style: none; margin: 0; max-height: 190px; overflow: auto; border-bottom: 1px solid var(--border); padding: 2px 0; }
+#es-results[hidden] { display: none; }
+#es-results li { display: flex; gap: 6px; align-items: baseline; padding: 3px 10px; cursor: pointer; font-size: 12px; }
+#es-results li:hover { background: var(--bg-hover); }
+#es-results li.empty { color: var(--muted2); cursor: default; font-size: 11px; }
+#es-results .ef { color: var(--text); flex: 0 0 auto; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#es-results .ep { color: var(--muted2); font-size: 11px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #ftree-modal-input { width: 100%; box-sizing: border-box; padding: 8px 10px; font-size: 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-surface); color: var(--text); }
 #ftree-modal-input:focus { outline: none; border-color: var(--accent); }
 #qo-list { list-style: none; margin-top: 8px; max-height: 300px; overflow: auto; }

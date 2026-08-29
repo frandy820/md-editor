@@ -60,9 +60,10 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     histRestore: "恢复此版本", histRestored: "已载入所选版本（未保存），确认内容后 Ctrl+S 保存落盘", histRestoreFail: "恢复失败：", histNoDoc: "（请先打开一个已保存的文档）", histPreview: "（预览）",
     tblRowUp: "整行上移", tblRowDown: "整行下移",
     sideOutline: "大纲", sideFiles: "文件",
-    outlineFilterPh: "过滤大纲…", filterFilesPh: "过滤文件名…",
+    outlineFilterPh: "过滤大纲…", filterFilesPh: "过滤树 / 全盘搜文件名…",
+    esSearching: "全盘搜索中…", esNone: "全盘无命中", esNoEngine: "未启用全盘搜索：将 es.exe 放到 md-editor.exe 同目录（需 Everything 运行中）", esFail: "全盘查询失败（Everything 未运行？）",
     recentTitle: "最近", clearRecentTip: "清空最近文件列表", clearRecent: "🗑 清空",
-    treeUpTip: "上一级目录", treePathPh: "路径，回车跳转", treeRefreshTip: "刷新目录",
+    treePathPh: "路径，回车跳转", treeRefreshTip: "刷新目录",
     gsearchPh: "搜同级文件内容，回车执行（Ctrl+Shift+F）", gsearchNone: "（无匹配）",
     gsearchNoDoc: "（打开文件后可搜其所在目录）", gsearchEmpty: "（输入关键词）",
     quickOpenTitle: "快速打开", quickOpenPh: "输入文件名过滤，↑↓选择，回车打开…", quickOpenEmpty: "（暂无最近文件）",
@@ -107,9 +108,10 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     histRestore: "恢復此版本", histRestored: "已載入所選版本（未儲存），確認內容後 Ctrl+S 儲存落盤", histRestoreFail: "恢復失敗：", histNoDoc: "（請先開啟一個已儲存的文件）", histPreview: "（預覽）",
     tblRowUp: "整行上移", tblRowDown: "整行下移",
     sideOutline: "大綱", sideFiles: "檔案",
-    outlineFilterPh: "過濾大綱…", filterFilesPh: "過濾檔名…",
+    outlineFilterPh: "過濾大綱…", filterFilesPh: "過濾樹 / 全碟搜檔名…",
+    esSearching: "全碟搜尋中…", esNone: "全碟無命中", esNoEngine: "未啟用全碟搜尋：將 es.exe 放到 md-editor.exe 同目錄（需 Everything 執行中）", esFail: "全碟查詢失敗（Everything 未執行？）",
     recentTitle: "最近", clearRecentTip: "清空最近檔案列表", clearRecent: "🗑 清空",
-    treeUpTip: "上一級目錄", treePathPh: "路徑，Enter 跳轉", treeRefreshTip: "重新整理目錄",
+    treePathPh: "路徑，Enter 跳轉", treeRefreshTip: "重新整理目錄",
     gsearchPh: "搜同層檔案內容，Enter 執行（Ctrl+Shift+F）", gsearchNone: "（無符合）",
     gsearchNoDoc: "（開啟檔案後可搜其所在目錄）", gsearchEmpty: "（輸入關鍵詞）",
     quickOpenTitle: "快速開啟", quickOpenPh: "輸入檔名過濾，↑↓選擇，Enter 開啟…", quickOpenEmpty: "（暫無最近檔案）",
@@ -154,9 +156,10 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     histRestore: "Restore this version", histRestored: "Version loaded (unsaved). Review and press Ctrl+S to write to disk", histRestoreFail: "Restore failed: ", histNoDoc: "(Open a saved document first)", histPreview: "(preview)",
     tblRowUp: "Move row up", tblRowDown: "Move row down",
     sideOutline: "Outline", sideFiles: "Files",
-    outlineFilterPh: "Filter outline…", filterFilesPh: "Filter file names…",
+    outlineFilterPh: "Filter outline…", filterFilesPh: "Filter tree / search all drives…",
+    esSearching: "Searching all drives…", esNone: "No matches on this computer", esNoEngine: "Drive-wide search disabled: put es.exe next to md-editor.exe (Everything must be running)", esFail: "Query failed (is Everything running?)",
     recentTitle: "Recent", clearRecentTip: "Clear recent files", clearRecent: "🗑 Clear",
-    treeUpTip: "Parent folder", treePathPh: "Path, Enter to go", treeRefreshTip: "Refresh folder",
+    treePathPh: "Path, Enter to go", treeRefreshTip: "Refresh folder",
     gsearchPh: "Search sibling files here, Enter (Ctrl+Shift+F)", gsearchNone: "(no match)",
     gsearchNoDoc: "(open a file to search its folder)", gsearchEmpty: "(type a keyword)",
     quickOpenTitle: "Quick open", quickOpenPh: "Type to filter, ↑↓ select, Enter open…", quickOpenEmpty: "(no recent files)",
@@ -553,6 +556,11 @@ const tabSel = new Set<string>();
 function renderTabs() {
   const bar = document.getElementById("tabs")!;
   bar.innerHTML = "";
+  // v0.3.18 标签栏空白处双击=新建空白文档（Notepad++ 同款；renderTabs 每次重建 bar，随建随绑）
+  bar.ondblclick = (e) => {
+    if ((e.target as HTMLElement).closest(".tab")) return; // 点在标签上：交给标签自身
+    openDoc(null, "", t("untitled"));
+  };
   docs.forEach((doc) => {
     const tab = document.createElement("div");
     tab.className = "tab" + (doc.id === activeId ? " active" : "") + (tabSel.has(doc.id) ? " sel" : "");
@@ -961,6 +969,66 @@ function markTreeCurrent(): void {
   });
 }
 
+// ===== v0.3.18 Everything 全盘文件名搜索（es.exe IPC，与树过滤共用过滤框） =====
+type EsHit = { path: string; is_dir: boolean };
+let esToken = 0;
+let esDebounce = 0;
+/** 过滤框输入防抖 300ms 后发起全盘搜索（连续输入只发最后一次） */
+function scheduleEsSearch(): void {
+  const inp = document.getElementById("ftree-filter") as HTMLInputElement | null;
+  const ul = document.getElementById("es-results");
+  if (!inp || !ul) return;
+  window.clearTimeout(esDebounce);
+  const q = inp.value.trim();
+  if (!q) { ul.hidden = true; ul.innerHTML = ""; return; }
+  esDebounce = window.setTimeout(() => void runEsSearch(q), 300);
+}
+async function runEsSearch(q: string): Promise<void> {
+  const ul = document.getElementById("es-results");
+  if (!ul) return;
+  const tok = ++esToken;
+  ul.hidden = false;
+  ul.innerHTML = `<li class="empty">${esc(t("esSearching"))}</li>`;
+  let hits: EsHit[];
+  try {
+    hits = await invoke<EsHit[]>("es_search", { query: q, limit: 50 });
+  } catch (e) {
+    if (tok !== esToken) return;
+    const msg = String(e);
+    ul.innerHTML = `<li class="empty">${esc(msg === "ES_NOT_FOUND" ? t("esNoEngine") : t("esFail"))}</li>`;
+    return;
+  }
+  if (tok !== esToken) return; // 已发起更新的搜索，本次结果作废
+  if (hits.length === 0) {
+    ul.innerHTML = `<li class="empty">${esc(t("esNone"))}</li>`;
+    return;
+  }
+  ul.innerHTML = "";
+  for (const h of hits) {
+    const li = document.createElement("li");
+    li.dataset.path = h.path;
+    li.title = h.path;
+    const i = Math.max(h.path.lastIndexOf("\\"), h.path.lastIndexOf("/"));
+    const name = i >= 0 ? h.path.slice(i + 1) : h.path;
+    const parent = i > 0 ? h.path.slice(0, i) : "";
+    li.innerHTML = `<span class="ef">${h.is_dir ? "📁 " : ""}${esc(name)}</span><span class="ep">${esc(parent)}</span>`;
+    li.addEventListener("click", () => void esHitOpen(h));
+    ul.appendChild(li);
+  }
+}
+/** 全盘命中点击分流：文本类=打开编辑；目录=树定位；其它=资源管理器显示 */
+async function esHitOpen(h: EsHit): Promise<void> {
+  if (h.is_dir) {
+    void locateTreeAt(h.path);
+    return;
+  }
+  if (/\.(md|markdown|mdown|txt)$/i.test(h.path)) {
+    loadFile(h.path);
+    return;
+  }
+  invoke("reveal_path", { path: h.path }).catch(() => { /* 资源管理器失败静默 */ });
+}
+
 // ===== v0.3.17 文件树右键操作：新建 MD/TXT/文件夹、重命名、删除、资源管理器、复制路径 =====
 let ftreeMenuPath: string | null = null; // 右键目标；null=树空白区（新建基准=当前定位目录 ftreeRoot）
 let ftreeMenuIsDir = false;
@@ -1297,17 +1365,7 @@ function switchSidePane(which: "outline" | "files"): void {
 function initSidePanels(): void {
   document.getElementById("side-tab-outline")!.addEventListener("click", () => switchSidePane("outline"));
   document.getElementById("side-tab-files")!.addEventListener("click", () => switchSidePane("files"));
-  // 文件树导航三件套：↑ 上级 / 地址栏回车跳转 / ⟳ 刷新（资源管理器范式）
-  document.getElementById("ftree-up")!.addEventListener("click", () => {
-    if (!ftreeRoot) return; // 已是「此电脑」盘符态，再上没有了
-    if (/^[A-Za-z]:\\?$/i.test(ftreeRoot)) { // 已在盘符根：↑=回盘符态（此电脑常驻可见，仅清定位）
-      ftreeRoot = null;
-      (document.getElementById("ftree-path") as HTMLInputElement).value = "";
-      return;
-    }
-    const up = docDirOf(ftreeRoot);
-    if (up) void locateTreeAt(up);
-  });
+  // 文件树导航：地址栏回车跳转 / ⟳ 刷新（v0.3.18 ↑ 上级已删——树常驻盘符，导航走树/地址栏）
   const pathInp = document.getElementById("ftree-path") as HTMLInputElement;
   pathInp.addEventListener("keydown", (e) => {
     if (e.key !== "Enter") return;
@@ -1320,8 +1378,11 @@ function initSidePanels(): void {
     });
   });
   document.getElementById("ftree-refresh")!.addEventListener("click", () => { refreshFileTree(); });
-  // 文件名过滤 + 最近文件清空（用户诉求：最近要能手动清理）
-  (document.getElementById("ftree-filter") as HTMLInputElement).addEventListener("input", applyTreeFilter);
+  // 文件名过滤 = 树内过滤 + Everything 全盘搜索双轨 + 最近文件清空（用户诉求：最近要能手动清理）
+  (document.getElementById("ftree-filter") as HTMLInputElement).addEventListener("input", () => {
+    applyTreeFilter();
+    scheduleEsSearch();
+  });
   document.getElementById("recent-clear")!.addEventListener("click", () => {
     saveUiStateKey("recent", []);
     renderRecent();
@@ -1695,7 +1756,6 @@ function applyAllText() {
   const ffi = document.getElementById("ftree-filter") as HTMLInputElement | null; if (ffi) ffi.placeholder = t("filterFilesPh");
   const rt = document.getElementById("recent-title"); const rts = rt ? rt.querySelector("span") : null; if (rts) rts.textContent = t("recentTitle");
   const rc = document.getElementById("recent-clear"); if (rc) { rc.title = t("clearRecentTip"); rc.textContent = t("clearRecent"); }
-  const fu = document.getElementById("ftree-up"); if (fu) fu.title = t("treeUpTip");
   const fp = document.getElementById("ftree-path") as HTMLInputElement | null; if (fp) fp.placeholder = t("treePathPh");
   const fr = document.getElementById("ftree-refresh"); if (fr) fr.title = t("treeRefreshTip");
   const gsi = document.getElementById("gsearch-input") as HTMLInputElement | null; if (gsi) gsi.placeholder = t("gsearchPh");
