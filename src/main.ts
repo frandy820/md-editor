@@ -709,6 +709,7 @@ function snapReset(doc: Doc | null): void {
   window.clearTimeout(snapTimer);
   snapBase = doc ? doc.content.replace(/\r\n/g, "\n") : ""; // 归一：磁盘CRLF vs getValue LF
   snapStepOpen = false;
+  syncUndoBtns(); // 切换文档后按钮禁用态跟随新文档的栈
 }
 function snapOnInput(doc: Doc, cur: string): void {
   if (cur === snapBase && !snapStepOpen) return;
@@ -718,6 +719,7 @@ function snapOnInput(doc: Doc, cur: string): void {
     doc.undoStack.push(snapBase);
     if (doc.undoStack.length > 100) doc.undoStack.shift(); // 栈深上限
     doc.redoStack.length = 0;
+    syncUndoBtns();
   }
   window.clearTimeout(snapTimer);
   snapTimer = window.setTimeout(() => { snapBase = cur; snapStepOpen = false; }, 900);
@@ -728,6 +730,28 @@ function snapOnInput(doc: Doc, cur: string): void {
 // 测试钩子：只读暴露 docs 内部态（dirty/base/栈深），供 e2e 诊断保存时序类问题
 Object.defineProperty(window, "__mdDocs", { get: () => docs });
 (window as any).__mdRedo = () => docRedo();
+// v0.3.21 撤销/重做按钮（Word 式双通道）：劫持 Vditor 自带按钮点击走自建栈。
+// 捕获层挂 .vditor-toolbar（父层 capture 先于按钮自身 listener，Vditor 内部 undo 不再执行）。
+function setupUndoToolbar(): void {
+  const bar = document.querySelector(".vditor-toolbar");
+  if (!bar) return;
+  if (!(bar as unknown as { __mdUndoBound?: boolean }).__mdUndoBound) {
+    (bar as unknown as { __mdUndoBound?: boolean }).__mdUndoBound = true;
+    bar.addEventListener("click", (e) => {
+      const ty = (e.target as Element | null)?.closest?.("[data-type]")?.getAttribute("data-type");
+      if (ty === "undo") { e.preventDefault(); e.stopPropagation(); docUndo(); }
+      else if (ty === "redo") { e.preventDefault(); e.stopPropagation(); docRedo(); }
+    }, true);
+  }
+  syncUndoBtns();
+}
+function syncUndoBtns(): void { // 栈空灰显（Word 式）
+  const d = activeDoc();
+  const u = document.querySelector<HTMLButtonElement>('.vditor-toolbar [data-type="undo"]');
+  const r = document.querySelector<HTMLButtonElement>('.vditor-toolbar [data-type="redo"]');
+  if (u) u.disabled = !d || d.undoStack.length === 0;
+  if (r) r.disabled = !d || d.redoStack.length === 0;
+}
 function docUndo(): void {
   const doc = activeDoc();
   if (!doc || !vditor) return;
@@ -753,6 +777,7 @@ function restoreDocValue(doc: Doc, v: string): void {
   updateTitle();
   renderTabs();
   scheduleOutline();
+  syncUndoBtns();
 }
 
 function switchDoc(id: string) {
@@ -1727,10 +1752,19 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
         const doc = activeDoc();
         if (doc && vditor) {
           const v = mdValue();
-          if (v !== "" || doc.content === "") doc.content = v;
+          if (v !== "" || doc.content === "") {
+            // v0.3.21 自建撤销栈补记：DOM 直接操作（整行上/下移等）不触发 input 事件，
+            // 不记步则不可撤销（B19 重做链实锤）。离散按钮操作一步一记（无 900ms 合并）。
+            if (doc.content !== "" && v !== doc.content) {
+              doc.undoStack.push(doc.content);
+              if (doc.undoStack.length > 100) doc.undoStack.shift();
+              doc.redoStack.length = 0;
+            }
+            doc.content = v;
+          }
           doc.dirty = true;
         }
-        updateTitle(); renderTabs(); scheduleOutline();
+        updateTitle(); renderTabs(); scheduleOutline(); syncUndoBtns();
       };
       const moveRow = (dir: -1 | 1): void => {
         const cell = curCell();
@@ -1786,8 +1820,8 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
       "headings", "bold", "italic", "strike", "|",
       "line", "quote", "list", "ordered-list", "check", "outdent", "indent", "|",
       "code", "inline-code", "link", "table", "|",
-      "undo", "redo", "|", // v0.3.21 必须保留（CSS 隐藏）：Vditor 见 toolbar.elements.undo 存在才自禁键盘 ⌘Z 分支，
-      // 让事件传到我们的自建栈 handler；删按钮=Vditor 抢占 Ctrl+Z（真实键盘/CDP 均拦截，AHK+ztrace 实证）
+      "undo", "redo", "|", // v0.3.21 按钮可见（点击走自建栈）：Vditor 见 toolbar.elements.undo 存在才自禁键盘 ⌘Z 分支，
+      // 让 Ctrl+Z 传到自建栈 handler；删配置=Vditor 抢占（真实键盘/CDP 均拦截，AHK+ztrace 实证）
       "edit-mode", "fullscreen",
     ],
     input: () => {
@@ -1805,6 +1839,7 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
     },
     after: () => {
       fixToolbarTooltipDirection();
+      setupUndoToolbar(); // v0.3.21 撤销/重做按钮劫持（模式/语言切换重建 toolbar 后重绑）
       // v0.3.11 拼写检查：Vditor 显式给 pre.vditor-reset 设 spellcheck="false"（dist 源码 3 处），
       // 编辑区元素固定不重建，after 统一改回 true 即可持续生效（模式/语言切换重建也会再进 after）。
       // WebView2/Chromium 内建检查：英文错词红波浪线+右键建议；中文无拼写概念不受影响。
@@ -2448,10 +2483,20 @@ function replaceAllMatches() {
     out = src.split(q).join(repRaw);
   }
   if (out === src) { refreshFind(true); return; } // 0 处命中
+  // v0.3.21 自建撤销栈时代补记：历史上全替靠"setValue 第二参不传=不清 Vditor 内置栈"实现
+  // Ctrl+Z 一次回退（v0.3.14 定稿）；自建栈接管键盘后 Vditor undo 不可达，若不显式记步，
+  // 全替彻底不可撤销（B5 实锤：栈深 0，Ctrl+Z 无步可撤）。现以替换前源码为一步，Word 同语义。
+  const doc0 = activeDoc();
+  if (doc0) {
+    doc0.undoStack.push(src);
+    if (doc0.undoStack.length > 100) doc0.undoStack.shift();
+    doc0.redoStack.length = 0; // 新编辑作废重做分支
+  }
   suppressInput = true;
   try { vditor.setValue(out); } finally { suppressInput = false; }
   const doc = activeDoc();
   if (doc) { doc.content = out; doc.dirty = true; }
+  snapReset(doc); // snapBase 对齐替换后值：后续键入开步基线正确，不会把 out 重复记步
   scheduleOutline(); updateTitle(); refreshFind(true);
 }
 
@@ -2784,7 +2829,7 @@ function rebindTableResize(): void {
 
 /** v0.3.12 大纲侧栏可拖宽（参考 Word 导航窗格）：右缘 5px 近缘拖动，clamp [180, 520]
  *  且不超过视口一半，宽度持久化 localStorage。面板为静态元素只挂一次。 */
-const OUTLINE_W_KEY = "mded-outline-w-v1";
+const OUTLINE_W_KEY = "mded-outline-w-v2"; // v2：默认宽改 180（用户要最窄起步），v1 旧宽值作废
 const OUTLINE_W_MIN = 180, OUTLINE_W_MAX = 520;
 function initOutlineResize(): void {
   const panel = document.getElementById("outline-panel");
@@ -3753,7 +3798,7 @@ async function boot() {
   initSidePanels();
   initTabMenu();
   initFtreeMenu();
-  switchSidePane("files"); // v0.3.16 默认显示文件页（一打开就能看到文件树/盘符）
+  switchSidePane("outline"); // v0.3.21 默认显示大纲页（用户 2026-08-30 定调；文件页点页签可达）
   // Word 式显示比例：Ctrl+滚轮 / Ctrl+加减 / Ctrl+0 复位 / 右下角拉杆——只缩正文内容区
   // （.vditor-content），格式工具条(.vditor-toolbar)/应用工具栏/大纲/标签页都不缩。
   // 实现=挂载点 CSS 变量 --doc-zoom（Vditor 模式/语言重建子树不丢）；zoom 参与布局，

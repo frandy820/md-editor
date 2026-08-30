@@ -85,6 +85,14 @@ html[data-theme="oled"] .vditor-reset { background-color: transparent !important
 html[data-theme="oled"] .vditor-reset code,
 html[data-theme="oled"] .vditor-reset pre { background-color: #16161e !important; border: 1px solid #34344a; }
 html[data-theme="oled"] .vditor-reset pre code { border: none; }
+/* v0.3.21 内容元素渗透（用户实测：表格在 content-theme 下仍白底）——!important 对抗 Vditor 动态 css */
+html[data-theme="oled"] .vditor-reset table th,
+html[data-theme="oled"] .vditor-reset table td { background-color: #0d0d12 !important; border: 1px solid #2e2e3a !important; }
+html[data-theme="oled"] .vditor-reset table th { background-color: #15151d !important; }
+html[data-theme="oled"] .vditor-reset blockquote { background-color: #0e0e14 !important; border-left: 3px solid #4a5a8a !important; color: #c8c8d2 !important; }
+html[data-theme="oled"] .vditor-reset hr { border: none; border-top: 1px solid #2e2e3a !important; background: none !important; }
+html[data-theme="oled"] .vditor-reset mark { background: #6b5a1e !important; color: #fff !important; }
+html[data-theme="oled"] .vditor-reset kbd { background-color: #16161e !important; border: 1px solid #34344a !important; }
 
 /* ===== v0.3.21 暖纸主题（GitHub 用户诉求：柔和纸感+代码块显眼）——米黄纸系 ===== */
 html[data-theme="paper"] {
@@ -108,6 +116,14 @@ html[data-theme="paper"] .vditor-reset { background-color: transparent !importan
 html[data-theme="paper"] .vditor-reset code,
 html[data-theme="paper"] .vditor-reset pre { background-color: #ead9b5 !important; border: 1px solid #c9b283; }
 html[data-theme="paper"] .vditor-reset pre code { border: none; }
+/* v0.3.21 内容元素渗透（同 oled：表格/引用/hr/mark/kbd 全米黄系） */
+html[data-theme="paper"] .vditor-reset table th,
+html[data-theme="paper"] .vditor-reset table td { background-color: #f7f1e0 !important; border: 1px solid #c9b98e !important; }
+html[data-theme="paper"] .vditor-reset table th { background-color: #efe6cd !important; }
+html[data-theme="paper"] .vditor-reset blockquote { background-color: #f0e8d2 !important; border-left: 3px solid #c0a468 !important; }
+html[data-theme="paper"] .vditor-reset hr { border: none; border-top: 1px solid #c9b98e !important; background: none !important; }
+html[data-theme="paper"] .vditor-reset mark { background: #f2d98c !important; }
+html[data-theme="paper"] .vditor-reset kbd { background-color: #ead9b5 !important; border: 1px solid #c9b283 !important; }
 
 #toolbar {
   height: 42px; flex: 0 0 auto;
@@ -155,7 +171,9 @@ html[data-theme="paper"] .vditor-reset pre code { border: none; }
 .tab.active { background: var(--bg-surface); border-bottom: 2px solid var(--accent); }
 
 /* v0.3.21 undo/redo 按钮仅作 Vditor 键盘分支开关（存在=Vditor 让出 ⌘Z/⌘Y），UI 隐藏走自建栈 */
-.vditor-toolbar [data-type="undo"], .vditor-toolbar [data-type="redo"] { display: none; }
+/* v0.3.21 撤销/重做按钮可见（Word 式双通道）：toolbar 配置保留使 Vditor 自禁键盘 ⌘Z 分支
+   （事件传到自建栈 handler），点击由 .vditor-toolbar 捕获层劫持转 docUndo/docRedo */
+.vditor-toolbar [data-type="undo"], .vditor-toolbar [data-type="redo"] { opacity: 1; }
 
 /* v0.3.21 标题分级配色（wysiwyg/ir 编辑区+预览同源） */
 .vditor-reset h1 { color: var(--h1c); }
@@ -190,7 +208,7 @@ html[data-theme="paper"] .vditor-reset pre code { border: none; }
 #main { flex: 1 1 auto; display: flex; overflow: hidden; }
 
 #outline-panel {
-  width: 250px; flex: 0 0 auto;
+  width: 180px; flex: 0 0 auto; /* v0.3.21 默认最窄起步（用户 2026-08-30 定调），拖宽持久化到 v2 键 */
   border-right: 1px solid var(--border2);
   background: var(--bg-panel);
   display: flex; flex-direction: column; overflow: hidden;
