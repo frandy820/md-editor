@@ -33,6 +33,8 @@
         <option value="light">🌙 浅色</option>
         <option value="dark">☀️ 深色</option>
         <option value="eye">🌿 护眼</option>
+        <option value="oled">🌑 墨黑</option>
+        <option value="paper">📜 暖纸</option>
       </select>
       <select id="lang-select" title="Language / 语言">
         <option value="zh-CN">简体中文</option>
@@ -47,8 +49,8 @@
       <aside id="outline-panel">
         <div id="side-gutter" title="拖动调整侧栏宽度"></div>
         <div class="side-tabs">
-          <button id="side-tab-files" class="side-tab active" type="button">文件</button>
           <button id="side-tab-outline" class="side-tab" type="button">大纲</button>
+          <button id="side-tab-files" class="side-tab active" type="button">文件</button>
         </div>
         <div id="side-pane-outline" class="side-pane" hidden>
           <input id="outline-filter" type="text" placeholder="过滤大纲…" autocomplete="off" spellcheck="false" />
@@ -147,7 +149,7 @@
       <button data-act="new-dir" type="button">新建文件夹</button>
       <button data-act="rename" type="button">重命名</button>
       <button data-act="delete" type="button">删除</button>
-      <button data-act="reveal" type="button">在资源管理器中显示</button>
+      <button data-act="reveal" type="button">在文件夹中显示</button>
       <button data-act="copy-path" type="button">复制路径</button>
     </div>
     <div id="ftree-modal" class="modal-mask" hidden>

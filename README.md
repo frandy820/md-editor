@@ -26,19 +26,20 @@
 - **内容增强**：数学公式（KaTeX 行内/块级即时渲染）、Mermaid 图表（mindmap、timeline、flowchart…）、代码块行号、emoji `:smile:` 自动补全（1500+）、英文拼写检查
 - **中文排版**：渲染与导出时中英文之间自动加空格（不改源文）
 - **版本历史**：每次保存前自动归档旧版（每文件 50 版 / 30 天），🕘 一键对比恢复
-- **多标签页**：`Ctrl+Click` 多选批量关闭；右键关闭其它/左侧/右侧/全部；**标签栏空白双击新建文档**（Notepad++ 式）
-- **撤销/重做**：`Ctrl+Z` / `Ctrl+Y`（含全替整体回退）
+- **多标签页**：`Ctrl+Click` 多选、`Shift+Click` 范围多选批量关闭；右键关闭其它/左侧/右侧/全部；**标签栏空白双击新建文档**（Notepad++ 式）；标签过多时**自动多行折行**，一个不漏
+- **撤销/重做**：`Ctrl+Z` 多步撤销 / `Ctrl+Y`、`Ctrl+Shift+Z` 重做——按输入停顿自动分步（每文档最多 100 步），逐字打的一段文字一次撤完，两段之间隔了一下就是两步
 
 **文件管理（侧栏「文件」页）**
-- **此电脑资源树**：盘符常驻（进入任何盘其它盘符不消失）、目录懒展开、地址栏跳转、当前文件自动定位
-- **右键文件管理**：新建 Markdown / TXT / 文件夹、重命名（联动打开中的标签）、删除（级联关闭相关标签）、在资源管理器中显示、复制路径
+- **此电脑资源树**：盘符常驻（进入任何盘其它盘符不消失）、目录懒展开、地址栏跳转、当前文件自动定位；**非文本文件也可见**（灰显显示，点击即在文件夹中打开，不再"无匹配"）
+- **右键文件管理**：新建 Markdown / TXT / 文件夹、重命名（联动打开中的标签）、删除（级联关闭相关标签）、在文件夹中显示、复制路径
 - **最近文件** + 快速打开 `Ctrl+Shift+O`
 - **搜同级文件内容** `Ctrl+Shift+F`：按关键词搜当前文件所在目录的全部文本文件内容，结果点击跳转
-- **全盘搜文件名（可选）**：文件名过滤框融合 [Everything](https://www.voidtools.com/)——毫秒级模糊搜索全盘文件，支持 Everything 语法（`ext:md`、`path:`、空格 AND…）；命中点击直达（文本打开 / 目录定位 / 其它资源管理器显示）
+- **全盘搜文件名（可选）**：文件名过滤框融合 [Everything](https://www.voidtools.com/)——毫秒级模糊搜索全盘文件，支持 Everything 语法（`ext:md`、`path:`、空格 AND…）；结果**双击在资源树中定位并展开所在路径**（文件夹则直接展开）；文件名 / 路径两列宽度可拖动，长文件名拖宽看全
 
 **外观与其它**
 - **中英双语界面**：中文（简体 / 繁体）/ English，跟随系统语言并记住你的选择
-- **主题**：浅色 / 深色 / 护眼绿 三态
+- **主题**：浅色 / 深色 / 护眼绿 / 墨黑（纯黑 OLED）/ 暖纸（米黄纸感）五选一
+- **标题分级配色**：H1–H6 六级标题各有专属颜色，扫一眼就能分清层级
 - **左侧大纲**：点击定位、✕ 删除章节（联动正文）、拖动重排、关键字过滤
 - **多种打开方式**：双击 .md / 拖拽到窗口 / 命令行参数 / 单实例转发
 - **编码自动识别**：UTF-8 / UTF-8(BOM) / GBK（标题栏显示实际编码）
@@ -77,11 +78,11 @@
 |---|---|
 | 编辑表格 | 光标点进表格单元格 → 浮出工具栏；或在行/列数字框输入目标数 + 回车批量增删 |
 | 切换语言 | 右上角下拉：简体中文 / 繁體中文 / English |
-| 切换主题 | 右上角下拉：浅色 / 深色 / 护眼 |
+| 切换主题 | 右上角下拉：浅色 / 深色 / 护眼 / 墨黑 / 暖纸 |
 | 切换模式 | 默认所见即所得；需要看 markdown 源码时点顶部「即时渲染」或 `Ctrl+Alt+M` |
 | 大纲 | 左侧：点章节定位 / ✕ 删章节 / 拖动重排 / 顶部框过滤 |
 | 文件树 | 左侧「文件」页：此电脑+盘符常驻；地址栏输入路径回车跳转；右键新建/重命名/删除/资源管理器显示 |
-| 全盘搜文件名 | 「文件」页过滤框输入关键词（需 Everything，见下方可选集成） |
+| 全盘搜文件名 | 「文件」页过滤框输入关键词（需 Everything，见下方可选集成）；结果**双击**=在资源树定位并展开路径，文件名/路径列宽可拖 |
 | 搜内容 | `Ctrl+Shift+F`：搜当前文件所在目录全部文本文件内容 |
 | 快速打开 | `Ctrl+Shift+O`：按文件名过滤最近文件回车打开 |
 | 新建文档 | 标签栏空白处**双击** |
@@ -97,7 +98,7 @@
 | 粘贴截图 | 直接 `Ctrl+V`，图片自动存到文档旁 `assets/`，正文引用相对路径 |
 | 粘贴跟随 | 粘贴长文本后视口自动滚到光标 |
 | 自动保存 | 已保存过的文档每 30s 及失焦时自动落盘（标题 ● 消失即已存） |
-| 快捷键 | `Ctrl+B` 加粗、`Ctrl+I` 斜体、`Ctrl+S` 保存、`Ctrl+Alt+M` 切模式 |
+| 快捷键 | `Ctrl+B` 加粗、`Ctrl+I` 斜体、`Ctrl+S` 保存、`Ctrl+Z`/`Ctrl+Y` 撤销重做、`Ctrl+Alt+M` 切模式 |
 | 保存 | 统一写 UTF-8 无 BOM；拖入打开的文件保留原路径，可直接保存 |
 
 ### 🆚 竞品对比
@@ -183,19 +184,20 @@ A lightweight WYSIWYG Markdown editor for Windows with **visual table editing**,
 - **Rich content**: math formulas (KaTeX inline & block, live rendering), Mermaid diagrams (mindmap, timeline, flowchart…), code line numbers, emoji `:smile:` autocomplete (1500+), English spell-check
 - **CJK typography**: auto-spacing between CJK & Latin text on render & export (source untouched)
 - **Version history**: every save archives the previous version first (50 versions / 30 days per file); 🕘 to compare and restore
-- **Multi-tab**: `Ctrl+Click` multi-select for batch close; right-click to close others/left/right/all; **double-click empty tab-bar space to create a new document** (Notepad++ style)
-- **Undo/redo**: `Ctrl+Z` / `Ctrl+Y` (replace-all undoes as one step)
+- **Multi-tab**: `Ctrl+Click` multi-select, `Shift+Click` range-select for batch close; right-click to close others/left/right/all; **double-click empty tab-bar space to create a new document** (Notepad++ style); tabs **wrap onto multiple rows** when they overflow — none hidden
+- **Undo/redo**: `Ctrl+Z` multi-step undo / `Ctrl+Y`, `Ctrl+Shift+Z` redo — steps split by typing pauses (up to 100 per document); a burst of typing undoes as one step, two bursts separated by a pause undo as two
 
 **File management ("Files" side pane)**
-- **"This PC" tree**: drive letters always visible (never disappear when you enter a drive), lazy folder expansion, address bar navigation, auto-locate the current file
-- **Right-click file management**: new Markdown / TXT / folder, rename (follows open tabs), delete (cascades to close related tabs), reveal in Explorer, copy path
+- **"This PC" tree**: drive letters always visible (never disappear when you enter a drive), lazy folder expansion, address bar navigation, auto-locate the current file; **non-text files are visible too** (grayed out — click to reveal in their folder, no more "no match")
+- **Right-click file management**: new Markdown / TXT / folder, rename (follows open tabs), delete (cascades to close related tabs), show in folder, copy path
 - **Recent files** + quick open `Ctrl+Shift+O`
 - **Search sibling files' content** `Ctrl+Shift+F`: grep all text files in the current file's folder, click a hit to jump
-- **Drive-wide filename search (optional)**: the filename filter box integrates with [Everything](https://www.voidtools.com/) — millisecond fuzzy search across all drives, full Everything syntax (`ext:md`, `path:`, space = AND…); click a hit to open / locate / reveal
+- **Drive-wide filename search (optional)**: the filename filter box integrates with [Everything](https://www.voidtools.com/) — millisecond fuzzy search across all drives, full Everything syntax (`ext:md`, `path:`, space = AND…); **double-click a hit to locate & expand its path in the tree** (folders expand directly); the filename / path columns are drag-resizable to read long names
 
 **Appearance & misc**
 - **Bilingual UI (English / Chinese)**: Chinese supports both Simplified & Traditional — auto-detects system language and remembers your choice
-- **Themes**: light / dark / eye-friendly green
+- **Themes**: light / dark / eye-friendly green / OLED black / warm paper
+- **Heading colors**: H1–H6 each has its own color, so levels are told apart at a glance
 - **Left outline**: click to navigate, ✕ to delete a section (updates body too), drag to reorder, keyword filter
 - **Multiple ways to open**: double-click .md / drag into window / command-line arg / single-instance forwarding
 - **Encoding auto-detection**: UTF-8 / UTF-8(BOM) / GBK (actual encoding shown in the title bar)
@@ -234,11 +236,11 @@ Grab `md-editor.exe` from [Releases](https://github.com/frandy820/md-editor/rele
 |---|---|
 | Edit table | Click into a table cell → floating toolbar appears; or type a target number + Enter in the row/column box to batch edit |
 | Switch language | Top-right dropdown: 简体中文 / 繁體中文 / English |
-| Switch theme | Top-right dropdown: light / dark / eye-friendly |
+| Switch theme | Top-right dropdown: light / dark / eye-friendly / OLED black / warm paper |
 | Switch mode | WYSIWYG by default; click top "Instant Rendering" or `Ctrl+Alt+M` to view markdown source |
 | Outline | Left panel: click a heading to navigate / ✕ to delete / drag to reorder / filter box on top |
 | File tree | "Files" pane: This PC + drives always visible; type a path in the address bar + Enter; right-click for new/rename/delete/reveal |
-| Drive-wide search | type keywords in the "Files" pane filter box (requires Everything — see optional integration below) |
+| Drive-wide search | type keywords in the "Files" pane filter box (requires Everything — see optional integration below); **double-click** a hit to locate it in the tree; columns are drag-resizable |
 | Content search | `Ctrl+Shift+F`: grep all text files in the current file's folder |
 | Quick open | `Ctrl+Shift+O`: filter recent files by name, Enter to open |
 | New document | **double-click** empty tab-bar space |
@@ -254,7 +256,7 @@ Grab `md-editor.exe` from [Releases](https://github.com/frandy820/md-editor/rele
 | Paste image | just `Ctrl+V` — saved to `assets/` beside the doc, referenced relatively |
 | Paste follow | view scrolls to the caret after pasting |
 | Autosave | Documents with a path save every 30s & on blur (● in title disappears once saved) |
-| Shortcuts | `Ctrl+B` bold, `Ctrl+I` italic, `Ctrl+S` save, `Ctrl+Alt+M` toggle mode |
+| Shortcuts | `Ctrl+B` bold, `Ctrl+I` italic, `Ctrl+S` save, `Ctrl+Z`/`Ctrl+Y` undo/redo, `Ctrl+Alt+M` toggle mode |
 | Save | Always writes UTF-8 without BOM; dragged-in files keep their path for direct save |
 
 ### 🆚 Comparison
@@ -265,6 +267,7 @@ Grab `md-editor.exe` from [Releases](https://github.com/frandy820/md-editor/rele
 | Typora | ⚠️ paid | ❌ install | ⚠️ basic | ✅ | ❌ | ✅ | ❌ |
 | MarkText | ✅ | ❌ install | ⚠️ basic | ⚠️ | ❌ | ⚠️ | ✅ |
 | Obsidian | ✅ | ❌ install | ⚠️ plugin | ✅ vault-only | ⚠️ vault-only | ✅ | ❌ |
+| Easy MD | ✅ | ❌ | ⚠️ weak | ⚠️ | ❌ | ✅ | — |
 
 ### 🔍 Drive-wide search: optional Everything integration
 
@@ -278,7 +281,6 @@ To enable (optional — everything else works without it):
 Click a hit to jump straight to it: text files open in the editor / folders locate in the tree / other types reveal in Explorer.
 
 > Everything and es.exe are free software by voidtools. This repository does not distribute or contain them; integration happens purely via local IPC after the user installs them. This project is not affiliated with voidtools.
-| Easy MD | ✅ | ❌ | ⚠️ weak | ⚠️ | ❌ | ✅ |
 
 ### 🛠️ Build from source
 

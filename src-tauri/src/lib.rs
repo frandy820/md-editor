@@ -735,6 +735,7 @@ fn tree_skip(name: &str) -> bool {
 fn list_md_dir(path: String) -> Result<Vec<serde_json::Value>, String> {
     let mut dirs: Vec<(String, String)> = vec![];
     let mut files: Vec<(String, String)> = vec![];
+    let mut truncated = false;
     let rd = fs::read_dir(&path).map_err(|e| e.to_string())?;
     for entry in rd.flatten() {
         let name = entry.file_name().to_string_lossy().to_string();
@@ -745,8 +746,13 @@ fn list_md_dir(path: String) -> Result<Vec<serde_json::Value>, String> {
         let full = entry.path().to_string_lossy().to_string();
         if is_dir {
             dirs.push((name, full));
-        } else if has_allowed_ext(&full) {
+        } else {
+            // v0.3.21：树列全部文件（不再只列可编辑扩展名）——不可编辑项前端点击走"在文件夹中显示"
             files.push((name, full));
+        }
+        if dirs.len() + files.len() >= 3000 {
+            truncated = true;
+            break; // 巨目录防线：超出截断，前端提示
         }
     }
     let key = |v: &(String, String)| v.0.to_lowercase();
@@ -755,9 +761,13 @@ fn list_md_dir(path: String) -> Result<Vec<serde_json::Value>, String> {
     let mk = |v: (String, String), d: bool| {
         serde_json::json!({ "name": v.0, "path": v.1, "is_dir": d })
     };
-    Ok(dirs.into_iter().map(|v| mk(v, true))
+    let mut out: Vec<serde_json::Value> = dirs.into_iter().map(|v| mk(v, true))
         .chain(files.into_iter().map(|v| mk(v, false)))
-        .collect())
+        .collect();
+    if truncated {
+        out.push(serde_json::json!({ "name": "…条目过多已截断", "path": "", "is_dir": false }));
+    }
+    Ok(out)
 }
 
 /// 跨文件搜索命中上限与扫描护栏（大目录防卡：深挖会拖垮 UI 线程返回）
@@ -1395,8 +1405,8 @@ mod tests {
             .iter()
             .map(|v| (v["name"].as_str().unwrap().to_string(), v["is_dir"].as_bool().unwrap()))
             .collect();
-        // 目录在前；隐藏/node_modules 排除；png 不在白名单
-        assert_eq!(names, vec![("sub".to_string(), true), ("a.md".to_string(), false), ("b.md".to_string(), false)]);
+        // 目录在前；隐藏/node_modules 排除；v0.3.21 起非白名单文件（png）也列出（前端点击走"在文件夹中显示"）
+        assert_eq!(names, vec![("sub".to_string(), true), ("a.md".to_string(), false), ("b.md".to_string(), false), ("img.png".to_string(), false)]);
         assert!(list_md_dir(dir.join("不存在").to_string_lossy().to_string()).is_err());
         let _ = fs::remove_dir_all(&dir);
     }

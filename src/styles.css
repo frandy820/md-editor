@@ -22,6 +22,8 @@ body { display: flex; flex-direction: column; overflow: hidden; }
   --text: #333; --text2: #555; --text3: #666;
   --muted: #888; --muted2: #999; --muted3: #aaa; --muted4: #bbb;
   --danger: #c33;
+  /* v0.3.21 标题分级配色：H1-H6 各一色，级别越低越沉静 */
+  --h1c: #1a56b0; --h2c: #0e7a6c; --h3c: #b3540d; --h4c: #6d3fa8; --h5c: #47678a; --h6c: #75758a;
   --shadow: 0 4px 16px rgba(0,0,0,.18);
 }
 html[data-theme="dark"] {
@@ -33,6 +35,7 @@ html[data-theme="dark"] {
   --text: #d8d9de; --text2: #c0c1c7; --text3: #a9aab1;
   --muted: #8f9098; --muted2: #7f8088; --muted3: #6d6e76; --muted4: #5d5e66;
   --danger: #e06c5f;
+  --h1c: #82abf8; --h2c: #58c6b2; --h3c: #f2a55f; --h4c: #b78ee4; --h5c: #8fa9cb; --h6c: #9b9bb0;
   --shadow: 0 4px 16px rgba(0,0,0,.5);
   color-scheme: dark; /* 原生控件（input/select/scrollbar）跟暗 */
 }
@@ -48,6 +51,7 @@ html[data-theme="eye"] {
   --text: #2b3a2e; --text2: #3a4c3e; --text3: #4c5f50;
   --muted: #6b8271; --muted2: #7a9080; --muted3: #8b9f91; --muted4: #9aac9f;
   --danger: #c33;
+  --h1c: #1a5e8a; --h2c: #2a7a3e; --h3c: #a8620d; --h4c: #6d3fa8; --h5c: #47678a; --h6c: #6d7d72;
   --shadow: 0 4px 16px rgba(62,142,81,.18);
 }
 /* 护眼主底=编辑区豆沙绿（WPS 同款视觉焦点在正文），外壳浅绿衬托 */
@@ -57,6 +61,53 @@ html[data-theme="eye"] #editor .vditor-content { background-color: #C7EDCC; }
 /* 正文层（pre.vditor-reset）白底来自 Vditor 运行时动态插入的 css，晚于本文件加载
    会覆盖普通优先级——!important 对抗，护眼必须渗透到光标所在的内容层 */
 html[data-theme="eye"] .vditor-reset { background-color: transparent !important; }
+
+
+/* ===== v0.3.21 墨黑主题（GitHub 用户诉求：暗背景+代码块高对比）——OLED 纯黑系 ===== */
+html[data-theme="oled"] {
+  --bg: #050507; --bg-elem: #0a0a0d; --bg-panel: #000000; --bg-panel2: #0a0a0d;
+  --bg-input: #141419; --bg-surface: #0e0e12; --bg-float: rgba(14,14,18,0.96);
+  --bg-hover: #1c1c26; --bg-hover2: #171722; --bg-active: #23233a;
+  --accent: #7d9bff; --accent2: #9ab2ff; --accent-soft: #232338; --accent-border: #4a5a8a;
+  --border: #34343e; --border2: #26262e; --border3: #22222a; --border4: #1c1c24;
+  --text: #e6e6ec; --text2: #c8c8d2; --text3: #a8a8b6;
+  --muted: #8a8a98; --muted2: #767684; --muted3: #62626e; --muted4: #50505a;
+  --danger: #ef6f5f;
+  --h1c: #8ab2fc; --h2c: #5ecab6; --h3c: #f4a863; --h4c: #ba93e8; --h5c: #92acce; --h6c: #9c9cae;
+  --shadow: 0 4px 16px rgba(0,0,0,.7);
+  color-scheme: dark;
+}
+/* 编辑区近纯黑；代码块是本主题的主角：深底+亮描边，一眼锁定 */
+html[data-theme="oled"] #editor,
+html[data-theme="oled"] #editor .vditor,
+html[data-theme="oled"] #editor .vditor-content { background-color: #050507; }
+html[data-theme="oled"] .vditor-reset { background-color: transparent !important; }
+html[data-theme="oled"] .vditor-reset code,
+html[data-theme="oled"] .vditor-reset pre { background-color: #16161e !important; border: 1px solid #34344a; }
+html[data-theme="oled"] .vditor-reset pre code { border: none; }
+
+/* ===== v0.3.21 暖纸主题（GitHub 用户诉求：柔和纸感+代码块显眼）——米黄纸系 ===== */
+html[data-theme="paper"] {
+  --bg: #e9dfc8; --bg-elem: #e2d7bc; --bg-panel: #f3ecda; --bg-panel2: #e9dfc8;
+  --bg-input: #e2d7bc; --bg-surface: #faf5e8; --bg-float: rgba(250,245,232,0.96);
+  --bg-hover: #ddd0ae; --bg-hover2: #e4d8ba; --bg-active: #d6c69c;
+  --accent: #9a6b2f; --accent2: #87591f; --accent-soft: #efe3c4; --accent-border: #c0a468;
+  --border: #c9b98e; --border2: #d2c49d; --border3: #d8cba7; --border4: #dfd3b3;
+  --text: #3b3222; --text2: #4c4029; --text3: #5f5136;
+  --muted: #83755a; --muted2: #93846a; --muted3: #a3967e; --muted4: #b3a792;
+  --danger: #b03a2e;
+  --h1c: #8a4a1a; --h2c: #6a5a14; --h3c: #a8500d; --h4c: #6d3f78; --h5c: #4a5f7a; --h6c: #75684f;
+  --shadow: 0 4px 16px rgba(120,100,60,.22);
+}
+/* 暖纸主底=编辑区米黄纸（eye 同模式：CSS 覆盖渗透到内容层） */
+html[data-theme="paper"] #editor,
+html[data-theme="paper"] #editor .vditor,
+html[data-theme="paper"] #editor .vditor-content { background-color: #f7f1e0; }
+html[data-theme="paper"] .vditor-reset { background-color: transparent !important; }
+/* 代码块棕底+边框：暖纸底上高对比锁定 */
+html[data-theme="paper"] .vditor-reset code,
+html[data-theme="paper"] .vditor-reset pre { background-color: #ead9b5 !important; border: 1px solid #c9b283; }
+html[data-theme="paper"] .vditor-reset pre code { border: none; }
 
 #toolbar {
   height: 42px; flex: 0 0 auto;
@@ -96,11 +147,25 @@ html[data-theme="eye"] .vditor-reset { background-color: transparent !important;
 .mode-badge.ir { color: var(--text3); background: var(--bg); }
 .mode-badge.wysiwyg { color: #fff; background: var(--accent); border-color: var(--accent); }
 
-#tabs { display: flex; height: 32px; user-select: none; flex: 0 0 auto; background: var(--bg-elem); border-bottom: 1px solid var(--border2); overflow-x: auto; }
+/* v0.3.21 多行标签（Notepad++ 式）：标签数超窗口宽自动折行，全部可见；上限 4 行后内部滚动防挤占编辑区 */
+#tabs { display: flex; flex-wrap: wrap; min-height: 32px; max-height: 136px; overflow-y: auto; user-select: none; flex: 0 0 auto; background: var(--bg-elem); border-bottom: 1px solid var(--border2); }
 #tabs::-webkit-scrollbar { height: 4px; }
-.tab { display: flex; align-items: center; gap: 6px; padding: 0 10px; height: 100%; cursor: pointer; font-size: 13px; border-right: 1px solid var(--border2); white-space: nowrap; }
+.tab { display: flex; align-items: center; gap: 6px; padding: 0 10px; height: 30px; cursor: pointer; font-size: 13px; border-right: 1px solid var(--border2); white-space: nowrap; } /* v0.3.21 固定行高（原 height:100% 在 wrap 多行容器内失效） */
 .tab:hover { background: var(--bg-panel); }
 .tab.active { background: var(--bg-surface); border-bottom: 2px solid var(--accent); }
+
+/* v0.3.21 undo/redo 按钮仅作 Vditor 键盘分支开关（存在=Vditor 让出 ⌘Z/⌘Y），UI 隐藏走自建栈 */
+.vditor-toolbar [data-type="undo"], .vditor-toolbar [data-type="redo"] { display: none; }
+
+/* v0.3.21 标题分级配色（wysiwyg/ir 编辑区+预览同源） */
+.vditor-reset h1 { color: var(--h1c); }
+.vditor-reset h2 { color: var(--h2c); }
+.vditor-reset h3 { color: var(--h3c); }
+.vditor-reset h4 { color: var(--h4c); }
+.vditor-reset h5 { color: var(--h5c); }
+.vditor-reset h6 { color: var(--h6c); }
+/* v0.3.21 不可编辑文件（树列全部文件后）：灰显区分可编辑项 */
+.node.file.fx .nname { color: var(--muted2); }
 .tab.sel { background: var(--accent); box-shadow: inset 0 0 0 1px var(--accent-border); } /* Ctrl+Click 多选态（Notepad++ 式批量关闭）——accent 实底+白字：旧 accent-soft(#eef3ff) vs 白底对比度过低，禁选词后用户看不到选中反馈 */
 .tab.sel .tab-name { color: #fff; }
 .tab.sel .tab-close { color: #fff; }

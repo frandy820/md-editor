@@ -19,6 +19,37 @@ import enI18n from "./i18n-en";
 let vditor: Vditor | null = null;
 let outlineTimer: number | null = null;
 let suppressInput = false; // setValue 时抑制 input 回调（避免切换/联动标签误标 dirty）
+
+// v0.3.21 撤销/重做/保存键盘拦截——必须在模块顶层注册（早于 new Vditor）：
+// Vditor 也在 window 捕获层挂热键且「先注册先执行」，晚注册的 handler 收不到 ⌘Z
+//（AHK 真实键盘 + ztrace 实证：s 到达、z 被抢占）。函数声明提升保证此处可引用下方函数。
+window.addEventListener("keydown", (e) => {
+  const isZY = e.key === "z" || e.key === "Z" || e.key === "y" || e.key === "Y";
+  if (isZY) { // 测试钩子：记录 z/y keydown 守卫状态（AHK 真键盘诊断用）
+    (window as any).__zTrace = (window as any).__zTrace || [];
+    if ((window as any).__zTrace.length < 40)
+      (window as any).__zTrace.push({ k: e.key, comp: e.isComposing, ctrl: !!(e.ctrlKey || e.metaKey),
+        ed: !!(e.target as Element | null)?.closest?.(".vditor"), t: Date.now() % 100000 });
+  }
+  // 组合态（IME 输入中）只放行 Ctrl+Z/Y：组合中撤销=打断组合并回退（Word/Typora 同语义），
+  // 静默放行会落入 Chromium 原生 undo 与自建栈双轨互踩（AHK 实测 composing 残留拦死 ^z）
+  if (e.isComposing && !(isZY && (e.ctrlKey || e.metaKey))) return;
+  if (e.isComposing && !(isZY && (e.ctrlKey || e.metaKey))) return;
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+  const inEditor = !!(e.target as Element | null)?.closest?.(".vditor");
+  if ((e.key === "z" || e.key === "Z") && inEditor) {
+    e.preventDefault(); e.stopPropagation();
+    if (e.shiftKey) docRedo(); else docUndo();
+  } else if ((e.key === "y" || e.key === "Y") && inEditor) {
+    e.preventDefault(); e.stopPropagation();
+    docRedo();
+  } else if ((e.key === "s" || e.key === "S")) {
+    // Ctrl+S：此前只有按钮/关闭确认/30s 自动保存，快捷键从未绑定（版本历史文案却宣称它）
+    e.preventDefault(); e.stopPropagation();
+    const d = activeDoc();
+    if (d) void saveDoc(d);
+  }
+}, true);
 let currentMode: "ir" | "wysiwyg" = "wysiwyg"; // 当前编辑模式（默认所见即所得，可直接编辑表格；可切回即时渲染）
 let vditorInited = false; // Vditor 是否已完成首次初始化（模式切换重建时不重跑 openDoc/pendingFile）
 let switchInFlight = false; // 模式切换重建中（destroy→after 之间），抑制重入避免并发销毁/重复实例/内容丢失
@@ -69,7 +100,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     quickOpenTitle: "快速打开", quickOpenPh: "输入文件名过滤，↑↓选择，回车打开…", quickOpenEmpty: "（暂无最近文件）",
     treeNoDoc: "（打开文件后显示其所在目录）", treeBadPath: "路径不存在或无法访问：", drivesRoot: "此电脑", fileTooBig: "文件过大（约 ",
     fmOpen: "打开", fmNewMd: "新建 Markdown 文件", fmNewTxt: "新建 TXT 文件", fmNewDir: "新建文件夹",
-    fmRename: "重命名", fmDelete: "删除", fmReveal: "在资源管理器中显示", fmCopyPath: "复制路径",
+    fmRename: "重命名", fmDelete: "删除", fmReveal: "在文件夹中显示", fmCopyPath: "复制路径",
     fmNewIn: "在当前位置新建", fmNamePh: "输入名称…", fmRenameTitle: "重命名为：", fmNewMdTitle: "新建 Markdown 文件：", fmNewTxtTitle: "新建 TXT 文件：", fmNewDirTitle: "新建文件夹：",
     fmDelTitle: "删除确认", fmDelFileMsg: "确定删除该文件？不可恢复。", fmDelDirMsg: "确定删除该文件夹及其全部内容？不可恢复。",
     fmNoBase: "请先打开文件或在树中定位一个目录", untitledMd: "未命名.md", untitledDir: "新建文件夹", fmCopyDone: "已复制", fmOk: "确定", fileTooBigSuf: " KB，上限 256 KB），为避免卡死已阻止打开，请用记事本等工具查看。",
@@ -117,7 +148,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     quickOpenTitle: "快速開啟", quickOpenPh: "輸入檔名過濾，↑↓選擇，Enter 開啟…", quickOpenEmpty: "（暫無最近檔案）",
     treeNoDoc: "（開啟檔案後顯示其所在目錄）", treeBadPath: "路徑不存在或無法存取：", drivesRoot: "本機", fileTooBig: "檔案過大（約 ",
     fmOpen: "開啟", fmNewMd: "新增 Markdown 檔案", fmNewTxt: "新增 TXT 檔案", fmNewDir: "新增資料夾",
-    fmRename: "重新命名", fmDelete: "刪除", fmReveal: "在檔案總管中顯示", fmCopyPath: "複製路徑",
+    fmRename: "重新命名", fmDelete: "刪除", fmReveal: "在資料夾中顯示", fmCopyPath: "複製路徑",
     fmNewIn: "在目前位置新增", fmNamePh: "輸入名稱…", fmRenameTitle: "重新命名為：", fmNewMdTitle: "新增 Markdown 檔案：", fmNewTxtTitle: "新增 TXT 檔案：", fmNewDirTitle: "新增資料夾：",
     fmDelTitle: "刪除確認", fmDelFileMsg: "確定刪除該檔案？無法復原。", fmDelDirMsg: "確定刪除該資料夾及其全部內容？無法復原。",
     fmNoBase: "請先開啟檔案或在樹中定位一個目錄", untitledMd: "未命名.md", untitledDir: "新增資料夾", fmCopyDone: "已複製", fmOk: "確定", fileTooBigSuf: " KB，上限 256 KB），為避免卡死已阻止開啟，請用記事本等工具查看。",
@@ -165,7 +196,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     quickOpenTitle: "Quick open", quickOpenPh: "Type to filter, ↑↓ select, Enter open…", quickOpenEmpty: "(no recent files)",
     treeNoDoc: "(open a file to show its folder)", treeBadPath: "Path not accessible: ", drivesRoot: "This PC", fileTooBig: "File too large (about ",
     fmOpen: "Open", fmNewMd: "New Markdown file", fmNewTxt: "New TXT file", fmNewDir: "New folder",
-    fmRename: "Rename", fmDelete: "Delete", fmReveal: "Reveal in Explorer", fmCopyPath: "Copy path",
+    fmRename: "Rename", fmDelete: "Delete", fmReveal: "Show in folder", fmCopyPath: "Copy path",
     fmNewIn: "New item here", fmNamePh: "Enter a name…", fmRenameTitle: "Rename to:", fmNewMdTitle: "New Markdown file:", fmNewTxtTitle: "New TXT file:", fmNewDirTitle: "New folder:",
     fmDelTitle: "Delete", fmDelFileMsg: "Delete this file? This cannot be undone.", fmDelDirMsg: "Delete this folder and ALL its contents? This cannot be undone.",
     fmNoBase: "Open a file or locate a folder in the tree first", untitledMd: "Untitled.md", untitledDir: "New folder", fmCopyDone: "Copied", fmOk: "OK", fileTooBigSuf: " KB, limit 256 KB). Opening blocked to avoid freezing; use Notepad instead.",
@@ -334,6 +365,9 @@ interface Doc {
   content: string;
   dirty: boolean;
   encoding: string;
+  undoStack: string[]; // v0.3.21 自建撤销快照栈（per-doc；Vditor 内部栈粒度坏：一次 undo 撤光全部输入）
+  redoStack: string[];
+  base: string; // 磁盘版内容（撤销后判定 dirty 用）
 }
 let docs: Doc[] = [];
 let activeId: string | null = null;
@@ -581,6 +615,17 @@ function renderTabs() {
         else { tabSel.add(doc.id); tab.classList.add("sel"); }
         return;
       }
+      if (e.shiftKey) {
+        // Shift+Click：从当前激活标签到点击标签的连续区间全选（v0.3.21 用户诉求）
+        const curIdx = docs.findIndex((d) => d.id === activeId);
+        const thisIdx = docs.findIndex((d) => d.id === doc.id);
+        if (curIdx >= 0 && thisIdx >= 0) {
+          const [a, b] = curIdx < thisIdx ? [curIdx, thisIdx] : [thisIdx, curIdx];
+          for (let i = a; i <= b; i++) tabSel.add(docs[i].id);
+          renderTabs();
+          return;
+        }
+      }
       tabSel.clear();
       bar.querySelectorAll(".tab.sel").forEach((x) => x.classList.remove("sel"));
       switchDoc(doc.id);
@@ -654,8 +699,65 @@ function initTabMenu(): void {
   });
 }
 
+// ===== v0.3.21 自建撤销/重做快照栈（per-doc） =====
+// Vditor 内部 undo 栈实测粒度坏：连续多段输入合并成一个 undo 单元（一次 Ctrl+Z 撤光全部），
+// 且首个 Ctrl+Z 常被吞。自建栈按输入停顿(900ms)分步记快照，Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z 分发。
+let snapBase = ""; // 当前步开始前的内容值
+let snapStepOpen = false; // 是否处于未封口的输入步中
+let snapTimer = 0;
+function snapReset(doc: Doc | null): void {
+  window.clearTimeout(snapTimer);
+  snapBase = doc ? doc.content.replace(/\r\n/g, "\n") : ""; // 归一：磁盘CRLF vs getValue LF
+  snapStepOpen = false;
+}
+function snapOnInput(doc: Doc, cur: string): void {
+  if (cur === snapBase && !snapStepOpen) return;
+  if (!snapStepOpen) {
+    // 新一步开启：步前值入栈（undo 将恢复到它）；任何新输入使 redo 分支作废
+    snapStepOpen = true;
+    doc.undoStack.push(snapBase);
+    if (doc.undoStack.length > 100) doc.undoStack.shift(); // 栈深上限
+    doc.redoStack.length = 0;
+  }
+  window.clearTimeout(snapTimer);
+  snapTimer = window.setTimeout(() => { snapBase = cur; snapStepOpen = false; }, 900);
+}
+// 测试钩子：CDP 合成 keydown 会被 Vditor 元素层拦截（真实键盘不受影响，AHK 冒烟已实证），
+// e2e 直接调函数测栈逻辑；键盘链路覆盖交给 AHK 真实输入层。
+(window as any).__mdUndo = () => docUndo();
+// 测试钩子：只读暴露 docs 内部态（dirty/base/栈深），供 e2e 诊断保存时序类问题
+Object.defineProperty(window, "__mdDocs", { get: () => docs });
+(window as any).__mdRedo = () => docRedo();
+function docUndo(): void {
+  const doc = activeDoc();
+  if (!doc || !vditor) return;
+  const cur = mdValue();
+  if (snapStepOpen) { window.clearTimeout(snapTimer); snapBase = cur; snapStepOpen = false; } // 封口当前步
+  if (doc.undoStack.length === 0) return;
+  doc.redoStack.push(cur);
+  restoreDocValue(doc, doc.undoStack.pop()!);
+}
+function docRedo(): void {
+  const doc = activeDoc();
+  if (!doc || !vditor || doc.redoStack.length === 0) return;
+  doc.undoStack.push(snapBase);
+  restoreDocValue(doc, doc.redoStack.pop()!);
+}
+function restoreDocValue(doc: Doc, v: string): void {
+  doc.content = v;
+  suppressInput = true;
+  vditor!.setValue(v, true);
+  suppressInput = false;
+  snapBase = v;
+  doc.dirty = v !== doc.base; // base=磁盘版内容，撤销到与磁盘一致即干净态
+  updateTitle();
+  renderTabs();
+  scheduleOutline();
+}
+
 function switchDoc(id: string) {
   hideEmptyState(); // 切到有内容的文档，隐藏空状态
+  tabSel.clear(); // 新激活产生=多选态作废（树上/最近/快开/ES 打开文件都应取消选中集，v0.3.21）
   // 保存当前文档内容到其 Doc（getValue 守卫：空值不覆盖）
   if (vditor) {
     const cur = activeDoc();
@@ -673,6 +775,7 @@ function switchDoc(id: string) {
     suppressInput = true;
     vditor.setValue(doc.content, true);
     suppressInput = false;
+    snapReset(doc); // 撤销基线跟随新文档（per-doc 栈隔离）
   }
   rebuildOutline();
   renderTabs();
@@ -742,6 +845,9 @@ function openDoc(path: string | null, content: string, name?: string, encoding?:
     content,
     dirty: false,
     encoding: encoding || "",
+    undoStack: [],
+    redoStack: [],
+    base: content.replace(/\r\n/g, "\n"), // 同 snapReset 归一：磁盘 CRLF vs getValue LF，不归一则撤到底 dirty 不清
   };
   docs.push(doc);
   switchDoc(doc.id);
@@ -813,7 +919,8 @@ let ftreeToken = 0; // 并发防护：慢目录返回时若已发起新刷新则
 let ftreeRoot: string | null = null; // 当前树根；换目录（导航/打开文件联动）时整树重建
 function makeTreeNode(e: TreeEntry, depth: number): HTMLElement {
   const node = document.createElement("div");
-  node.className = "node " + (e.is_dir ? "dir" : "file");
+  const editable = /\.(md|markdown|mdown|txt)$/i.test(e.path);
+  node.className = "node " + (e.is_dir ? "dir" : "file") + (!e.is_dir && !editable ? " fx" : "");
   node.dataset.path = e.path;
   node.dataset.depth = String(depth);
   node.style.paddingLeft = 6 + depth * 14 + "px";
@@ -822,7 +929,12 @@ function makeTreeNode(e: TreeEntry, depth: number): HTMLElement {
     `<span class="nname" title="${esc(e.path)}">${esc(e.name)}</span>`;
   node.addEventListener("click", (ev) => {
     ev.stopPropagation();
-    if (!e.is_dir) { loadFile(e.path); return; }
+    if (!e.is_dir) {
+      // v0.3.21：树列全部文件——不可编辑扩展名点击=在文件夹中显示（与全盘结果三分流一致）
+      if (editable) loadFile(e.path);
+      else invoke("reveal_path", { path: e.path }).catch(() => { /* 打开失败静默 */ });
+      return;
+    }
     if (node.classList.contains("open")) collapseNode(node);
     else void expandNode(node);
   });
@@ -1013,7 +1125,26 @@ async function runEsSearch(q: string): Promise<void> {
     const parent = i > 0 ? h.path.slice(0, i) : "";
     li.innerHTML = `<span class="ef">${h.is_dir ? "📁 " : ""}${esc(name)}</span><span class="es-split" title="${esc(t("esSplitTip"))}"></span><span class="ep">${esc(parent)}</span>`;
     li.addEventListener("click", (e) => { if ((e.target as HTMLElement).closest(".es-split")) return; void esHitOpen(h); });
+    li.addEventListener("dblclick", (e) => { if ((e.target as HTMLElement).closest(".es-split")) return; void esLocateTree(h); });
     ul.appendChild(li);
+  }
+}
+/** 全盘命中双击=树定位展开（v0.3.21 用户诉求）：文件=沿路径展开到所在目录并高亮该文件节点；文件夹=定位并展开其内容 */
+async function esLocateTree(h: EsHit): Promise<void> {
+  switchSidePane("files"); // 定位动作必须落在文件页才看得见
+  if (h.is_dir) {
+    await locateTreeAt(h.path);
+    const n = findTreeNode(h.path);
+    if (n && n.classList.contains("dir")) await expandNode(n);
+  } else {
+    const dir = docDirOf(h.path);
+    if (dir) await locateTreeAt(dir);
+    const n = findTreeNode(h.path);
+    if (n) {
+      n.scrollIntoView({ block: "nearest" });
+      n.classList.add("cur"); // 手动高亮目标文件（markTreeCurrent 只认活动文档）
+      window.setTimeout(() => n.classList.remove("cur"), 4000); // 临时高亮 4s 后淡出
+    }
   }
 }
 /** 列宽拖动（v0.3.20）：拖任一行分隔条=全列表文件名列同步变宽/窄（列宽存 ul 变量），持久化+双击复位 */
@@ -1059,6 +1190,7 @@ function setupEsSplitter(): void {
 /** 全盘命中点击分流：文本类=打开编辑；目录=树定位；其它=资源管理器显示 */
 async function esHitOpen(h: EsHit): Promise<void> {
   if (h.is_dir) {
+    switchSidePane("files");
     void locateTreeAt(h.path);
     return;
   }
@@ -1360,7 +1492,7 @@ function closeQuickOpen(): void {
 // Vditor 编辑区内容主题走 content-theme/<name>.css（light/dark/eye，eye 为自建）。
 // ⚠ setTheme 真实签名=(theme, contentTheme, codeTheme, contentThemePath)：v0.3.14 曾把
 // cdn 误传到第二参——界面主题切了但内容主题仍 light（暗色下表格发白的根因）。
-type ThemeName = "light" | "dark" | "eye";
+type ThemeName = "light" | "dark" | "eye" | "oled" | "paper";
 let themeName: ThemeName = "light";
 function applyTheme(name: ThemeName, persist = true): void {
   themeName = name;
@@ -1368,14 +1500,16 @@ function applyTheme(name: ThemeName, persist = true): void {
   const sel = document.getElementById("theme-select") as HTMLSelectElement | null;
   if (sel) sel.value = name;
   if (vditor) {
-    try { vditor.setTheme(name === "dark" ? "dark" : "classic", name, undefined, "/vditor-assets/dist/css/content-theme"); } catch { /* 未就绪：重建时随 options 生效 */ }
+    // v0.3.21 新增 oled(墨黑)/paper(暖纸)：编辑区底色走 CSS 覆盖（eye 同模式），Vditor 侧只分深浅两档
+    const vd = name === "dark" || name === "oled" ? "dark" : "classic";
+    try { vditor.setTheme(vd, name, undefined, "/vditor-assets/dist/css/content-theme"); } catch { /* 未就绪：重建时随 options 生效 */ }
   }
   if (persist) saveUiStateKey("theme", name);
 }
 function initTheme(): void {
   // 未选过（磁盘无合法 theme 值）→ 跟随系统，且不写盘（选过才固定）
   const v = uiStateAll.theme;
-  const saved = (typeof v === "string" && ["light", "dark", "eye"].includes(v)) ? (v as ThemeName) : null;
+  const saved = (typeof v === "string" && ["light", "dark", "eye", "oled", "paper"].includes(v)) ? (v as ThemeName) : null;
   const name: ThemeName = saved ?? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
   applyTheme(name, saved !== null);
 }
@@ -1652,7 +1786,8 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
       "headings", "bold", "italic", "strike", "|",
       "line", "quote", "list", "ordered-list", "check", "outdent", "indent", "|",
       "code", "inline-code", "link", "table", "|",
-      "undo", "redo", "|",
+      "undo", "redo", "|", // v0.3.21 必须保留（CSS 隐藏）：Vditor 见 toolbar.elements.undo 存在才自禁键盘 ⌘Z 分支，
+      // 让事件传到我们的自建栈 handler；删按钮=Vditor 抢占 Ctrl+Z（真实键盘/CDP 均拦截，AHK+ztrace 实证）
       "edit-mode", "fullscreen",
     ],
     input: () => {
@@ -1662,6 +1797,7 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
         const v = mdValue();
         if (v !== "" || doc.content === "") doc.content = v; // 守卫：空值不覆盖
         doc.dirty = true;
+        snapOnInput(doc, v); // v0.3.21 自建撤销栈：按输入停顿分步记快照
       }
       updateTitle();
       renderTabs();
@@ -1694,6 +1830,7 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
           suppressInput = true;
           vditor.setValue(doc.content, true);
           suppressInput = false;
+          snapReset(doc);
         }
         rebuildOutline();
         renderTabs();
@@ -1965,6 +2102,9 @@ async function saveDoc(doc: Doc): Promise<boolean> {
     const v = mdValue();
     if (v !== "" || doc.content === "") doc.content = v;
   }
+  (window as any).__sLog = (window as any).__sLog || []; // 诊断：保存时刻的取值与栈
+  if ((window as any).__sLog.length < 40)
+    (window as any).__sLog.push({ v: doc.content.slice(-16), u: doc.undoStack.length, r: doc.redoStack.length });
   let path = doc.path;
   if (!path) {
     const sp = await saveDialog({ filters: [{ name: "Markdown", extensions: ["md"] }] });
@@ -1981,6 +2121,7 @@ async function saveDoc(doc: Doc): Promise<boolean> {
   try {
     await invoke("save_file", { path, content: doc.content });
     doc.dirty = false;
+    doc.base = doc.content; // v0.3.21 撤销栈的干净态基线跟随保存
     return true;
   } catch (e) {
     alert(t("saveFail") + doc.name + " — " + e);
@@ -2001,6 +2142,13 @@ const AUTOSAVE_INTERVAL_MS = 30_000;
 let autosaveTimer: number | undefined;
 async function autosaveDirty(): Promise<void> {
   if (!vditor) return;
+  // 兜底：键入后立刻失焦时，Vditor input 回调可能仍在防抖窗口内未跑（dirty 未置位）——
+  // 主动从编辑器取真值对比，不等 input 回调（fullcheck A11b 实证：type 后立即 blur 会漏存最后一段）
+  const a = activeDoc();
+  if (a?.path) {
+    const v = mdValue();
+    if ((v !== "" || a.content === "") && v !== a.content) { a.content = v; a.dirty = true; }
+  }
   for (const doc of docs) {
     if (!doc.dirty || !doc.path) continue;
     if (activeDoc()?.id === doc.id) {
@@ -2373,28 +2521,8 @@ function bindFindBar() {
       // v0.3.9 打印。Vditor 内置 ⌘P=edit-mode 按钮热键，但工具栏未配置该按钮不激活；
       // 捕获拦截兜底（与 Ctrl+H 同理），防双触发
       e.preventDefault(); e.stopPropagation(); printCurrentDoc();
-    } else if (!e.isComposing && (e.ctrlKey || e.metaKey) && !e.altKey && !e.key.startsWith("Arrow") && (
-        (!e.shiftKey && (e.key === "z" || e.key === "Z")) || // Ctrl+Z 撤销
-        (!e.shiftKey && (e.key === "y" || e.key === "Y")) || // Ctrl+Y 重做
-        (e.shiftKey && (e.key === "z" || e.key === "Z"))     // Ctrl+Shift+Z 重做
-      ) && !!(e.target as Element | null)?.closest?.(".vditor")) {
-      // v0.3.10 撤销/重做统一 Vditor 单轨。Vditor 键盘分支自带 !toolbar.elements.undo 条件：
-      // 工具栏配了 undo/redo 按钮后键盘 ⌘Z/⌘Y 不再走 Vditor，落入 Chromium 原生
-      // contenteditable undo——与按钮的 Vditor patch 栈双轨互踩，键盘撤掉的步不进
-      // Vditor redoStack，按钮 redo 恒灰（"点不动"的真因，v0.3.3 误判为内核清栈）。
-      // 捕获转发到与工具栏按钮同一 Vditor undo 栈；焦点在查找条等输入框时不拦（保留原生）。
-      e.preventDefault(); e.stopPropagation();
-      const isRedo = e.shiftKey || e.key === "y" || e.key === "Y";
-      // vditor.undo 运行时存在（toolbar MenuItem 即此路径）但 Vditor 类类型未暴露
-      // （挂在 IVditor 接口，dist/types/index.d.ts:876），按序断言取用
-      const vu = (vditor as unknown as {
-        undo?: { undo(v: Vditor): void; redo(v: Vditor): void };
-      })?.undo;
-      if (vditor && vu) {
-        if (isRedo) vu.redo(vditor);
-        else vu.undo(vditor);
-      }
     }
+    // ⌘Z/⌘Y/⌘S/⌘⇧Z 已搬到模块顶层注册（早于 Vditor 抢占，见文件头注释）
   }, true);
   // 编辑内容变化 → 高亮同步（document input 捕获 contenteditable 键入，避免动 vditor 共用 input 回调链）
   // 排除查找条自身输入：否则会清掉 find-input 的 250ms 定时器（同一 debounce 变量被互踩 → findIndex 恒 -1）
