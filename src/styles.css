@@ -96,7 +96,7 @@ html[data-theme="eye"] .vditor-reset { background-color: transparent !important;
 .mode-badge.ir { color: var(--text3); background: var(--bg); }
 .mode-badge.wysiwyg { color: #fff; background: var(--accent); border-color: var(--accent); }
 
-#tabs { display: flex; height: 32px; flex: 0 0 auto; background: var(--bg-elem); border-bottom: 1px solid var(--border2); overflow-x: auto; }
+#tabs { display: flex; height: 32px; user-select: none; flex: 0 0 auto; background: var(--bg-elem); border-bottom: 1px solid var(--border2); overflow-x: auto; }
 #tabs::-webkit-scrollbar { height: 4px; }
 .tab { display: flex; align-items: center; gap: 6px; padding: 0 10px; height: 100%; cursor: pointer; font-size: 13px; border-right: 1px solid var(--border2); white-space: nowrap; }
 .tab:hover { background: var(--bg-panel); }
@@ -401,8 +401,13 @@ body.focus-mode .vditor-reset > .fw-current { opacity: 1; }
 }
 #qo-input:focus { outline: none; border-color: var(--accent); }
 /* v0.3.18 Everything 全盘搜索结果（过滤框双轨：树过滤+全盘命中） */
-#es-results { list-style: none; margin: 0; max-height: 190px; overflow: auto; border-bottom: 1px solid var(--border); padding: 2px 0; }
+#es-results { list-style: none; margin: 0; overflow: auto; border-bottom: 1px solid var(--border); padding: 2px 0; }
 #es-results[hidden] { display: none; }
+/* v0.3.19 结果展开=接管整个树区（树+最近让位，看完结果清空即恢复），不再挤在 190px 小框里 */
+#es-results:not([hidden]) { flex: 1 1 auto; }
+#es-results:not([hidden]) ~ .ftree,
+#es-results:not([hidden]) ~ .recent-title,
+#es-results:not([hidden]) ~ #recent-list { display: none; }
 #es-results li { display: flex; gap: 6px; align-items: baseline; padding: 3px 10px; cursor: pointer; font-size: 12px; }
 #es-results li:hover { background: var(--bg-hover); }
 #es-results li.empty { color: var(--muted2); cursor: default; font-size: 11px; }
