@@ -61,7 +61,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     tblRowUp: "整行上移", tblRowDown: "整行下移",
     sideOutline: "大纲", sideFiles: "文件",
     outlineFilterPh: "过滤大纲…", filterFilesPh: "过滤树 / 全盘搜文件名…",
-    esSearching: "全盘搜索中…", esNone: "全盘无命中", esNoEngine: "未启用全盘搜索：将 es.exe 放到 md-editor.exe 同目录（需 Everything 运行中）", esFail: "全盘查询失败（Everything 未运行？）",
+    esSearching: "全盘搜索中…", esNone: "全盘无命中", esNoEngine: "未启用全盘搜索：将 es.exe 放到 md-editor.exe 同目录（需 Everything 运行中）", esFail: "全盘查询失败（Everything 未运行？）", esSplitTip: "拖动调整文件名列宽，双击复位",
     recentTitle: "最近", clearRecentTip: "清空最近文件列表", clearRecent: "🗑 清空",
     treePathPh: "路径，回车跳转", treeRefreshTip: "刷新目录",
     gsearchPh: "搜同级文件内容，回车执行（Ctrl+Shift+F）", gsearchNone: "（无匹配）",
@@ -109,7 +109,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     tblRowUp: "整行上移", tblRowDown: "整行下移",
     sideOutline: "大綱", sideFiles: "檔案",
     outlineFilterPh: "過濾大綱…", filterFilesPh: "過濾樹 / 全碟搜檔名…",
-    esSearching: "全碟搜尋中…", esNone: "全碟無命中", esNoEngine: "未啟用全碟搜尋：將 es.exe 放到 md-editor.exe 同目錄（需 Everything 執行中）", esFail: "全碟查詢失敗（Everything 未執行？）",
+    esSearching: "全碟搜尋中…", esNone: "全碟無命中", esNoEngine: "未啟用全碟搜尋：將 es.exe 放到 md-editor.exe 同目錄（需 Everything 執行中）", esFail: "全碟查詢失敗（Everything 未執行？）", esSplitTip: "拖動調整文件名列寬，雙擊復位",
     recentTitle: "最近", clearRecentTip: "清空最近檔案列表", clearRecent: "🗑 清空",
     treePathPh: "路徑，Enter 跳轉", treeRefreshTip: "重新整理目錄",
     gsearchPh: "搜同層檔案內容，Enter 執行（Ctrl+Shift+F）", gsearchNone: "（無符合）",
@@ -157,7 +157,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     tblRowUp: "Move row up", tblRowDown: "Move row down",
     sideOutline: "Outline", sideFiles: "Files",
     outlineFilterPh: "Filter outline…", filterFilesPh: "Filter tree / search all drives…",
-    esSearching: "Searching all drives…", esNone: "No matches on this computer", esNoEngine: "Drive-wide search disabled: put es.exe next to md-editor.exe (Everything must be running)", esFail: "Query failed (is Everything running?)",
+    esSearching: "Searching all drives…", esNone: "No matches on this computer", esNoEngine: "Drive-wide search disabled: put es.exe next to md-editor.exe (Everything must be running)", esFail: "Query failed (is Everything running?)", esSplitTip: "Drag to resize the name column, double-click to reset",
     recentTitle: "Recent", clearRecentTip: "Clear recent files", clearRecent: "🗑 Clear",
     treePathPh: "Path, Enter to go", treeRefreshTip: "Refresh folder",
     gsearchPh: "Search sibling files here, Enter (Ctrl+Shift+F)", gsearchNone: "(no match)",
@@ -1011,10 +1011,50 @@ async function runEsSearch(q: string): Promise<void> {
     const i = Math.max(h.path.lastIndexOf("\\"), h.path.lastIndexOf("/"));
     const name = i >= 0 ? h.path.slice(i + 1) : h.path;
     const parent = i > 0 ? h.path.slice(0, i) : "";
-    li.innerHTML = `<span class="ef">${h.is_dir ? "📁 " : ""}${esc(name)}</span><span class="ep">${esc(parent)}</span>`;
-    li.addEventListener("click", () => void esHitOpen(h));
+    li.innerHTML = `<span class="ef">${h.is_dir ? "📁 " : ""}${esc(name)}</span><span class="es-split" title="${esc(t("esSplitTip"))}"></span><span class="ep">${esc(parent)}</span>`;
+    li.addEventListener("click", (e) => { if ((e.target as HTMLElement).closest(".es-split")) return; void esHitOpen(h); });
     ul.appendChild(li);
   }
+}
+/** 列宽拖动（v0.3.20）：拖任一行分隔条=全列表文件名列同步变宽/窄（列宽存 ul 变量），持久化+双击复位 */
+function setupEsSplitter(): void {
+  const ul = document.getElementById("es-results");
+  if (!ul || (ul as any).__splitterReady) return;
+  (ul as any).__splitterReady = true;
+  const saved = localStorage.getItem("mdes-name-w");
+  if (saved) ul.style.setProperty("--es-name-w", saved);
+  let dragging = false;
+  ul.addEventListener("mousedown", (e) => {
+    const sp = (e.target as HTMLElement).closest(".es-split");
+    if (!sp) return;
+    e.preventDefault();
+    dragging = true;
+    const x0 = e.clientX;
+    const w0 = (ul.querySelector(".ef") as HTMLElement | null)?.offsetWidth ?? Math.round(ul.clientWidth * 0.45);
+    const maxW = ul.clientWidth - 60; // 路径列至少留 60px（盘符级尾巴）；要更宽可先拖宽侧栏（side-gutter）
+    const mv = (ev: MouseEvent) => {
+      const w = Math.min(Math.max(w0 + ev.clientX - x0, 60), Math.max(maxW, 60));
+      ul.style.setProperty("--es-name-w", `${w}px`);
+    };
+    const up = () => {
+      dragging = false;
+      document.removeEventListener("mousemove", mv);
+      document.removeEventListener("mouseup", up);
+      localStorage.setItem("mdes-name-w", ul.style.getPropertyValue("--es-name-w"));
+    };
+    document.addEventListener("mousemove", mv);
+    document.addEventListener("mouseup", up);
+  });
+  // 双击分隔条=复位默认 45%
+  ul.addEventListener("dblclick", (e) => {
+    if (!(e.target as HTMLElement).closest(".es-split")) return;
+    ul.style.removeProperty("--es-name-w");
+    localStorage.removeItem("mdes-name-w");
+  });
+  // 拖动后抑制行 click（防止拖完误开文件）
+  ul.addEventListener("click", (e) => {
+    if (dragging) { e.stopImmediatePropagation(); dragging = false; }
+  }, true);
 }
 /** 全盘命中点击分流：文本类=打开编辑；目录=树定位；其它=资源管理器显示 */
 async function esHitOpen(h: EsHit): Promise<void> {
@@ -1383,6 +1423,7 @@ function initSidePanels(): void {
     applyTreeFilter();
     scheduleEsSearch();
   });
+  setupEsSplitter(); // 全盘结果文件名列宽拖动（v0.3.20）
   document.getElementById("recent-clear")!.addEventListener("click", () => {
     saveUiStateKey("recent", []);
     renderRecent();

@@ -101,7 +101,9 @@ html[data-theme="eye"] .vditor-reset { background-color: transparent !important;
 .tab { display: flex; align-items: center; gap: 6px; padding: 0 10px; height: 100%; cursor: pointer; font-size: 13px; border-right: 1px solid var(--border2); white-space: nowrap; }
 .tab:hover { background: var(--bg-panel); }
 .tab.active { background: var(--bg-surface); border-bottom: 2px solid var(--accent); }
-.tab.sel { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent-border); } /* Ctrl+Click 多选态（Notepad++ 式批量关闭） */
+.tab.sel { background: var(--accent); box-shadow: inset 0 0 0 1px var(--accent-border); } /* Ctrl+Click 多选态（Notepad++ 式批量关闭）——accent 实底+白字：旧 accent-soft(#eef3ff) vs 白底对比度过低，禁选词后用户看不到选中反馈 */
+.tab.sel .tab-name { color: #fff; }
+.tab.sel .tab-close { color: #fff; }
 
 /* ===== v0.3.15 标签右键菜单（Notepad++：关闭/关闭其它/关闭右侧/全部；Ctrl+Click 多选加"关闭选中"） ===== */
 #tab-menu, #ftree-menu {
@@ -411,8 +413,12 @@ body.focus-mode .vditor-reset > .fw-current { opacity: 1; }
 #es-results li { display: flex; gap: 6px; align-items: baseline; padding: 3px 10px; cursor: pointer; font-size: 12px; }
 #es-results li:hover { background: var(--bg-hover); }
 #es-results li.empty { color: var(--muted2); cursor: default; font-size: 11px; }
-#es-results .ef { color: var(--text); flex: 0 0 auto; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#es-results .ep { color: var(--muted2); font-size: 11px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#es-results .ef { color: var(--text); flex: 0 0 var(--es-name-w, 45%); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* v0.3.20 列宽拖动条：拖任一行=全列表文件名列同步调宽（长文件名拖宽即完整显示） */
+#es-results .es-split { flex: 0 0 5px; align-self: stretch; margin: 0 -3px; cursor: col-resize; }
+#es-results .es-split::after { content: ""; display: block; width: 1px; height: 100%; margin: 0 auto; background: var(--border); }
+#es-results .es-split:hover::after { background: var(--accent); }
+#es-results .ep { color: var(--muted2); font-size: 11px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #ftree-modal-input { width: 100%; box-sizing: border-box; padding: 8px 10px; font-size: 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-surface); color: var(--text); }
 #ftree-modal-input:focus { outline: none; border-color: var(--accent); }
 #qo-list { list-style: none; margin-top: 8px; max-height: 300px; overflow: auto; }
