@@ -26,15 +26,8 @@ let bootFocused = false; // 启动首次挂载后焦点进编辑区（after 回�
 //（AHK 真实键盘 + ztrace 实证：s 到达、z 被抢占）。函数声明提升保证此处可引用下方函数。
 window.addEventListener("keydown", (e) => {
   const isZY = e.key === "z" || e.key === "Z" || e.key === "y" || e.key === "Y";
-  if (isZY) { // 测试钩子：记录 z/y keydown 守卫状态（AHK 真键盘诊断用）
-    (window as any).__zTrace = (window as any).__zTrace || [];
-    if ((window as any).__zTrace.length < 40)
-      (window as any).__zTrace.push({ k: e.key, comp: e.isComposing, ctrl: !!(e.ctrlKey || e.metaKey),
-        ed: !!(e.target as Element | null)?.closest?.(".vditor"), t: Date.now() % 100000 });
-  }
   // 组合态（IME 输入中）只放行 Ctrl+Z/Y：组合中撤销=打断组合并回退（Word/Typora 同语义），
   // 静默放行会落入 Chromium 原生 undo 与自建栈双轨互踩（AHK 实测 composing 残留拦死 ^z）
-  if (e.isComposing && !(isZY && (e.ctrlKey || e.metaKey))) return;
   if (e.isComposing && !(isZY && (e.ctrlKey || e.metaKey))) return;
   if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
   const inEditor = !!(e.target as Element | null)?.closest?.(".vditor");
@@ -716,25 +709,62 @@ function snapReset(doc: Doc | null): void {
   snapStepOpen = false;
   syncUndoBtns(); // 切换文档后按钮禁用态跟随新文档的栈
 }
-const SNAP_STEP_MS = 600;  // Word 式分步：输入停顿窗口
+const SNAP_STEP_MS = 1500; // Word 式编辑会话空闲窗：连按退格删一个标题全程可超 900ms，
+// 600ms 窗会在连删中途到期复位、后半段又开新步（实测 7 连删被切成 2 步，"撤一次只回半个标题"根因）。
+// Word 的真实语义=连续同类编辑（不插其他操作）合为一步，窗口必须覆盖整段连击。
 const SNAP_STEP_CHARS = 8; // 单步字符增量阈值：连打长段/IME 长上屏按 ~8 字切步，
 // 否则"一直打字不停顿"整篇并成一步，Ctrl+Z 一下回到很久以前（用户 2026-08-31 反馈）
+let restoreFreezeUntil = 0; // 撤销/重做恢复后的冻结窗：setValue 触发的 afterRender 定时器
+// 会晚于同步 suppressInput 复位再调 options.input/原生 input——漏网信号会把刚弹出的值
+// 重新入栈并清空 redoStack（"重做按钮恒灰"+栈自我修复的假动作根因）
 function snapOnInput(doc: Doc, cur: string): void {
+  if (Date.now() < restoreFreezeUntil) return;
   if (cur === snapBase && !snapStepOpen) return;
-  if (snapStepOpen && Math.abs(cur.length - snapBase.length) >= SNAP_STEP_CHARS) {
+  // 字数切步只对"变长"（打字）生效：删除收窄靠时间窗+导航切步——实测连删标题 7 字
+  // 恰撞 8 字线被腰斩成两步（栈里出现 25 字中间态），"撤一次只回半个标题"根因
+  // （__snapLog t=9548 curLen=25 baseLen=33 实锤）
+  if (snapStepOpen && cur.length - snapBase.length >= SNAP_STEP_CHARS) {
     snapBase = cur; snapStepOpen = false; // 增量达阈值即封口，本事件继续走下方"开新步"
   }
   if (!snapStepOpen) {
-    // 新一步开启：步前值入栈（undo 将恢复到它）；任何新输入使 redo 分支作废
+    // 新一步开启：步前值入栈（undo 将恢复到它）；任何新输入使 redo 分支作废。
+    // 入栈时去重（不在 docUndo 出栈时弹）：setValue 后 Vditor 取值有规范化差异，
+    // 出栈端弹"空步"会把相邻两步一次弹光（实测一次 Ctrl+Z 跳回初始+按钮置灰根因）
     snapStepOpen = true;
-    doc.undoStack.push(snapBase);
-    if (doc.undoStack.length > 100) doc.undoStack.shift(); // 栈深上限
+    if (doc.undoStack[doc.undoStack.length - 1] !== snapBase) {
+      doc.undoStack.push(snapBase);
+      if (doc.undoStack.length > 100) doc.undoStack.shift(); // 栈深上限
+    }
     doc.redoStack.length = 0;
     syncUndoBtns();
   }
   window.clearTimeout(snapTimer);
+  lastEditSignalAt = Date.now(); // 续编辑会话：紧随其后的导航键不切步
   snapTimer = window.setTimeout(() => { snapBase = cur; snapStepOpen = false; }, SNAP_STEP_MS);
 }
+// 光标重定位=切步（Word 语义）：删完标题后 Ctrl+End/点击跳到别处再删=新的删除意图，应单独成步。
+// 不能用 selectionchange——行首 Backspace 删段落分隔时光标必然大跳（删除的结果而非用户意图），
+// 会被误封口并把 snapBase 刷成删后值，导致该删除永不进栈（实测丢步根因）。
+// 只认导航键 keydown 与编辑区 mousedown，且距上次编辑信号 >400ms（防输入法选词/删除连击误切）。
+let lastEditSignalAt = 0;
+const NAV_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);
+function navSealStep(): void {
+  if (snapStepOpen) {
+    window.clearTimeout(snapTimer);
+    snapBase = mdValue(); snapStepOpen = false; // 封口：跳转前的内容单独成步
+  }
+}
+document.addEventListener("keydown", (e) => {
+  if (!NAV_KEYS.has(e.key)) return;
+  if (Date.now() - lastEditSignalAt < 400) return;
+  navSealStep();
+}, true);
+document.addEventListener("mousedown", (e) => {
+  const t = e.target as Element | null;
+  if (!t?.closest?.(".vditor-reset")) return;
+  if (Date.now() - lastEditSignalAt < 400) return;
+  navSealStep();
+}, true);
 // 测试钩子：CDP 合成 keydown 会被 Vditor 元素层拦截（真实键盘不受影响，AHK 冒烟已实证），
 // e2e 直接调函数测栈逻辑；键盘链路覆盖交给 AHK 真实输入层。
 (window as any).__mdUndo = () => docUndo();
@@ -744,18 +774,20 @@ Object.defineProperty(window, "__mdDocs", { get: () => docs });
 // v0.3.21 删除动作分步+记步兜底（用户实测"删三行，一次 Ctrl+Z 恢复两行"根因）：
 // Vditor 对 Backspace/Delete 走自有 DOM 删除路径，不触发原生 input 事件——逐字符阈值收不到
 // 信号，且该路径连 options.input 兜底都常常不发，删除内容完全不进撤销栈（Ctrl+Z 跳步）。
-// ①按下时：距上次删除键 >400ms 且有开步 → 立即封口前段（每次删除动作=新步；连按并步）
+// ①按下时：距上次删除键 >1500ms（同 600ms 会话窗教训：400ms 连 7 键退格会被拦腰切两段）
+//    且有开步 → 封口前段（间隔久的删除=新删除意图）
 // ②抬起后 80ms：值变了但没有任何信号开过步 → 主动 snapOnInput 记步（兜住纯 DOM 删除）
 let lastDelKeyAt = 0;
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Backspace" && e.key !== "Delete") return;
   if (e.isComposing) return; // 组合中的退格=删拼音串，交给输入法
   const now = Date.now();
-  if (now - lastDelKeyAt > 400 && snapStepOpen) {
+  if (now - lastDelKeyAt > 1500 && snapStepOpen) {
     window.clearTimeout(snapTimer);
     snapBase = mdValue(); snapStepOpen = false; // 封口：删除动作之前的内容单独成步
   }
   lastDelKeyAt = now;
+  lastEditSignalAt = now; // 连删期间导航键不切步（Ctrl+End 定位后紧接的删除仍是同会话）
 }, true);
 document.addEventListener("keyup", (e) => {
   if (e.key !== "Backspace" && e.key !== "Delete") return;
@@ -764,7 +796,7 @@ document.addEventListener("keyup", (e) => {
     const doc = activeDoc();
     if (!doc || snapStepOpen) return; // 已有 input 信号开步则不重复
     const v = mdValue();
-    if (v !== doc.content) snapOnInput(doc, v); // 无信号到达的 DOM 删除：这里补记
+    if (v !== snapBase) snapOnInput(doc, v); // 基准用 snapBase：doc.content 会被 30s 自动保存刷新，用它判会漏记（用户实测删标题后按钮仍灰）
   }, 80);
 }, true);
 // v0.3.21 Word 式分步信号源：原生 input 逐字符可达。Vditor 的 options.input 挂在其内部
@@ -799,22 +831,39 @@ function setupUndoToolbar(): void {
 }
 function syncUndoBtns(): void { // 栈空灰显（Word 式）
   const d = activeDoc();
+  // 双通道置灰（2026-08-31 用户实锤"重做按钮恒灰但 CDP 读 disabled=false"）：
+  // Vditor 的 disableToolbar/enableToolbar 走 CSS class vditor-menu--disabled（视觉灰），
+  // 不设 disabled 属性；此前只设属性=「JS 读数亮、用户看到灰」读写分裂。
+  // 属性拦点击（DOM 语义），class 管视觉——两套必须同进退，且摘掉 Vditor 历史加的 class。
   // querySelectorAll 遍历所有 toolbar 实例（模式/语言切换 Vditor 重建后旧节点可能残留，
   // 只同步第一个会出现"活按钮恒灰、点不动"——用户 2026-08-31 反馈重做按钮不可点）
-  document.querySelectorAll<HTMLButtonElement>('.vditor-toolbar [data-type="undo"]').forEach((u) => { u.disabled = !d || d.undoStack.length === 0; });
-  document.querySelectorAll<HTMLButtonElement>('.vditor-toolbar [data-type="redo"]').forEach((r) => { r.disabled = !d || d.redoStack.length === 0; });
+  document.querySelectorAll<HTMLButtonElement>('.vditor-toolbar [data-type="undo"]').forEach((u) => {
+    u.disabled = !d || d.undoStack.length === 0;
+    u.classList.toggle("vditor-menu--disabled", u.disabled);
+  });
+  document.querySelectorAll<HTMLButtonElement>('.vditor-toolbar [data-type="redo"]').forEach((r) => {
+    r.disabled = !d || d.redoStack.length === 0;
+    r.classList.toggle("vditor-menu--disabled", r.disabled);
+  });
 }
 function syncUndoBtnsSoon(): void { // 异步竞争兜底：撤销/重做后 300ms 复刷一次（Vditor 内部
   // 异步尾巴若再碰按钮态，这里拉回真值；one-shot 非常驻）
   window.setTimeout(syncUndoBtns, 300);
 }
+// 重入去重（v0.3.21 根修"一次 Ctrl+Z 撤两步"）：Vditor 的 processKeydown 也会响应 ⌘Z/⌘Y 并
+// 转发为按钮点击（toolbar 捕获层劫持→docUndo 第二次调用，__undoCnt=2/一次 keydown 实锤）。
+// 250ms 内的重复调用只执行第一次——80ms 实测不够（转发链路经 Vditor 内部定时器可超 80ms）。
+let lastUndoMs = 0, lastRedoMs = 0;
 function docUndo(): void {
   const doc = activeDoc();
   if (!doc || !vditor) return;
+  const nowMs = Date.now();
+  if (nowMs - lastUndoMs < 700) return; // 同一按键的转发重复，丢弃（Vditor 转发链经 afterRender 定时器，实测可晚 577ms）
+  lastUndoMs = nowMs;
   const cur = mdValue();
   if (snapStepOpen) { window.clearTimeout(snapTimer); snapBase = cur; snapStepOpen = false; } // 封口当前步
-  // 弹掉与当前值相同的空步（打开/联动可能留下无差异快照——按钮亮但点了"无反应"的来源）
-  while (doc.undoStack.length > 0 && doc.undoStack[doc.undoStack.length - 1] === cur) doc.undoStack.pop();
+  // 注：不在出栈端弹"空步"——setValue 后 Vditor 取值规范化会让 cur 恒等栈顶，
+  // while 连弹把多步一次撤光（实测一次 Ctrl+Z 直达初始+按钮置灰）。入栈去重见 snapOnInput。
   if (doc.undoStack.length === 0) { syncUndoBtns(); return; }
   doc.redoStack.push(cur);
   restoreDocValue(doc, doc.undoStack.pop()!);
@@ -823,10 +872,11 @@ function docUndo(): void {
 function docRedo(): void {
   const doc = activeDoc();
   if (!doc || !vditor || doc.redoStack.length === 0) return;
+  const nowMs = Date.now();
+  if (nowMs - lastRedoMs < 700) return; // Vditor 转发按钮点击的重复调用，丢弃
+  lastRedoMs = nowMs;
   const cur = mdValue(); // 与 docUndo 对称：当前值回 undo 栈（snapBase 在未封步时≠当前值）
   if (snapStepOpen) { window.clearTimeout(snapTimer); snapStepOpen = false; }
-  while (doc.redoStack.length > 0 && doc.redoStack[doc.redoStack.length - 1] === cur) doc.redoStack.pop(); // 弹空步
-  if (doc.redoStack.length === 0) { syncUndoBtns(); return; }
   doc.undoStack.push(cur);
   restoreDocValue(doc, doc.redoStack.pop()!);
   syncUndoBtnsSoon();
@@ -834,6 +884,7 @@ function docRedo(): void {
 function restoreDocValue(doc: Doc, v: string): void {
   doc.content = v;
   suppressInput = true;
+  restoreFreezeUntil = Date.now() + 800; // 冻结窗盖过 Vditor afterRender 定时器的异步尾巴
   vditor!.setValue(v, true);
   suppressInput = false;
   snapBase = v;
