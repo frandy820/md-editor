@@ -19,6 +19,7 @@ import enI18n from "./i18n-en";
 let vditor: Vditor | null = null;
 let outlineTimer: number | null = null;
 let suppressInput = false; // setValue 时抑制 input 回调（避免切换/联动标签误标 dirty）
+let bootFocused = false; // 启动首次挂载后焦点进编辑区（after 回调 flag，防模式切换重抢）
 
 // v0.3.21 撤销/重做/保存键盘拦截——必须在模块顶层注册（早于 new Vditor）：
 // Vditor 也在 window 捕获层挂热键且「先注册先执行」，晚注册的 handler 收不到 ⌘Z
@@ -1840,6 +1841,16 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
     after: () => {
       fixToolbarTooltipDirection();
       setupUndoToolbar(); // v0.3.21 撤销/重做按钮劫持（模式/语言切换重建 toolbar 后重绑）
+      // v0.3.21 启动焦点进编辑区（仅首次挂载）：默认大纲页时代启动后焦点停在 body，
+      // "打开即打字"落空（CDP 诊断 activeElement=BODY 实锤；boot 末尾延时 focus 会因 pre
+      // 未渲染落空，after 才是挂载完成保证）。模式/语言切换重建也进 after，flag 防重抢焦点。
+      if (!bootFocused) {
+        bootFocused = true;
+        window.setTimeout(() => {
+          const ed = document.querySelector(".vditor-wysiwyg pre.vditor-reset, .vditor-ir pre.vditor-reset") as HTMLElement | null;
+          if (ed && (document.activeElement === document.body || document.activeElement === null)) ed.focus();
+        }, 0);
+      }
       // v0.3.11 拼写检查：Vditor 显式给 pre.vditor-reset 设 spellcheck="false"（dist 源码 3 处），
       // 编辑区元素固定不重建，after 统一改回 true 即可持续生效（模式/语言切换重建也会再进 after）。
       // WebView2/Chromium 内建检查：英文错词红波浪线+右键建议；中文无拼写概念不受影响。
