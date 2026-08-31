@@ -8,6 +8,120 @@ use tauri::{AppHandle, Emitter, Manager};
 /// 启动时从命令行参数传入的文件路径
 struct StartupFile(Mutex<Option<String>>);
 
+// ===== v0.3.23 运行日志（零观测根修：报障从口述复现变带日志自证）=====
+// %APPDATA%\md-editor\logs\md-editor.log，单文件滚动（>512KB 轮转 .log.1/.log.2，留三代）。
+// 启动首行=版本+系统+启动参数（run() 最先调用，覆盖开机第一行不留观测盲区）。
+// panic hook 落盘崩溃位置（release 保留 panic Location 行号）——白屏/闪退可自证。
+// 纯本机文件，无任何网络上报（离线个人工具定位不变）。
+static LOG_W: Mutex<()> = Mutex::new(());
+
+fn logs_dir() -> PathBuf {
+    let base = std::env::var("APPDATA").unwrap_or_else(|_| ".".into());
+    PathBuf::from(base).join("md-editor").join("logs")
+}
+
+/// 本地(UTC+8) yyyy-MM-dd HH:mm:ss（与 local_ts 同换算）
+fn log_ts() -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let local = now + 8 * 3600;
+    let (y, mo, d) = civil_from_days((local / 86400) as i64);
+    let (h, mi, s) = ((local % 86400) / 3600, (local % 3600) / 60, local % 60);
+    format!("{y:04}-{mo:02}-{d:02} {h:02}:{mi:02}:{s:02}")
+}
+
+/// 追加一行日志（失败静默：日志系统绝不能反过来打断主流程）
+pub fn app_log(level: &str, scope: &str, msg: &str) {
+    let _g = LOG_W.lock().unwrap();
+    let dir = logs_dir();
+    if fs::create_dir_all(&dir).is_err() {
+        return;
+    }
+    let path = dir.join("md-editor.log");
+    // 滚动：>512KB → .log.2 删、.log.1→.log.2、主→.log.1
+    if let Ok(meta) = fs::metadata(&path) {
+        if meta.len() > 512 * 1024 {
+            let _ = fs::remove_file(dir.join("md-editor.log.2"));
+            let _ = fs::rename(dir.join("md-editor.log.1"), dir.join("md-editor.log.2"));
+            let _ = fs::rename(&path, dir.join("md-editor.log.1"));
+        }
+    }
+    let line = format!("[{}] [{}] [{}] {}\n", log_ts(), level, scope, msg.replace('\n', " | "));
+    let _ = fs::OpenOptions::new().create(true).append(true).open(&path)
+        .and_then(|mut f| std::io::Write::write_all(&mut f, line.as_bytes()));
+}
+
+/// 采系统版本串。ver 输出跟随系统代码页（中文系统=GBK），用 GBK 解码防乱码
+fn sys_ver() -> String {
+    use std::os::windows::process::CommandExt;
+    Command::new("cmd").args(["/c", "ver"])
+        .creation_flags(0x0800_0000).output()
+        .map(|o| {
+            let (cow, _, had_err) = encoding_rs::GBK.decode(&o.stdout);
+            if had_err { String::from_utf8_lossy(&o.stdout).trim().to_string() }
+            else { cow.trim().to_string() }
+        })
+        .unwrap_or_else(|_| "(ver 不可用)".into())
+}
+
+/// 启动首行（run() 最先调用）：版本/系统/启动参数/进程信息
+fn log_startup(args: &str) {
+    app_log("INFO", "startup", &format!(
+        "===== md-editor v{} 启动 | pid={} | args={}",
+        env!("CARGO_PKG_VERSION"),
+        std::process::id(),
+        if args.is_empty() { "(无)" } else { args }
+    ));
+    // 系统/运行环境一次采集（失败不阻断）
+    let ver = sys_ver();
+    let exe = std::env::current_exe().map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_else(|_| "(路径不可用)".into());
+    app_log("INFO", "startup", &format!("os={} | exe={}", ver, exe));
+    // panic 钩子：崩溃落日志（用户闪退/白屏的观测盲区）
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let loc = info.location()
+            .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
+            .unwrap_or_else(|| "未知位置".into());
+        app_log("PANIC", "crash", &format!("{} | {}", loc, info));
+        default_hook(info);
+    }));
+}
+
+/// 导出诊断包：txt 单文件（系统信息+版本+启动参数+全部日志代）。
+/// 不用 zip：压缩需引库增大 exe，txt 同样单文件可直接转发，零依赖零风险。
+#[tauri::command]
+fn export_diagnostics(path: String) -> Result<String, String> {
+    let mut out = String::with_capacity(64 * 1024);
+    let hr = "|===========|\n";
+    let sec = |out: &mut String, title: &str| {
+        out.push_str(&hr);
+        out.push_str(&format!("| {} \n", title));
+        out.push_str(&hr);
+    };
+    sec(&mut out, "md-editor 诊断包");
+    out.push_str(&format!("导出时间: {}\n版本: v{}\n进程 PID: {}\n",
+        log_ts(), env!("CARGO_PKG_VERSION"), std::process::id()));
+    sec(&mut out, "系统信息");
+    out.push_str(&format!("OS: {}\n", sys_ver()));
+    out.push_str(&format!("exe: {}\n", std::env::current_exe()
+        .map(|p| p.to_string_lossy().into_owned()).unwrap_or_else(|_| "?".into())));
+    out.push_str(&format!("盘符: {}\n", fixed_drive_roots().iter()
+        .map(|p| p.display().to_string()).collect::<Vec<_>>().join(" ")));
+    out.push_str(&format!("启动参数: {:?}\n", std::env::args().collect::<Vec<_>>()));
+    sec(&mut out, "运行日志（三代合并，新在前）");
+    for name in ["md-editor.log", "md-editor.log.1", "md-editor.log.2"] {
+        if let Ok(t) = fs::read_to_string(logs_dir().join(name)) {
+            out.push_str(&format!("----- {} -----\n{}\n", name, t));
+        }
+    }
+    fs::write(&path, out.as_bytes()).map_err(|e| e.to_string())?;
+    app_log("INFO", "diag", &format!("诊断包已导出: {} ({}KB)", path, out.len() / 1024));
+    Ok(path)
+}
+
 /// 允许打开/保存的扩展名（与前端 dialog/拖拽过滤口径一致）
 const ALLOWED_EXTS: &[&str] = &["md", "markdown", "mdown", "txt"];
 
@@ -24,8 +138,12 @@ fn has_allowed_ext(path: &str) -> bool {
 fn extract_md_from_args(mut args: impl Iterator<Item = String>) -> Option<String> {
     args.next(); // 跳过程序自身路径
     for a in args {
-        if has_allowed_ext(&a) && std::path::Path::new(&a).is_file() {
-            return Some(a);
+        if has_allowed_ext(&a) {
+            if std::path::Path::new(&a).is_file() {
+                return Some(a);
+            }
+            // 典型报障场景：双击旧快捷方式/参数里的文件已被移动或删除，静默落欢迎页
+            app_log("WARN", "startup", &format!("启动参数文件不存在，已忽略: {a}"));
         }
     }
     None
@@ -40,6 +158,7 @@ fn extract_md_arg() -> Option<String> {
 #[tauri::command]
 fn open_file(path: String) -> Result<(String, String), String> {
     if !has_allowed_ext(&path) {
+        app_log("WARN", "open", &format!("拒绝打开(扩展名不符): {path}"));
         return Err("不支持的文件类型（仅 md/markdown/mdown/txt）".into());
     }
     // 硬上限 2MB：超大文件读入+IPC 传输本身就慢，先在源头拒绝（渲染层 256KB 防线在前端）
@@ -48,7 +167,10 @@ fn open_file(path: String) -> Result<(String, String), String> {
             return Err(format!("文件过大（{} KB，上限 2048 KB），已阻止打开以免卡死", meta.len() / 1024));
         }
     }
-    let bytes = fs::read(&path).map_err(|e| e.to_string())?;
+    let bytes = fs::read(&path).map_err(|e| {
+        app_log("ERROR", "open", &format!("读取失败 {path}: {e}"));
+        e.to_string()
+    })?;
     let (content, enc) = if bytes.starts_with(&[0xEF, 0xBB, 0xBF]) {
         (
             String::from_utf8_lossy(&bytes[3..]).to_string(),
@@ -83,7 +205,10 @@ fn save_file(path: String, content: String) -> Result<(), String> {
     }
     archive_old_version(&path); // v0.3.11 覆盖前归档旧版（best-effort）
     let tmp = format!("{}.tmp", path);
-    fs::write(&tmp, &content).map_err(|e| e.to_string())?;
+    fs::write(&tmp, &content).map_err(|e| {
+        app_log("ERROR", "save", &format!("写入失败 {path}: {e}"));
+        e.to_string()
+    })?;
     // 同目录 rename 在 Windows 上原子覆盖目标文件
     fs::rename(&tmp, &path).map_err(|e| {
         let _ = fs::remove_file(&tmp);
@@ -869,7 +994,10 @@ fn save_binary_file(path: String, data_b64: String) -> Result<(), String> {
 #[tauri::command]
 fn read_binary_file(path: String) -> Result<String, String> {
     use base64::Engine;
-    let bytes = fs::read(&path).map_err(|e| e.to_string())?;
+    let bytes = fs::read(&path).map_err(|e| {
+        app_log("ERROR", "open", &format!("读取失败 {path}: {e}"));
+        e.to_string()
+    })?;
     Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
 }
 
@@ -1086,6 +1214,7 @@ fn build_index() {
     if INDEX_BUILDING.swap(true, std::sync::atomic::Ordering::SeqCst) {
         return; // 已在构建，防重入
     }
+    app_log("INFO", "index", "全盘索引构建开始");
     INDEX_SCANNED.store(0, std::sync::atomic::Ordering::Relaxed);
     INDEX.write().unwrap().clear(); // 重建从零开始（防新旧混叠）
     let roots = fixed_drive_roots();
@@ -1104,7 +1233,8 @@ fn build_index() {
         });
     }
     // 合并+缓存写出线程：3s 周期搬缓冲→INDEX；walk 全部结束后收尾搬+shrink+写缓存
-    std::thread::spawn(|| {
+    let t0 = std::time::Instant::now();
+    std::thread::spawn(move || {
         loop {
             std::thread::sleep(std::time::Duration::from_secs(3));
             let drained: Vec<IndexEntry> = {
@@ -1144,6 +1274,9 @@ fn build_index() {
                     let _ = std::fs::rename(&tmp, &cache);
                 }
                 INDEX_BUILDING.store(false, std::sync::atomic::Ordering::SeqCst);
+                app_log("INFO", "index", &format!(
+                    "全盘索引构建完成: {} 项, 耗时 {:.0}s",
+                    n, t0.elapsed().as_secs_f64()));
                 return;
             }
         }
@@ -1335,6 +1468,8 @@ fn fatal_msgbox(text: &str, caption: &str) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // v0.3.23 运行日志首行：run() 第一件事（覆盖开机第一行，不留观测盲区）
+    log_startup(&std::env::args().skip(1).collect::<Vec<_>>().join(" "));
     // 启动预检：WebView2 Runtime 缺失（极老/精简系统）时 Tauri 会静默失败或白屏，
     // 先给出可读指引再退出（明算工具缺 VC++ DLL 用户机起不来的同类教训）。
     #[cfg(windows)]
@@ -1419,6 +1554,7 @@ pub fn run() {
             delete_entry,
             reveal_path,
             es_search,
+            export_diagnostics,
             search_md_files,
             dnd_selftest_enabled,
             print_webview

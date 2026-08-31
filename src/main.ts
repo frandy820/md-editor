@@ -87,7 +87,8 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     sideOutline: "大纲", sideFiles: "文件",
     printBtn: "🖨 打印", printTip: "打印正文（Ctrl+P）：弹系统打印预览，可选打印机/份数/双面",
     outlineFilterPh: "过滤大纲…", filterFilesPh: "过滤树 / 全盘搜文件名…",
-    esSearching: "全盘搜索中…", esNone: "全盘无命中", esIndexing: "正在建立全盘文件索引（已扫描 {n} 项）——数十秒后即可搜到部分结果，期间逐步补全", esFail: "全盘查询失败", esSplitTip: "拖动调整文件名列宽，双击复位",
+    esSearching: "全盘搜索中…", esNone: "全盘无命中", esIndexing: "正在建立全盘文件索引（已扫描 {n} 项）——数十秒后即可搜到部分结果，期间逐步补全", esFail: "全盘查询失败",
+  diagOk: "诊断包已导出（含运行日志+版本+系统信息），可直接发给反馈者：", diagFail: "诊断包导出失败：", esSplitTip: "拖动调整文件名列宽，双击复位",
     recentTitle: "最近", clearRecentTip: "清空最近文件列表", clearRecent: "🗑 清空",
     treePathPh: "路径，回车跳转", treeRefreshTip: "刷新目录",
     gsearchPh: "搜同级文件内容，回车执行（Ctrl+Shift+F）", gsearchNone: "（无匹配）",
@@ -136,7 +137,8 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     sideOutline: "大綱", sideFiles: "檔案",
     printBtn: "🖨 列印", printTip: "列印正文（Ctrl+P）：彈系統列印預覽，可選印表機/份數/雙面",
     outlineFilterPh: "過濾大綱…", filterFilesPh: "過濾樹 / 全碟搜檔名…",
-    esSearching: "全碟搜尋中…", esNone: "全碟無命中", esIndexing: "正在建立全碟文件索引（已掃描 {n} 項）——數十秒後即可搜到部分結果，期間逐步補全", esFail: "全碟查詢失敗", esSplitTip: "拖動調整文件名列寬，雙擊復位",
+    esSearching: "全碟搜尋中…", esNone: "全碟無命中", esIndexing: "正在建立全碟文件索引（已掃描 {n} 項）——數十秒後即可搜到部分結果，期間逐步補全", esFail: "全碟查詢失敗",
+  diagOk: "診斷包已導出（含運行日誌+版本+系統信息），可直接發給反饋者：", diagFail: "診斷包導出失敗：", esSplitTip: "拖動調整文件名列寬，雙擊復位",
     recentTitle: "最近", clearRecentTip: "清空最近檔案列表", clearRecent: "🗑 清空",
     treePathPh: "路徑，Enter 跳轉", treeRefreshTip: "重新整理目錄",
     gsearchPh: "搜同層檔案內容，Enter 執行（Ctrl+Shift+F）", gsearchNone: "（無符合）",
@@ -185,7 +187,8 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     sideOutline: "Outline", sideFiles: "Files",
     printBtn: "🖨 Print", printTip: "Print the document (Ctrl+P): system print preview — printer, copies, duplex",
     outlineFilterPh: "Filter outline…", filterFilesPh: "Filter tree / search all drives…",
-    esSearching: "Searching all drives…", esNone: "No matches on this computer", esIndexing: "Building drive-wide file index ({n} items scanned) — partial results become searchable within a minute", esFail: "Query failed", esSplitTip: "Drag to resize the name column, double-click to reset",
+    esSearching: "Searching all drives…", esNone: "No matches on this computer", esIndexing: "Building drive-wide file index ({n} items scanned) — partial results become searchable within a minute", esFail: "Query failed",
+  diagOk: "Diagnostics exported (logs + version + system info). Send this file for bug reports:", diagFail: "Failed to export diagnostics:", esSplitTip: "Drag to resize the name column, double-click to reset",
     recentTitle: "Recent", clearRecentTip: "Clear recent files", clearRecent: "🗑 Clear",
     treePathPh: "Path, Enter to go", treeRefreshTip: "Refresh folder",
     gsearchPh: "Search sibling files here, Enter (Ctrl+Shift+F)", gsearchNone: "(no match)",
@@ -3235,6 +3238,23 @@ async function openHistory(): Promise<void> {
 }
 function bindHistory(): void {
   document.getElementById("btn-history")!.addEventListener("click", () => { void openHistory(); });
+  // v0.3.23 导出诊断包：Rust 收集日志+版本+系统信息写单个 txt（报障从口述复现变带日志自证）
+  document.getElementById("btn-diag")!.addEventListener("click", async () => {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    const sp = await saveDialog({
+      defaultPath: `md-editor-diagnostics-${stamp}.txt`,
+      filters: [{ name: "Text", extensions: ["txt"] }],
+    });
+    if (!sp) return;
+    try {
+      const saved = await invoke<string>("export_diagnostics", { path: sp });
+      alert(t("diagOk") + "\n" + saved);
+    } catch (e) {
+      alert(t("diagFail") + "\n" + e);
+    }
+  });
   document.getElementById("hist-close")!.addEventListener("click", () => {
     (document.getElementById("history-modal") as HTMLElement).hidden = true;
   });
