@@ -92,6 +92,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     histRestore: "恢复此版本", histRestored: "已载入所选版本（未保存），确认内容后 Ctrl+S 保存落盘", histRestoreFail: "恢复失败：", histNoDoc: "（请先打开一个已保存的文档）", histPreview: "（预览）",
     tblRowUp: "整行上移", tblRowDown: "整行下移",
     sideOutline: "大纲", sideFiles: "文件",
+    printBtn: "🖨 打印", printTip: "打印正文（Ctrl+P）：弹系统打印预览，可选打印机/份数/双面",
     outlineFilterPh: "过滤大纲…", filterFilesPh: "过滤树 / 全盘搜文件名…",
     esSearching: "全盘搜索中…", esNone: "全盘无命中", esNoEngine: "未启用全盘搜索：将 es.exe 放到 md-editor.exe 同目录（需 Everything 运行中）", esFail: "全盘查询失败（Everything 未运行？）", esSplitTip: "拖动调整文件名列宽，双击复位",
     recentTitle: "最近", clearRecentTip: "清空最近文件列表", clearRecent: "🗑 清空",
@@ -140,6 +141,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     histRestore: "恢復此版本", histRestored: "已載入所選版本（未儲存），確認內容後 Ctrl+S 儲存落盤", histRestoreFail: "恢復失敗：", histNoDoc: "（請先開啟一個已儲存的文件）", histPreview: "（預覽）",
     tblRowUp: "整行上移", tblRowDown: "整行下移",
     sideOutline: "大綱", sideFiles: "檔案",
+    printBtn: "🖨 列印", printTip: "列印正文（Ctrl+P）：彈系統列印預覽，可選印表機/份數/雙面",
     outlineFilterPh: "過濾大綱…", filterFilesPh: "過濾樹 / 全碟搜檔名…",
     esSearching: "全碟搜尋中…", esNone: "全碟無命中", esNoEngine: "未啟用全碟搜尋：將 es.exe 放到 md-editor.exe 同目錄（需 Everything 執行中）", esFail: "全碟查詢失敗（Everything 未執行？）", esSplitTip: "拖動調整文件名列寬，雙擊復位",
     recentTitle: "最近", clearRecentTip: "清空最近檔案列表", clearRecent: "🗑 清空",
@@ -188,6 +190,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     histRestore: "Restore this version", histRestored: "Version loaded (unsaved). Review and press Ctrl+S to write to disk", histRestoreFail: "Restore failed: ", histNoDoc: "(Open a saved document first)", histPreview: "(preview)",
     tblRowUp: "Move row up", tblRowDown: "Move row down",
     sideOutline: "Outline", sideFiles: "Files",
+    printBtn: "🖨 Print", printTip: "Print the document (Ctrl+P): system print preview — printer, copies, duplex",
     outlineFilterPh: "Filter outline…", filterFilesPh: "Filter tree / search all drives…",
     esSearching: "Searching all drives…", esNone: "No matches on this computer", esNoEngine: "Drive-wide search disabled: put es.exe next to md-editor.exe (Everything must be running)", esFail: "Query failed (is Everything running?)", esSplitTip: "Drag to resize the name column, double-click to reset",
     recentTitle: "Recent", clearRecentTip: "Clear recent files", clearRecent: "🗑 Clear",
@@ -702,7 +705,8 @@ function initTabMenu(): void {
 
 // ===== v0.3.21 自建撤销/重做快照栈（per-doc） =====
 // Vditor 内部 undo 栈实测粒度坏：连续多段输入合并成一个 undo 单元（一次 Ctrl+Z 撤光全部），
-// 且首个 Ctrl+Z 常被吞。自建栈按输入停顿(900ms)分步记快照，Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z 分发。
+// 且首个 Ctrl+Z 常被吞。自建栈按「输入停顿(600ms) + 单步字符增量(8字)」双阈值分步记快照
+// （Word 式逐步撤销：连打长段/IME 长上屏也会切步），Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z 分发。
 let snapBase = ""; // 当前步开始前的内容值
 let snapStepOpen = false; // 是否处于未封口的输入步中
 let snapTimer = 0;
@@ -712,8 +716,14 @@ function snapReset(doc: Doc | null): void {
   snapStepOpen = false;
   syncUndoBtns(); // 切换文档后按钮禁用态跟随新文档的栈
 }
+const SNAP_STEP_MS = 600;  // Word 式分步：输入停顿窗口
+const SNAP_STEP_CHARS = 8; // 单步字符增量阈值：连打长段/IME 长上屏按 ~8 字切步，
+// 否则"一直打字不停顿"整篇并成一步，Ctrl+Z 一下回到很久以前（用户 2026-08-31 反馈）
 function snapOnInput(doc: Doc, cur: string): void {
   if (cur === snapBase && !snapStepOpen) return;
+  if (snapStepOpen && Math.abs(cur.length - snapBase.length) >= SNAP_STEP_CHARS) {
+    snapBase = cur; snapStepOpen = false; // 增量达阈值即封口，本事件继续走下方"开新步"
+  }
   if (!snapStepOpen) {
     // 新一步开启：步前值入栈（undo 将恢复到它）；任何新输入使 redo 分支作废
     snapStepOpen = true;
@@ -723,7 +733,7 @@ function snapOnInput(doc: Doc, cur: string): void {
     syncUndoBtns();
   }
   window.clearTimeout(snapTimer);
-  snapTimer = window.setTimeout(() => { snapBase = cur; snapStepOpen = false; }, 900);
+  snapTimer = window.setTimeout(() => { snapBase = cur; snapStepOpen = false; }, SNAP_STEP_MS);
 }
 // 测试钩子：CDP 合成 keydown 会被 Vditor 元素层拦截（真实键盘不受影响，AHK 冒烟已实证），
 // e2e 直接调函数测栈逻辑；键盘链路覆盖交给 AHK 真实输入层。
@@ -731,6 +741,19 @@ function snapOnInput(doc: Doc, cur: string): void {
 // 测试钩子：只读暴露 docs 内部态（dirty/base/栈深），供 e2e 诊断保存时序类问题
 Object.defineProperty(window, "__mdDocs", { get: () => docs });
 (window as any).__mdRedo = () => docRedo();
+// v0.3.21 Word 式分步信号源：原生 input 逐字符可达。Vditor 的 options.input 挂在其内部
+// afterRender 定时器上且 composingLock 过滤，连打整段常合并成一次触发——字符阈值分步
+// 在那里收不到逐字符信号（实测 10 字连打 delay40ms：原生 input×10 vs 栈深 1 不切步）。
+// 组合态（IME 打字中）跳过：组合中间态序列化有毒（拼音字母混进 mdValue）；
+// 上屏终值由 options.input（composingLock 解除后触发）兜底记步。
+document.addEventListener("input", (e) => {
+  if (suppressInput) return;
+  if ((e as InputEvent).isComposing) return;
+  const t = e.target as Element | null;
+  if (!t?.closest?.(".vditor")) return;
+  const doc = activeDoc();
+  if (doc && vditor) snapOnInput(doc, mdValue());
+}, true);
 // v0.3.21 撤销/重做按钮（Word 式双通道）：劫持 Vditor 自带按钮点击走自建栈。
 // 捕获层挂 .vditor-toolbar（父层 capture 先于按钮自身 listener，Vditor 内部 undo 不再执行）。
 function setupUndoToolbar(): void {
@@ -743,15 +766,17 @@ function setupUndoToolbar(): void {
       if (ty === "undo") { e.preventDefault(); e.stopPropagation(); docUndo(); }
       else if (ty === "redo") { e.preventDefault(); e.stopPropagation(); docRedo(); }
     }, true);
+    // 注：曾试 MutationObserver 纠偏按钮态——setAttribute 同值也排队 mutation record，
+    // syncUndoBtns↔observer 微任务风暴直接挂死页面（实锤），删除。
   }
   syncUndoBtns();
 }
 function syncUndoBtns(): void { // 栈空灰显（Word 式）
   const d = activeDoc();
-  const u = document.querySelector<HTMLButtonElement>('.vditor-toolbar [data-type="undo"]');
-  const r = document.querySelector<HTMLButtonElement>('.vditor-toolbar [data-type="redo"]');
-  if (u) u.disabled = !d || d.undoStack.length === 0;
-  if (r) r.disabled = !d || d.redoStack.length === 0;
+  // querySelectorAll 遍历所有 toolbar 实例（模式/语言切换 Vditor 重建后旧节点可能残留，
+  // 只同步第一个会出现"活按钮恒灰、点不动"——用户 2026-08-31 反馈重做按钮不可点）
+  document.querySelectorAll<HTMLButtonElement>('.vditor-toolbar [data-type="undo"]').forEach((u) => { u.disabled = !d || d.undoStack.length === 0; });
+  document.querySelectorAll<HTMLButtonElement>('.vditor-toolbar [data-type="redo"]').forEach((r) => { r.disabled = !d || d.redoStack.length === 0; });
 }
 function docUndo(): void {
   const doc = activeDoc();
@@ -765,7 +790,9 @@ function docUndo(): void {
 function docRedo(): void {
   const doc = activeDoc();
   if (!doc || !vditor || doc.redoStack.length === 0) return;
-  doc.undoStack.push(snapBase);
+  const cur = mdValue(); // 与 docUndo 对称：当前值回 undo 栈（snapBase 在未封步时≠当前值）
+  if (snapStepOpen) { window.clearTimeout(snapTimer); snapStepOpen = false; }
+  doc.undoStack.push(cur);
   restoreDocValue(doc, doc.redoStack.pop()!);
 }
 function restoreDocValue(doc: Doc, v: string): void {
@@ -1966,6 +1993,7 @@ function applyAllText() {
   document.getElementById("btn-open")!.textContent = t("open");
   document.getElementById("btn-save")!.textContent = t("save");
   document.getElementById("btn-export")!.textContent = t("export");
+  const bp = document.getElementById("btn-print"); if (bp) { bp.textContent = t("printBtn"); bp.title = t("printTip"); }
   const bfw = document.getElementById("btn-focus-mode"); if (bfw) { bfw.textContent = t("focusMode"); bfw.title = t("focusTip"); }
   const bfd = document.getElementById("btn-find"); if (bfd) { bfd.textContent = t("findBtn"); bfd.title = t("findTip"); }
   const fi = document.getElementById("find-input") as HTMLInputElement | null; if (fi) fi.placeholder = t("findPlaceholder");
@@ -3131,6 +3159,7 @@ function bindHistory(): void {
   });
 }
 async function printCurrentDoc(): Promise<void> {
+  if (!vditor || exporting) return; // 重入锁：所有入口（工具栏按钮/Ctrl+P）统一，避免打印预览叠加
   const frag = await exportFragment("html");
   if (!frag) return;
   cleanupPrintRoot();
@@ -3453,7 +3482,13 @@ function bindExportMenu(): void {
     else if (kind === "html-plain") exportHtml(false);
     else if (kind === "image") exportImagePng();
     else if (kind === "docx") exportDocx();
-    else if (kind === "print") printCurrentDoc();
+  });
+  // v0.3.21 打印独立成工具栏按钮（用户反馈：放"导出"菜单里语义怪——导出=生成文件，打印=送打印机）
+  document.getElementById("btn-print")!.addEventListener("click", () => {
+    // 与导出菜单项同款守卫：空文档先确认（防误打白纸），重入锁在 printCurrentDoc 内部 exporting
+    const curVal = vditor?.getValue()?.trim();
+    if (!curVal && !confirm(t("exportEmptyConfirm"))) return;
+    printCurrentDoc();
   });
   // 点外部收起（capture，与查找条同模式；排除导出按钮自身）；Esc 同关（浮层统一交互）
   document.addEventListener("pointerdown", (e) => {
