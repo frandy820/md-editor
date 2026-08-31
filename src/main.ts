@@ -783,7 +783,9 @@ function docUndo(): void {
   if (!doc || !vditor) return;
   const cur = mdValue();
   if (snapStepOpen) { window.clearTimeout(snapTimer); snapBase = cur; snapStepOpen = false; } // 封口当前步
-  if (doc.undoStack.length === 0) return;
+  // 弹掉与当前值相同的空步（打开/联动可能留下无差异快照——按钮亮但点了"无反应"的来源）
+  while (doc.undoStack.length > 0 && doc.undoStack[doc.undoStack.length - 1] === cur) doc.undoStack.pop();
+  if (doc.undoStack.length === 0) { syncUndoBtns(); return; }
   doc.redoStack.push(cur);
   restoreDocValue(doc, doc.undoStack.pop()!);
 }
@@ -792,6 +794,8 @@ function docRedo(): void {
   if (!doc || !vditor || doc.redoStack.length === 0) return;
   const cur = mdValue(); // 与 docUndo 对称：当前值回 undo 栈（snapBase 在未封步时≠当前值）
   if (snapStepOpen) { window.clearTimeout(snapTimer); snapStepOpen = false; }
+  while (doc.redoStack.length > 0 && doc.redoStack[doc.redoStack.length - 1] === cur) doc.redoStack.pop(); // 弹空步
+  if (doc.redoStack.length === 0) { syncUndoBtns(); return; }
   doc.undoStack.push(cur);
   restoreDocValue(doc, doc.redoStack.pop()!);
 }
@@ -1868,6 +1872,12 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
     after: () => {
       fixToolbarTooltipDirection();
       setupUndoToolbar(); // v0.3.21 撤销/重做按钮劫持（模式/语言切换重建 toolbar 后重绑）
+      // v0.3.21 根修「撤销亮但点了没反应/重做恒灰」：Vditor 内置 Undo.resetIcon 按**它自己的栈**
+      // enable/disable 按钮——它的 redo 栈恒空（undo 分支已禁用）→ 每次编辑后 disable redo、
+      // 打开文档后 enable undo，与自建栈按钮态打时序竞赛，抢设即症状（dist 14274 实锤）。
+      // 猴补实例方法为 no-op；构造期它设的初始灰态（栈空语义）恰好保留。
+      const vu = (vditor as unknown as { undo?: { resetIcon?: (v: unknown) => void } }).undo;
+      if (vu?.resetIcon) vu.resetIcon = () => {};
       // v0.3.21 启动焦点进编辑区（仅首次挂载）：默认大纲页时代启动后焦点停在 body，
       // "打开即打字"落空（CDP 诊断 activeElement=BODY 实锤；boot 末尾延时 focus 会因 pre
       // 未渲染落空，after 才是挂载完成保证）。模式/语言切换重建也进 after，flag 防重抢焦点。
