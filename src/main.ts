@@ -87,7 +87,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     sideOutline: "大纲", sideFiles: "文件",
     printBtn: "🖨 打印", printTip: "打印正文（Ctrl+P）：弹系统打印预览，可选打印机/份数/双面",
     outlineFilterPh: "过滤大纲…", filterFilesPh: "过滤树 / 全盘搜文件名…",
-    esSearching: "全盘搜索中…", esNone: "全盘无命中", esNoEngine: "未启用全盘搜索：将 es.exe 放到 md-editor.exe 同目录（需 Everything 运行中）", esFail: "全盘查询失败（Everything 未运行？）", esSplitTip: "拖动调整文件名列宽，双击复位",
+    esSearching: "全盘搜索中…", esNone: "全盘无命中", esIndexing: "正在建立全盘文件索引（已扫描 {n} 项）——数十秒后即可搜到部分结果，期间逐步补全", esFail: "全盘查询失败", esSplitTip: "拖动调整文件名列宽，双击复位",
     recentTitle: "最近", clearRecentTip: "清空最近文件列表", clearRecent: "🗑 清空",
     treePathPh: "路径，回车跳转", treeRefreshTip: "刷新目录",
     gsearchPh: "搜同级文件内容，回车执行（Ctrl+Shift+F）", gsearchNone: "（无匹配）",
@@ -136,7 +136,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     sideOutline: "大綱", sideFiles: "檔案",
     printBtn: "🖨 列印", printTip: "列印正文（Ctrl+P）：彈系統列印預覽，可選印表機/份數/雙面",
     outlineFilterPh: "過濾大綱…", filterFilesPh: "過濾樹 / 全碟搜檔名…",
-    esSearching: "全碟搜尋中…", esNone: "全碟無命中", esNoEngine: "未啟用全碟搜尋：將 es.exe 放到 md-editor.exe 同目錄（需 Everything 執行中）", esFail: "全碟查詢失敗（Everything 未執行？）", esSplitTip: "拖動調整文件名列寬，雙擊復位",
+    esSearching: "全碟搜尋中…", esNone: "全碟無命中", esIndexing: "正在建立全碟文件索引（已掃描 {n} 項）——數十秒後即可搜到部分結果，期間逐步補全", esFail: "全碟查詢失敗", esSplitTip: "拖動調整文件名列寬，雙擊復位",
     recentTitle: "最近", clearRecentTip: "清空最近檔案列表", clearRecent: "🗑 清空",
     treePathPh: "路徑，Enter 跳轉", treeRefreshTip: "重新整理目錄",
     gsearchPh: "搜同層檔案內容，Enter 執行（Ctrl+Shift+F）", gsearchNone: "（無符合）",
@@ -185,7 +185,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     sideOutline: "Outline", sideFiles: "Files",
     printBtn: "🖨 Print", printTip: "Print the document (Ctrl+P): system print preview — printer, copies, duplex",
     outlineFilterPh: "Filter outline…", filterFilesPh: "Filter tree / search all drives…",
-    esSearching: "Searching all drives…", esNone: "No matches on this computer", esNoEngine: "Drive-wide search disabled: put es.exe next to md-editor.exe (Everything must be running)", esFail: "Query failed (is Everything running?)", esSplitTip: "Drag to resize the name column, double-click to reset",
+    esSearching: "Searching all drives…", esNone: "No matches on this computer", esIndexing: "Building drive-wide file index ({n} items scanned) — partial results become searchable within a minute", esFail: "Query failed", esSplitTip: "Drag to resize the name column, double-click to reset",
     recentTitle: "Recent", clearRecentTip: "Clear recent files", clearRecent: "🗑 Clear",
     treePathPh: "Path, Enter to go", treeRefreshTip: "Refresh folder",
     gsearchPh: "Search sibling files here, Enter (Ctrl+Shift+F)", gsearchNone: "(no match)",
@@ -1247,7 +1247,11 @@ async function runEsSearch(q: string): Promise<void> {
   } catch (e) {
     if (tok !== esToken) return;
     const msg = String(e);
-    ul.innerHTML = `<li class="empty">${esc(msg === "ES_NOT_FOUND" ? t("esNoEngine") : t("esFail"))}</li>`;
+    // v0.3.22 自建索引：未就绪时 Rust 返回 INDEX_BUILDING:<已扫描数>（首次建索引 1-3 分钟）
+    const m = msg.match(/^INDEX_BUILDING:(\d+)$/);
+    ul.innerHTML = `<li class="empty">${esc(
+      m ? t("esIndexing").replace("{n}", Number(m[1]).toLocaleString())
+        : t("esFail"))}</li>`;
     return;
   }
   if (tok !== esToken) return; // 已发起更新的搜索，本次结果作废

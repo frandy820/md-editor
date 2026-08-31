@@ -961,93 +961,267 @@ fn reveal_path(path: String) {
     let _ = std::process::Command::new("explorer").arg(format!("/select,{path}")).spawn();
 }
 
-/// v0.3.18 Everything 全盘文件名搜索：调 es.exe（voidtools 官方 CLI，本地 IPC 查询
-/// 运行中的 Everything，毫秒级）。语法透传（空格=AND、ext:md、path:、通配符、regex:）。
-/// es.exe 输出为系统 ANSI 代码页（中文系统=GBK），用 MultiByteToWideChar 解码。
-/// 探测链（OnceLock 缓存）：本 exe 同目录 → PATH → Everything 标准安装目录。
+/// v0.3.22 自建全盘文件名索引（替代 v0.3.18 的 es.exe 外部依赖——单 exe 零依赖定调）。
+/// es.exe 路线废弃原因：它是 voidtools 闭源 CLI 且只做 IPC 查询，真正引擎是 Everything
+/// 常驻服务（MFT 直读+USN 监听），"拆代码合入"不可行（无源码、许可不允许、没服务即空壳）。
+/// 本方案：多线程遍历固定盘（每盘一线程）建内存索引（完整路径+文件名小写副本），
+/// 缓存 %APPDATA%\md-editor\file-index.txt——启动后台秒载缓存即就绪，30s 后低优先级重建
+/// 保持新鲜；无缓存则启动即构建（首次 1-3 分钟，进度实时）。搜索=多词 AND 包含匹配
+/// 文件名（es.exe 同语义），内存过滤毫秒级。无管理员权限、无第三方依赖。
+struct IndexEntry {
+    path: String,    // 完整路径（展示/定位用）
+    name_at: usize,  // file_name 在 path 中的起始偏移（省一份 String：本机实测全量 295 万项双字符串内存 500MB+）
+    is_dir: bool,
+}
+/// 索引收录的扩展名白名单（目录全部收录）。全盘动辄数百万文件——node_modules/target/
+/// 系统 DLL 无人搜，全量收录内存和缓存都不可承受（本机实测 385MB 缓存）。
+/// 收录口径=用户会搜的：文档/代码/媒体/压缩包/安装包/字体。
+const INDEX_EXTS: &[&str] = &[
+    // 文档
+    "md", "markdown", "mdown", "txt", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+    "pdf", "epub", "mobi", "csv", "tsv", "json", "xml", "yaml", "yml", "ini", "cfg",
+    "conf", "log", "rtf", "odt", "ots",
+    // 代码
+    "js", "jsx", "ts", "tsx", "py", "rs", "go", "java", "c", "h", "cpp", "hpp",
+    "cs", "php", "rb", "sh", "bat", "ps1", "html", "htm", "css", "scss", "vue", "sql", "ipynb",
+    // 媒体
+    "png", "jpg", "jpeg", "gif", "bmp", "webp", "svg", "ico", "tif", "tiff",
+    "mp3", "wav", "flac", "aac", "ogg", "m4a",
+    "mp4", "mkv", "avi", "mov", "wmv", "flv", "webm",
+    // 压缩/安装/字体
+    "zip", "rar", "7z", "tar", "gz", "bz2", "xz", "iso", "exe", "msi",
+    "ttf", "otf", "woff", "woff2",
+];
+/// ASCII 忽略大小写包含匹配（非 ASCII 字节原样比：UTF-8 中文无大小写，语义正确）
+fn ascii_ci_contains(hay: &str, needle: &str) -> bool {
+    let h = hay.as_bytes(); let n = needle.as_bytes();
+    if n.is_empty() || h.len() < n.len() { return n.is_empty(); }
+    'outer: for i in 0..=h.len() - n.len() {
+        for j in 0..n.len() {
+            let a = h[i + j].to_ascii_lowercase();
+            let b = if n[j].is_ascii() { n[j].to_ascii_lowercase() } else { n[j] };
+            if a != b { continue 'outer; }
+        }
+        return true;
+    }
+    false
+}
+static INDEX: std::sync::RwLock<Vec<IndexEntry>> = std::sync::RwLock::new(Vec::new());
+static INDEX_BUILDING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static INDEX_SCANNED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+/// walk 线程→合并线程的批量缓冲（512 条一批入锁，压锁频次）
+static INDEX_BUF: std::sync::Mutex<Vec<IndexEntry>> = std::sync::Mutex::new(Vec::new());
+/// 存活 walk 线程计数（合并线程判收尾）
+static WALK_ALIVE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// 把当前线程降到最低调度优先级（索引重建用）：HDD 全盘遍历重 IO，
+/// 正常优先级会拖慢 UI 响应（实测表格浮动面板弹出超时）——后台任务须让路。
+fn lower_thread_priority() {
+    #[cfg(windows)]
+    unsafe {
+        #[link(name = "kernel32")]
+        extern "system" {
+            fn SetThreadPriority(thread: isize, priority: i32) -> i32;
+        }
+        // GetCurrentThread() 伪句柄 = -1；THREAD_PRIORITY_LOWEST = -2
+        SetThreadPriority(-1, -2);
+    }
+}
+
+fn index_cache_path() -> PathBuf {
+    let base = std::env::var("APPDATA").unwrap_or_else(|_| ".".into());
+    PathBuf::from(base).join("md-editor").join("file-index.txt")
+}
+
+/// 固定盘根列表（遍历目标）：C..Z 探测可读根，排除光驱/可移动盘（读光驱会卡转盘）。
+fn fixed_drive_roots() -> Vec<PathBuf> {
+    (b'C'..=b'Z')
+        .map(|c| PathBuf::from(format!("{}:\\", c as char)))
+        .filter(|p| std::fs::metadata(p).is_ok())
+        .collect()
+}
+
+/// 递归遍历一目录树（无权限静默跳过；symlink/junction 不跟随防环）。
+/// 命中项攒本地批量，512 条推一次共享缓冲（锁频次降 512 倍）。
+fn walk_into(dir: &PathBuf, batch: &mut Vec<IndexEntry>) {
+    let rd = match std::fs::read_dir(dir) {
+        Ok(r) => r,
+        Err(_) => return, // 无权限/被占用：跳过整棵
+    };
+    for e in rd.flatten() {
+        let Ok(ft) = e.file_type() else { continue };
+        if ft.is_symlink() {
+            continue; // junction/symlink：不跟随（All Users→ProgramData 类环会死循环）
+        }
+        let is_dir = ft.is_dir();
+        let p = e.path();
+        // 白名单过滤（目录全收；文件按扩展名）——全量收录内存/缓存不可承受（295 万项实锤）
+        let take = if is_dir { true } else {
+            p.extension().and_then(|x| x.to_str())
+                .map(|x| INDEX_EXTS.iter().any(|w| w.eq_ignore_ascii_case(x)))
+                .unwrap_or(false)
+        };
+        if take {
+            let s = p.to_string_lossy().to_string();
+            let name_at = s.rfind(['\\', '/']).map(|i| i + 1).unwrap_or(0);
+            batch.push(IndexEntry { path: s, name_at, is_dir });
+        }
+        INDEX_SCANNED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        if is_dir {
+            walk_into(&p, batch);
+        }
+        if batch.len() >= 512 {
+            if let Ok(mut buf) = INDEX_BUF.lock() {
+                buf.append(batch);
+            }
+        }
+    }
+}
+
+/// 索引构建主流程（后台线程）：每盘一线程并行遍历（写共享缓冲），合并线程每 3s
+/// 把缓冲搬进 INDEX——搜索端即刻可查已扫描部分（v0.3.22 边建边搜：本机实测全盘
+/// 295 万项 HDD 上 8 分钟扫不完，「建完才能搜」会把用户晾数分钟，不可接受）。
+/// 完成后 shrink+原子写缓存。INDEX_BUILDING 期间 es_search 返回部分命中。
+fn build_index() {
+    if INDEX_BUILDING.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        return; // 已在构建，防重入
+    }
+    INDEX_SCANNED.store(0, std::sync::atomic::Ordering::Relaxed);
+    INDEX.write().unwrap().clear(); // 重建从零开始（防新旧混叠）
+    let roots = fixed_drive_roots();
+    WALK_ALIVE.store(roots.len(), std::sync::atomic::Ordering::Relaxed);
+    for root in roots {
+        std::thread::spawn(move || {
+            lower_thread_priority(); // 重建=后台低优先级：不与用户编辑/点击抢 CPU 调度
+            let mut batch: Vec<IndexEntry> = vec![];
+            walk_into(&root, &mut batch);
+            if !batch.is_empty() {
+                if let Ok(mut buf) = INDEX_BUF.lock() {
+                    buf.append(&mut batch);
+                }
+            }
+            WALK_ALIVE.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+        });
+    }
+    // 合并+缓存写出线程：3s 周期搬缓冲→INDEX；walk 全部结束后收尾搬+shrink+写缓存
+    std::thread::spawn(|| {
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(3));
+            let drained: Vec<IndexEntry> = {
+                let mut buf = INDEX_BUF.lock().unwrap();
+                std::mem::take(&mut *buf)
+            };
+            if !drained.is_empty() {
+                INDEX.write().unwrap().extend(drained);
+            }
+            if WALK_ALIVE.load(std::sync::atomic::Ordering::Relaxed) == 0 {
+                let drained: Vec<IndexEntry> = {
+                    let mut buf = INDEX_BUF.lock().unwrap();
+                    std::mem::take(&mut *buf)
+                };
+                if !drained.is_empty() {
+                    INDEX.write().unwrap().extend(drained);
+                }
+                INDEX.write().unwrap().shrink_to_fit();
+                // 缓存原子写（tmp+rename）：行格式 "D\t路径"/"F\t路径"
+                let n = INDEX.read().unwrap().len();
+                let cache = index_cache_path();
+                if let Some(d) = cache.parent() {
+                    let _ = std::fs::create_dir_all(d);
+                }
+                let tmp = cache.with_extension("txt.tmp");
+                let mut buf = String::with_capacity(n * 64);
+                {
+                    let idx = INDEX.read().unwrap();
+                    for e in idx.iter() {
+                        buf.push(if e.is_dir { 'D' } else { 'F' });
+                        buf.push('\t');
+                        buf.push_str(&e.path);
+                        buf.push('\n');
+                    }
+                }
+                if std::fs::write(&tmp, buf.as_bytes()).is_ok() {
+                    let _ = std::fs::rename(&tmp, &cache);
+                }
+                INDEX_BUILDING.store(false, std::sync::atomic::Ordering::SeqCst);
+                return;
+            }
+        }
+    });
+}
+
+/// 启动索引管线（setup 调一次）：有缓存→后台载入即就绪，载入后 30s 重建刷新；
+/// 无缓存→立即构建（边建边搜）。缓存损坏按无缓存处理。
+fn start_index_pipeline() {
+    std::thread::spawn(|| {
+        let cache = index_cache_path();
+        let loaded = std::fs::read_to_string(&cache)
+            .ok()
+            .filter(|s| s.len() > 4)
+            .map(|text| {
+                let mut v: Vec<IndexEntry> = vec![];
+                for line in text.lines() {
+                    let mut it = line.splitn(2, '\t');
+                    let (flag, path) = match (it.next(), it.next()) {
+                        (Some(f), Some(p)) => (f, p),
+                        _ => continue,
+                    };
+                    let is_dir = flag == "D";
+                    let s = path.to_string();
+                    let name_at = s.rfind(['\\', '/']).map(|i| i + 1).unwrap_or(0);
+                    v.push(IndexEntry { path: s, name_at, is_dir });
+                }
+                v
+            })
+            .filter(|v| !v.is_empty());
+        if let Some(v) = loaded {
+            INDEX_SCANNED.store(v.len(), std::sync::atomic::Ordering::Relaxed);
+            *INDEX.write().unwrap() = v;
+            // 缓存只是"先能用"：延迟 10 分钟再重建（错开用户"打开就搜/就编辑"高峰；
+            // 30s 就重建曾实锤拖慢表格面板弹出——HDD 全盘遍历重 IO，走最低线程优先级）
+            std::thread::sleep(std::time::Duration::from_secs(600));
+        }
+        build_index();
+    });
+}
+
+/// 全盘文件名搜索（v0.3.22 自建索引，边建边搜）：完全无数据（构建刚开始）才报
+/// INDEX_BUILDING:<已扫描数>；有数据=Ok(命中)——构建中命中的是已扫描部分。
 #[tauri::command]
 fn es_search(query: String, limit: u32) -> Result<Vec<EsHit>, String> {
-    let q = query.trim().to_string();
+    let q = query.trim().to_lowercase();
     if q.is_empty() {
         return Ok(vec![]);
     }
-    let es = find_es_exe().ok_or("ES_NOT_FOUND")?;
-    use std::os::windows::process::CommandExt;
-    use std::process::Stdio;
-    // -timeout 3000：Everything 数据库冷加载时 es 最多等 3s；-s 按完整路径排序（结果稳定）
-    // 关键：搜索词按空白拆成多参数传——es.exe 对单参数内部的空格不做语法拆分
-    //（"md-editor ext:md" 整串=字面子串匹配，0 命中；拆开传=语法生效）
-    let terms: Vec<String> = q.split_whitespace().map(str::to_string).collect();
-    let out = Command::new(&es)
-        .args(["-n", &limit.clamp(1, 500).to_string(), "-s", "-timeout", "3000"])
-        .args(&terms)
-        .creation_flags(0x0800_0000) // CREATE_NO_WINDOW：防 console 闪窗
-        .stdin(Stdio::null())
-        .stderr(Stdio::null())
-        .output()
-        .map_err(|e| format!("spawn es.exe: {e}"))?;
-    if !out.status.success() {
-        // Everything 未运行等：es 非零退出，统一给前端一个可识别语义
-        return Err("ES_QUERY_FAILED".into());
+    let building = INDEX_BUILDING.load(std::sync::atomic::Ordering::Relaxed);
+    let idx = INDEX.read().unwrap();
+    if idx.is_empty() && building {
+        return Err(format!(
+            "INDEX_BUILDING:{}",
+            INDEX_SCANNED.load(std::sync::atomic::Ordering::Relaxed)
+        ));
     }
-    // es.exe 输出不带文件/目录标记：逐条 metadata 判（NTFS 上 50 次 stat 毫秒级）
-    Ok(ansi_to_lines(&out.stdout)
-        .into_iter()
-        .map(|path| EsHit { is_dir: std::path::Path::new(&path).is_dir(), path })
-        .collect())
+    // 空格拆词 AND 匹配文件名（ASCII 忽略大小写）；路径短的相关度高更靠前
+    let terms: Vec<String> = q.split_whitespace().map(str::to_string).collect();
+    let mut hits: Vec<EsHit> = idx
+        .iter()
+        .filter(|e| {
+            let name = &e.path[e.name_at.min(e.path.len())..];
+            terms.iter().all(|t| ascii_ci_contains(name, t))
+        })
+        .take(limit.clamp(1, 2000) as usize)
+        .map(|e| EsHit { path: e.path.clone(), is_dir: e.is_dir })
+        .collect();
+    drop(idx);
+    hits.sort_by_key(|h| h.path.len());
+    Ok(hits)
 }
 
-/// Everything 命中项（path=完整路径；is_dir=是否目录，前端点击分流用）
+/// 命中项（path=完整路径；is_dir=是否目录，前端点击分流用）——字段与 es.exe 时代一致
 #[derive(serde::Serialize, Debug)]
 struct EsHit {
     path: String,
     is_dir: bool,
-}
-
-/// es.exe 路径探测（进程生命周期内缓存一次）
-fn find_es_exe() -> Option<&'static PathBuf> {
-    static ES: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
-    ES.get_or_init(|| {
-        let mut cands: Vec<PathBuf> = vec![];
-        if let Ok(exe) = std::env::current_exe() {
-            if let Some(d) = exe.parent() {
-                cands.push(d.join("es.exe"));
-            }
-        }
-        if let Some(p) = std::env::var_os("PATH") {
-            cands.extend(std::env::split_paths(&p).map(|d| d.join("es.exe")));
-        }
-        for b in [r"C:\Program Files\Everything", r"C:\Program Files (x86)\Everything"] {
-            cands.push(PathBuf::from(b).join("es.exe"));
-        }
-        cands.into_iter().find(|p| p.is_file())
-    })
-    .as_ref()
-}
-
-/// ANSI(GBK) 字节 → 按行拆的 String 列表（es.exe stdout 解码；解码失败回落 lossy）
-fn ansi_to_lines(bytes: &[u8]) -> Vec<String> {
-    let text = {
-        #[cfg(windows)]
-        unsafe {
-            use windows::Win32::Globalization::MultiByteToWideChar;
-            // None=只询所需 wchar 数；再取缓冲转换（windows 0.61 切片化签名）
-            let n = MultiByteToWideChar(936, Default::default(), bytes, None);
-            if n > 0 {
-                let mut w = vec![0u16; n as usize];
-                MultiByteToWideChar(936, Default::default(), bytes, Some(&mut w));
-                String::from_utf16_lossy(&w)
-            } else {
-                String::from_utf8_lossy(bytes).into_owned()
-            }
-        }
-        #[cfg(not(windows))]
-        String::from_utf8_lossy(bytes).into_owned()
-    };
-    text.lines()
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .collect()
 }
 
 /// 写导出用文本文件（HTML 等）。与 save_file 分离：导出产物不受 md/txt 白名单限制，
@@ -1215,6 +1389,11 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(StartupFile(Mutex::new(startup)))
+        .setup(|_app| {
+            // v0.3.22 自建全盘索引管线：缓存秒载→延迟重建/无缓存即建（后台线程不阻塞 UI）
+            start_index_pipeline();
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             open_file,
             save_file,
@@ -1255,23 +1434,49 @@ mod tests {
     use std::fs;
 
     #[test]
-    fn ansi_to_lines_decodes_gbk() {
-        // "报告 md-editor" 的 GBK 字节（b1a8b8e6 20 6d642d656469746f72）
-        let gbk: Vec<u8> = vec![0xb1, 0xa8, 0xb8, 0xe6, 0x20, 0x6d, 0x64, 0x2d, 0x65, 0x64, 0x69, 0x74, 0x6f, 0x72, 0x0d, 0x0a];
-        assert_eq!(ansi_to_lines(&gbk), vec!["报告 md-editor".to_string()]);
+    fn es_search_selfindex_queries() {
+        // v0.3.22 自建索引查询逻辑（注入小索引，不触发全盘构建）：
+        // 多词 AND、大小写不敏感（ascii_ci_contains）、目录命中、limit 截断、未就绪语义
+        fn entry(path: &str, is_dir: bool) -> IndexEntry {
+            let name_at = path.rfind(['\\', '/']).map(|i| i + 1).unwrap_or(0);
+            IndexEntry { path: path.into(), name_at, is_dir }
+        }
+        *INDEX.write().unwrap() = vec![
+            entry(r"C:\docs\年度报告.md", false),
+            entry(r"C:\docs\Report-2026.md", false),
+            entry(r"C:\docs\报告资料", true),
+            entry(r"D:\notes\todo.txt", false),
+        ];
+        INDEX_BUILDING.store(false, std::sync::atomic::Ordering::Relaxed);
+        // 单词命中（大小写不敏感：REPORT 命中 Report-2026）
+        let hits = es_search("report".into(), 10).unwrap();
+        assert!(hits.iter().any(|h| h.path.ends_with("Report-2026.md")), "{hits:?}");
+        // 多词 AND：报告+md 只命中「年度报告.md」（目录"报告资料"无 md 词、Report-2026 无中文词）
+        let hits = es_search("报告 md".into(), 10).unwrap();
+        assert_eq!(hits.len(), 1, "{hits:?}");
+        assert!(hits[0].path.ends_with("年度报告.md"));
+        // limit 截断
+        let hits = es_search("md".into(), 1).unwrap();
+        assert_eq!(hits.len(), 1);
+        // 空查询
+        assert!(es_search("  ".into(), 10).unwrap().is_empty());
+        // 清空索引+构建中 → 未就绪语义
+        INDEX.write().unwrap().clear();
+        INDEX_BUILDING.store(true, std::sync::atomic::Ordering::Relaxed);
+        INDEX_SCANNED.store(42, std::sync::atomic::Ordering::Relaxed);
+        let err = es_search("x".into(), 10).unwrap_err();
+        assert_eq!(err, "INDEX_BUILDING:42");
     }
     #[test]
-    fn es_search_integration_or_skip() {
-        // 本机集成：es.exe+Everything 在则应命中 .md；es.exe 缺失的机器跳过（不算失败）
-        match es_search("md-editor ext:md".into(), 20) {
-            Ok(list) => assert!(
-                list.iter().any(|h| h.path.to_lowercase().ends_with(".md")),
-                "es 命中应含 .md 文件，实际: {list:?}"
-            ),
-            Err(e) if e == "ES_NOT_FOUND" => eprintln!("skip: 本机无 es.exe"),
-            Err(e) => panic!("es_search 错误: {e}"),
-        }
+    fn ascii_ci_contains_cases() {
+        assert!(ascii_ci_contains("Report-2026.md", "report"));
+        assert!(ascii_ci_contains("年度报告.md", "报告"));
+        assert!(ascii_ci_contains("年度报告.md", "MD"));
+        assert!(!ascii_ci_contains("Report-2026.md", "reportx"));
+        assert!(!ascii_ci_contains("报告.md", "汇报"));
+        assert!(ascii_ci_contains("a", ""));
     }
+
     #[test]
     fn ext_whitelist_normal() {
         for e in ["a.md", "a.markdown", "a.mdown", "a.txt"] {
