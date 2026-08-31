@@ -741,6 +741,32 @@ function snapOnInput(doc: Doc, cur: string): void {
 // 测试钩子：只读暴露 docs 内部态（dirty/base/栈深），供 e2e 诊断保存时序类问题
 Object.defineProperty(window, "__mdDocs", { get: () => docs });
 (window as any).__mdRedo = () => docRedo();
+// v0.3.21 删除动作分步+记步兜底（用户实测"删三行，一次 Ctrl+Z 恢复两行"根因）：
+// Vditor 对 Backspace/Delete 走自有 DOM 删除路径，不触发原生 input 事件——逐字符阈值收不到
+// 信号，且该路径连 options.input 兜底都常常不发，删除内容完全不进撤销栈（Ctrl+Z 跳步）。
+// ①按下时：距上次删除键 >400ms 且有开步 → 立即封口前段（每次删除动作=新步；连按并步）
+// ②抬起后 80ms：值变了但没有任何信号开过步 → 主动 snapOnInput 记步（兜住纯 DOM 删除）
+let lastDelKeyAt = 0;
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Backspace" && e.key !== "Delete") return;
+  if (e.isComposing) return; // 组合中的退格=删拼音串，交给输入法
+  const now = Date.now();
+  if (now - lastDelKeyAt > 400 && snapStepOpen) {
+    window.clearTimeout(snapTimer);
+    snapBase = mdValue(); snapStepOpen = false; // 封口：删除动作之前的内容单独成步
+  }
+  lastDelKeyAt = now;
+}, true);
+document.addEventListener("keyup", (e) => {
+  if (e.key !== "Backspace" && e.key !== "Delete") return;
+  window.setTimeout(() => {
+    if (suppressInput || !vditor) return;
+    const doc = activeDoc();
+    if (!doc || snapStepOpen) return; // 已有 input 信号开步则不重复
+    const v = mdValue();
+    if (v !== doc.content) snapOnInput(doc, v); // 无信号到达的 DOM 删除：这里补记
+  }, 80);
+}, true);
 // v0.3.21 Word 式分步信号源：原生 input 逐字符可达。Vditor 的 options.input 挂在其内部
 // afterRender 定时器上且 composingLock 过滤，连打整段常合并成一次触发——字符阈值分步
 // 在那里收不到逐字符信号（实测 10 字连打 delay40ms：原生 input×10 vs 栈深 1 不切步）。
@@ -778,6 +804,10 @@ function syncUndoBtns(): void { // 栈空灰显（Word 式）
   document.querySelectorAll<HTMLButtonElement>('.vditor-toolbar [data-type="undo"]').forEach((u) => { u.disabled = !d || d.undoStack.length === 0; });
   document.querySelectorAll<HTMLButtonElement>('.vditor-toolbar [data-type="redo"]').forEach((r) => { r.disabled = !d || d.redoStack.length === 0; });
 }
+function syncUndoBtnsSoon(): void { // 异步竞争兜底：撤销/重做后 300ms 复刷一次（Vditor 内部
+  // 异步尾巴若再碰按钮态，这里拉回真值；one-shot 非常驻）
+  window.setTimeout(syncUndoBtns, 300);
+}
 function docUndo(): void {
   const doc = activeDoc();
   if (!doc || !vditor) return;
@@ -788,6 +818,7 @@ function docUndo(): void {
   if (doc.undoStack.length === 0) { syncUndoBtns(); return; }
   doc.redoStack.push(cur);
   restoreDocValue(doc, doc.undoStack.pop()!);
+  syncUndoBtnsSoon();
 }
 function docRedo(): void {
   const doc = activeDoc();
@@ -798,6 +829,7 @@ function docRedo(): void {
   if (doc.redoStack.length === 0) { syncUndoBtns(); return; }
   doc.undoStack.push(cur);
   restoreDocValue(doc, doc.redoStack.pop()!);
+  syncUndoBtnsSoon();
 }
 function restoreDocValue(doc: Doc, v: string): void {
   doc.content = v;
