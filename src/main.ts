@@ -2780,9 +2780,17 @@ html, body {
 }
 .vditor-reset { max-width: none; margin: 0; padding: 0; }
 pre { white-space: pre-wrap; word-break: break-word; }
-pre, table, tr, blockquote, img { break-inside: avoid; }
+/* v0.3.24：table 从 avoid 名单移除——表格能换行后整表变高，avoid 会把整表推到下页
+ * （首页标题下大片空白）；tr 保持不拆 + Chrome 断页时自动重复 thead */
+pre, tr, blockquote, img { break-inside: avoid; }
 img { max-width: 100%; }
-table { border-collapse: collapse; }
+/* v0.3.24 宽表修复：此前只有 border-collapse，多列长文本表被内容撑出 A4 页面（右侧截断）。
+ * 特异性两次踩坑实录：①裸 table/td (0,0,1) 输给 Vditor (0,1,1)/(0,1,2)；②.vditor-reset td
+ * (0,1,1) 仍输——Vditor 单元格规则实为 .vditor-reset table td (0,1,2)（nowrap 移动端滚动表
+ * 设计）。必须逐字同形 (0,1,2)+本块位于 vditorCssText 之后才生效。fixed 布局以首行单元格宽
+ * 为列宽基准（applyTableColWeights 按内容权重预设百分比），超出列宽的内容强制换行 */
+.vditor-reset table { border-collapse: collapse; width: 100%; table-layout: fixed; display: table; overflow: visible; }
+.vditor-reset table th, .vditor-reset table td { overflow-wrap: anywhere; word-break: break-word; white-space: normal; }
 </style>
 </head>
 <body class="vditor-reset"><div class="vditor-reset">${fragmentHtml}</div></body>
@@ -2898,6 +2906,24 @@ function applyTableWidths(): void {
   });
 }
 /** 导出用：把编辑器当前的列宽写进导出 fragment 的 table（HTML/PDF/PNG 同步所见） */
+/** v0.3.24 导出表格按内容权重分配列宽：table-layout:fixed 下浏览器以首行单元格宽为
+ * 列宽基准——给每表首行设百分比，替代均分（# 列不再与长文本列同宽，长文本列自动换行）。
+ * 与 applyExportWidths 协作：本函数先跑设百分比兜底，用户编辑器内拖定的 px 宽后跑覆盖。 */
+function applyTableColWeights(fragment: HTMLElement): void {
+  fragment.querySelectorAll<HTMLTableElement>("table").forEach((tb) => {
+    const first = tb.rows[0];
+    if (!first) return;
+    const cells = [...first.cells];
+    const n = cells.length;
+    if (n < 2) return;
+    const weights = new Array(n).fill(1);
+    for (const tr of tb.rows) {
+      [...tr.cells].forEach((c, i) => { if (i < n) weights[i] = Math.max(weights[i], visualLen(c.textContent || ""), 1); });
+    }
+    const pct = allocColWidths(weights, 1000).map((x) => (x / 10).toFixed(1) + "%");
+    cells.forEach((c, i) => { (c as HTMLElement).style.width = pct[i]; });
+  });
+}
 function applyExportWidths(fragment: HTMLElement): void {
   const saved = colwAll()[docKeyOf()] || {};
   fragment.querySelectorAll<HTMLTableElement>("table").forEach((tb) => {
@@ -2909,12 +2935,29 @@ function applyExportWidths(fragment: HTMLElement): void {
     [...first.cells].forEach((c, i) => { if (w[i] > 0) (c as HTMLElement).style.width = w[i] + "px"; });
   });
 }
+/** v0.3.24 mermaid 图随显示比例缩放：mermaid 输出的 SVG 是 width=100% + 内联
+ * max-width:Npx，而显示比例=#editor .vditor-content 的 CSS zoom——zoom 放大内容但不放宽
+ * 容器（物理宽受窗口约束），width:100% 的 SVG 视觉宽恒等于容器宽，放大对图无效（无头
+ * Chrome 实测复现）。改为显式自然宽 px（zoom 下按倍数放大 ✓，同样实测验证），外层容器
+ * 横向滚动兜底。幂等：处理后 max-width 变 none，px 正则不再命中。 */
+function fitMermaidSvgs(): void {
+  document.querySelectorAll<SVGSVGElement>(".vditor-reset svg").forEach((svg) => {
+    const m = /max-width:\s*([\d.]+)px/.exec(svg.getAttribute("style") || "");
+    if (!m) return;
+    svg.style.width = m[1] + "px";
+    svg.style.maxWidth = "none";
+    const holder = svg.parentElement;
+    if (holder) holder.style.overflowX = "auto"; // 超容器宽时滚动而非撑破布局
+  });
+}
+
 function rebindTableResize(): void {
   tblWidthObserver?.disconnect();
   const root = document.querySelector(".vditor-wysiwyg pre.vditor-reset") as HTMLElement | null;
   if (!root) return;
   applyTableWidths();
-  tblWidthObserver = new MutationObserver(() => applyTableWidths());
+  fitMermaidSvgs();
+  tblWidthObserver = new MutationObserver(() => { applyTableWidths(); fitMermaidSvgs(); });
   tblWidthObserver.observe(root, { childList: true, subtree: true });
 
   // 近缘光标（mousemove 节流切换，不加 DOM 手柄——零注入零序列化风险）
@@ -3043,6 +3086,45 @@ function loadLocalScript(src: string): Promise<void> {
  * mathOutput: "html"=HTML+MathML 双输出（带样式档/PDF/PNG，katex css 已入导出模板）；
  *             "mathml"=纯 MathML（纯净档无 CSS，浏览器原生渲染零依赖）。
  * 任一环节失败降级保源文本，不阻断导出。 */
+/** v0.3.24 mermaid 渲染器最小形态（两条导出管线共用） */
+type MmRenderer = { initialize: (o: object) => void; render: (id: string, code: string) => Promise<{ svg: string }> };
+/** mermaid SVG 字符串 → 自然像素尺寸（viewBox 优先，width/height 兜底） */
+function mmSvgSize(svg: string): { w: number; h: number } {
+  try {
+    const el = new DOMParser().parseFromString(svg, "image/svg+xml").documentElement;
+    const vb = (el.getAttribute("viewBox") || "").trim().split(/[\s,]+/).map(Number);
+    const w = vb.length === 4 && vb[2] > 0 ? vb[2] : parseFloat(el.getAttribute("width") || "") || 0;
+    const h = vb.length === 4 && vb[3] > 0 ? vb[3] : parseFloat(el.getAttribute("height") || "") || 0;
+    return { w, h };
+  } catch { return { w: 0, h: 0 }; }
+}
+/** v0.3.24 第四轮：超宽 mermaid 导出自动转竖排。
+ * LR/RL 全景图（样本 3596px 宽）压进 A4 内容区只剩 ~15% 缩放，图在但文字不可读=没修。
+ * 这里在导出副本上把方向声明 LR/RL→TB 重渲染（不动用户源文件），两版里选放进 A4
+ * 内容区（550×933px@96dpi，与 DOCX MAXW 同基准）后缩放比例更高的那个；TB 只在明显
+ * 更优（>1.15×）时才采用，防止微幅抖动导致布局来回切。任一环节失败保原方向。 */
+const MM_DIR_RE = /^(\s*(?:flowchart|graph)\s+)(LR|RL)(?=\s)/m;
+const MM_FIT_W = 550, MM_FIT_H = 933;
+async function pickExportMermaidSvg(mermaid: MmRenderer, code: string, idBase: string): Promise<string | null> {
+  let best: { svg: string; scale: number } | null = null;
+  try {
+    const { svg } = await mermaid.render(idBase + "-a", code);
+    const { w, h } = mmSvgSize(svg);
+    if (w && h) best = { svg, scale: Math.min(MM_FIT_W / w, MM_FIT_H / h) };
+  } catch { return null; }
+  if (best && MM_DIR_RE.test(code)) {
+    try {
+      const { svg } = await mermaid.render(idBase + "-b", code.replace(MM_DIR_RE, "$1TB "));
+      const { w, h } = mmSvgSize(svg);
+      if (w && h) {
+        const scale = Math.min(MM_FIT_W / w, MM_FIT_H / h);
+        if (best && scale > best.scale * 1.15) best = { svg, scale };
+      }
+    } catch { /* TB 重渲染失败保原方向 */ }
+  }
+  return best ? best.svg : null;
+}
+
 async function renderSpecialBlocks(root: HTMLElement, mathOutput: "html" | "mathml"): Promise<void> {
   const maths = [...root.querySelectorAll<HTMLElement>(".language-math")];
   if (maths.length) {
@@ -3067,16 +3149,65 @@ async function renderSpecialBlocks(root: HTMLElement, mathOutput: "html" | "math
       await loadLocalScript("/vditor-assets/dist/js/mermaid/mermaid.min.js");
       const mermaid = (window as unknown as { mermaid?: { initialize: (o: object) => void; render: (id: string, code: string) => Promise<{ svg: string }> } }).mermaid;
       if (mermaid) {
-        mermaid.initialize({ startOnLoad: false, securityLevel: "loose" });
+        // v0.3.24 htmlLabels:false 与 DOCX 嵌图路径（renderMermaidPng）统一初始化——
+        // mermaid.initialize 是全局合并配置，两路形态不一致会互相覆盖；纯 <text> 标签
+        // 也让 SVG 经 <img> 光栅化可成像（foreignObject 限制，见 renderMermaidPng 注释）
+        mermaid.initialize({ startOnLoad: false, securityLevel: "loose", htmlLabels: false, flowchart: { htmlLabels: false } });
         for (let i = 0; i < mms.length; i++) {
           const code = (mms[i].textContent || "").trim();
           if (!code) continue;
-          try { const { svg } = await mermaid.render("export-mm-" + Date.now() + "-" + i, code); mms[i].innerHTML = svg; }
+          // 超宽 LR/RL 图转 TB 竖排（HTML/PDF 管线，pickExportMermaidSvg 注释）
+          try { const svg = await pickExportMermaidSvg(mermaid as MmRenderer, code, "export-mm-" + Date.now() + "-" + i); if (svg) mms[i].innerHTML = svg; }
           catch { /* 单图渲染错保源码 */ }
         }
       }
     } catch { /* 同上 */ }
   }
+}
+
+/** v0.3.24 mermaid 源码 → PNG（字节 + viewBox 原始尺寸），导出 DOCX 嵌图用。
+ * 路线：mermaid.render 出 SVG → DOMParser 副本上设显式像素宽高 → <img> 载入 →
+ * canvas 2x 白底光栅化（Word 里放大查看不糊；透明底在 Word 深色模式会糊成黑块）。
+ * 关键：initialize 必须关 htmlLabels——SVG 内的 foreignObject 经 <img> 光栅化时
+ * Chromium 不渲染（安全限制），纯 <text> 才能成像。
+ * 任一环节失败返回 null，调用方降级保源码文本。 */
+async function renderMermaidPng(code: string, seq: number): Promise<{ data: Uint8Array; w: number; h: number } | null> {
+  try {
+    await loadLocalScript("/vditor-assets/dist/js/mermaid/mermaid.min.js");
+    const mermaid = (window as unknown as { mermaid?: { initialize: (o: object) => void; render: (id: string, code: string) => Promise<{ svg: string }> } }).mermaid;
+    if (!mermaid) return null;
+    mermaid.initialize({ startOnLoad: false, securityLevel: "loose", htmlLabels: false, flowchart: { htmlLabels: false } });
+    // 超宽 LR/RL 图先经 pickExportMermaidSvg 选型（可能已在 TB 副本上重渲染）
+    const svgPicked = await pickExportMermaidSvg(mermaid as MmRenderer, code, "docx-mm-" + seq);
+    if (!svgPicked) return null;
+    const docXml = new DOMParser().parseFromString(svgPicked, "image/svg+xml");
+    const svgEl = docXml.documentElement;
+    // 自然尺寸以 viewBox 为准（mermaid 必带）；width/style 只作 fallback
+    const vb = (svgEl.getAttribute("viewBox") || "").trim().split(/[\s,]+/).map(Number);
+    let w = vb.length === 4 && vb[2] > 0 ? vb[2] : parseFloat(svgEl.getAttribute("width") || "") || 0;
+    let h = vb.length === 4 && vb[3] > 0 ? vb[3] : parseFloat(svgEl.getAttribute("height") || "") || 0;
+    if (!w || !h) return null;
+    const RASTER = 2;
+    const cw = Math.min(6000, Math.ceil(w * RASTER)), ch = Math.min(6000, Math.ceil(h * RASTER));
+    svgEl.setAttribute("width", String(cw));
+    svgEl.setAttribute("height", String(ch));
+    svgEl.removeAttribute("style"); // 去 max-width:100% 限制，显式像素宽生效
+    const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svgEl)], { type: "image/svg+xml;charset=utf-8" }));
+    try {
+      const img = new Image();
+      await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = () => rej(new Error("svg load")); img.src = url; });
+      const canvas = document.createElement("canvas");
+      canvas.width = cw; canvas.height = ch;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, cw, ch);
+      ctx.drawImage(img, 0, 0, cw, ch);
+      const blob: Blob | null = await new Promise((res) => canvas.toBlob(res, "image/png"));
+      if (!blob) return null;
+      return { data: new Uint8Array(await blob.arrayBuffer()), w, h };
+    } finally { URL.revokeObjectURL(url); }
+  } catch { /* 降级源码文本 */ return null; }
 }
 
 /** 导出片段（HTML 两档/PNG/PDF 公共管线：getHTML + 相对图片解析 + math/mermaid 渲染），失败返回 null */
@@ -3089,7 +3220,8 @@ async function exportFragment(mathOutput: "html" | "mathml" = "html"): Promise<s
   const tmp = document.createElement("div");
   tmp.innerHTML = fragmentHtml;
   resolveImageSources(tmp, doc.path);
-  applyExportWidths(tmp); // v0.3.11 编辑器内拖定的列宽同步进导出物
+  applyTableColWeights(tmp); // v0.3.24 按内容权重设首行百分比列宽（fixed 布局基准）
+  applyExportWidths(tmp); // v0.3.11 编辑器内拖定的列宽同步进导出物（px 覆盖百分比）
   await renderSpecialBlocks(tmp, mathOutput);
   return tmp.innerHTML;
 }
@@ -3338,6 +3470,27 @@ function imageSize(b: Uint8Array): { w: number; h: number; type: "png" | "jpg" |
   return null;
 }
 
+/** v0.3.24 视觉宽度：CJK/全角字符计 2、其余计 1——表格列宽按内容权重分配的度量 */
+function visualLen(s: string): number {
+  let n = 0;
+  for (const ch of s) n += ch.charCodeAt(0) > 0x2e7f ? 2 : 1;
+  return n;
+}
+
+/** v0.3.24 列宽分配：weights（各列内容视觉宽度）→ 总宽 total DXA/百分比基准。
+ * 按权重比例分，单列最小 total*7% 防压扁，尾差吸收进末列；和恒等于 total。
+ * DOCX（DXA 像素）与导出 HTML（百分比）两路共用同一算法。 */
+function allocColWidths(weights: number[], total: number): number[] {
+  const n = Math.max(1, weights.length);
+  const w = Array.from({ length: n }, (_, i) => Math.max(weights[i] || 1, 1));
+  const min = Math.floor(total * 0.07);
+  const sum = w.reduce((a, b) => a + b, 0);
+  const widths = w.map((x) => Math.max(min, Math.round(total * x / sum)));
+  const wsum = widths.reduce((a, b) => a + b, 0);
+  widths[n - 1] += total - wsum; // 尾差吸收（min 抬升后 wsum 可能超 total，负尾差同样成立）
+  return widths.map((x) => Math.max(x, 1));
+}
+
 /** markdown-it token → docx 元素转换（覆盖：标题/段落/行内样式/链接/嵌套列表(原生numbering)/引用(含嵌套与内嵌列表)/代码块/表格/图片(真嵌入)/脚注/分隔线） */
 async function exportDocx(): Promise<void> {
   const doc = activeDoc();
@@ -3355,7 +3508,7 @@ async function exportDocx(): Promise<void> {
     mdit.use((await import("markdown-it-footnote")).default);
     const tokens = mdit.parse(md, {});
 
-    const { Paragraph, TextRun, HeadingLevel, ExternalHyperlink, Table, TableRow, TableCell, WidthType } = docx;
+    const { Paragraph, TextRun, HeadingLevel, ExternalHyperlink, Table, TableRow, TableCell, WidthType, TableLayoutType } = docx;
     const FONT = "Microsoft YaHei";
     const MONO = "Consolas";
 
@@ -3522,6 +3675,26 @@ async function exportDocx(): Promise<void> {
         }
         flushFn();
         i = j;
+      } else if (tk.type === "fence" && /mermaid/i.test(tk.info || "")) {
+        // v0.3.24：mermaid 块渲染为 PNG 嵌入（此前走 fence 代码文本，Word 里丢图——
+        // 编辑器里好看、交付物里没有，正是用户报的缺口）。失败降级保源码文本不阻断导出。
+        const png = await renderMermaidPng(tk.content || "", blocks.length);
+        if (png) {
+          // v0.3.24：宽高双向约束（A4 可用 550×933px@96dpi，与 pickExportMermaidSvg 同基准）——
+          // TB 竖排重排后的图可能超页高，只限宽会溢出页底
+          const scale = Math.min(550 / png.w, 933 / png.h, 1);
+          blocks.push(new Paragraph({
+            children: [new docx.ImageRun({ type: "png", data: png.data, transformation: { width: Math.round(png.w * scale), height: Math.round(png.h * scale) } })],
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 120, after: 120 },
+          }));
+        } else {
+          const lines = (tk.content || "").split("\n");
+          blocks.push(new Paragraph({
+            children: lines.map((ln: string, k: number) => new TextRun({ text: (k ? "\n" : "") + ln, font: MONO, size: 18, color: "333333", shading: { type: "clear", fill: "F5F5F5" } })),
+            spacing: { before: 80, after: 80 },
+          }));
+        }
       } else if (tk.type === "fence" || tk.type === "code_block") {
         const lines = (tk.content || "").split("\n");
         blocks.push(new Paragraph({
@@ -3531,23 +3704,38 @@ async function exportDocx(): Promise<void> {
       } else if (tk.type === "hr") {
         blocks.push(new Paragraph({ text: "", border: { bottom: { style: docx.BorderStyle.SINGLE, size: 6, color: "CCCCCC" } }, spacing: { after: 120 } }));
       } else if (tk.type === "table_open") {
-        // 收集到 table_close：thead/tbody 行
+        // v0.3.24 宽表修复：旧实现 cell 宽 = 9000/(已闭合格数+1) 是行内累积——同行
+        // 9000/4500/3000/2250 递减，整行总宽 18750 DXA≈33cm >> A4 竖版可用 ~9026，
+        // 右列被推出页面（用户导出"表格看不全"根因）；且未写 columnWidths，tblGrid 全 100 假值。
+        // 新法：先预扫全表拿列数 + 每列最长单元格的视觉宽度权重，按比例分 9000 DXA
+        // （单列最小 7% 防压扁），FIXED 布局 + columnWidths 写实 tblGrid，长文本在格内换行。
         let j = i + 1;
-        const rows: any[] = []; let curCells: any[] = []; let curInline: any[] = [];
+        const rowCells: { inline: any[]; isHead: boolean }[][] = [];
+        const colWeight: number[] = [];
+        let curRow: { inline: any[]; isHead: boolean }[] = []; let curInline: any[] = [];
+        let nCols = 0;
         for (; j < tokens.length && tokens[j].type !== "table_close"; j++) {
           const tt = tokens[j];
-          if (tt.type === "tr_open") { curCells = []; }
+          if (tt.type === "tr_open") { curRow = []; }
           else if (tt.type === "th_open" || tt.type === "td_open") { curInline = []; }
           else if (tt.type === "inline") curInline = tt.children || [];
           else if (tt.type === "th_close" || tt.type === "td_close") {
-            curCells.push(new TableCell({
-              width: { size: Math.floor(9000 / Math.max(1, curCells.length + 1)), type: WidthType.DXA },
-              shading: tt.type === "th_close" ? { type: "clear", fill: "EEEEEE" } : undefined,
-              children: [new Paragraph({ children: inlineRuns(curInline, { bold: tt.type === "th_close" }) })],
-            }));
-          } else if (tt.type === "tr_close") rows.push(new TableRow({ children: curCells }));
+            const isHead = tt.type === "th_close";
+            curRow.push({ inline: curInline, isHead });
+            const wgt = curInline.reduce((s, c) => s + visualLen(String(c.content || "")), 0);
+            const ci = curRow.length - 1;
+            colWeight[ci] = Math.max(colWeight[ci] || 0, wgt, 1);
+          } else if (tt.type === "tr_close") { rowCells.push(curRow); nCols = Math.max(nCols, curRow.length); }
         }
-        blocks.push(new Table({ width: { size: 9000, type: WidthType.DXA }, rows }));
+        const widths = allocColWidths(colWeight.slice(0, nCols), 9000);
+        const rows = rowCells.map((r) => r.map((cell, ci) => new TableCell({
+          width: { size: widths[Math.min(ci, nCols - 1)], type: WidthType.DXA },
+          shading: cell.isHead ? { type: "clear", fill: "EEEEEE" } : undefined,
+          children: [new Paragraph({ children: inlineRuns(cell.inline, { bold: cell.isHead }) })],
+        }))).map((cells, ri) => new TableRow({ children: cells, ...(ri === 0 ? { tableHeader: true } : {}) }));
+        // ^ v0.3.24：首行 tableHeader——跨页续表自动重复表头（PDF 侧 Chrome 断页自带 thead
+        // 重复，Word 必须显式声明；视觉终验发现漏配则 Word 续表裸行无列名）
+        blocks.push(new Table({ width: { size: 9000, type: WidthType.DXA }, columnWidths: widths, layout: TableLayoutType.FIXED, rows }));
         blocks.push(new Paragraph({ text: "" }));
         i = j;
       } else if (tk.type === "inline") {
