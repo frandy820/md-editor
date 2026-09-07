@@ -38,10 +38,13 @@
 | 撤销/保存/自动保存（main.ts snap*/saveDoc/autosaveDirty） | B、fullcheck(A11)、AHK |
 | 大文档延迟取值（valueSync*/openDoc 上限/switchDoc 装载） | L、B、AHK |
 | 标签页（renderTabs/多选/溢出） | B、J |
+| 会话持久化/惰性恢复/外改检测/状态栏/查找历史（v0.3.26 saveSession·loadLazyDoc·checkExternalMod·trackSelectionStatus·findHist*） | M、fullcheck、B |
 | 文件树/全盘搜索/定位 | E、H、I、J |
 | 主题/样式（styles.css/applyTheme） | D、J |
 | 导出/打印 | fullcheck(E)、C |
 | lib.rs（Rust 命令） | cargo test + 相关组 |
+
+M 组脚本：`F:/claudecode/output/md-editor-session-v0326/`（e2e_user_M_v0326.py M1-13 + m_big_ws.py/m_ir2.py M14-18；**禁 playwright connect_over_cdp**——对部署 WebView 偶发握手后挂死，一律纯 CDP websocket + suppress_origin=True）。fullcheck 三处历史漂移（2026-09-08 定性，非产品问题）：A1/B2=v0.3.26 带参启动不再开欢迎页+会话不含欢迎页（预期变更）；D2=脚本打字-点✕时序漂移（产品弹窗独立验证正常）。
 
 ### AHK 外测铁律（历史实测教训，逐条有效）
 
@@ -61,6 +64,8 @@
 - **Vditor 热键抢占**：Vditor 元素层拦截合成 KeyboardEvent——带修饰键的真键盘行为只能在 AHK 层验证。
 - **blur 保存时序**：失焦自动保存取值有异步竞争，改动保存链路必跑 B 组 + fullcheck(A11)。
 - 大文件防线（v0.3.25 重设：>200 万字符拒开 / >262144 字符进大文档延迟取值通道；Rust 16MB 硬上限）、编码识别（UTF-8/BOM/GBK，保存统一 UTF-8 无 BOM）。
+- **已知边界·单巨段落大文档**（2026-09-08 定界，v0.3.25 同症=Vditor 引擎存量问题，非 v0.3.26 回归）：md 源无空行分段（单行巨文或连续换行软折行皆算）且 10 万字符级以上，wysiwyg 装载后 JS 主线程长时间同步阻塞（evaluate/输入全超时、CPU 静止、非 JS 命令正常）。空行分段同体量（27 万）正常、诛仙合册 57 万（天然分段）正常。勿按"字符数"单指标判断大文档性能，段落结构才是关键变量。
+- **v0.3.26 会话结构**：ui-state.json `session:{v:1,tabs:[{p,n,s,m,z}],a}`（路径/名/scrollTop/mtime/size/active）；恢复标签全部 lazy 构造，活动标签 await loadLazyDoc（open_file 后 lazy=false）——**不能直接给活动标签 lazy:false**（loadLazyDoc 前置 `!doc.lazy` 即 return，永远空内容）。装载窗口期防串守卫（lazy/loading 检查）在 options.input/原生 input/flushValueSync/autosaveDirty 四处，改装载链路勿删。
 
 ## 3. 常用命令
 
