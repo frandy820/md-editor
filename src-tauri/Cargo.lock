@@ -1951,7 +1951,7 @@ dependencies = [
 
 [[package]]
 name = "md-editor"
-version = "0.3.25"
+version = "0.3.26"
 dependencies = [
  "base64 0.22.1",
  "encoding_rs",

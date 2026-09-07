@@ -1012,10 +1012,11 @@ function switchDoc(id: string) {
     suppressInput = false;
     snapReset(doc); // 撤销基线跟随新文档（per-doc 栈隔离）
     rebuildOutline();
-    // v0.3.26 会话恢复：setValue 会把滚动归零，装载完成后回滚到离开时的阅读位置（一次性消费）
-    if (doc.restoreScroll != null) {
-      const target = doc.restoreScroll;
-      doc.restoreScroll = null;
+    // v0.3.26 阅读位置：setValue 会把滚动归零，装载后回滚（会话恢复用 restoreScroll，
+    // 普通切换用离开时存的 scrollTop——否则切回标签总在顶部，且会把已存位置覆盖成 0）
+    const target = doc.restoreScroll != null ? doc.restoreScroll : doc.scrollTop;
+    doc.restoreScroll = null;
+    if (target > 0) {
       window.setTimeout(() => { const el = editorScrollEl(); if (el) el.scrollTop = target; }, 0);
     }
     updateStatus(); // v0.3.26 状态栏随文档切换刷新（大小/选中归零）
@@ -1211,7 +1212,8 @@ async function restoreSession(): Promise<boolean> {
       redoStack: [],
       base: "",
       large: false,
-      lazy: tab.p !== activePath, // 活动标签立即加载，其余占位
+      lazy: true, // 全部以惰性形态构造：活动标签紧接着 loadLazyDoc 真读盘（lazy 置 false）。
+      // 不能直接给活动标签 lazy:false——loadLazyDoc 开头 !doc.lazy 即 return，标签永远空内容
       loading: false,
       restoreScroll: tab.s > 0 ? tab.s : null,
       scrollTop: tab.s || 0,
