@@ -100,6 +100,9 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     fmNewIn: "在当前位置新建", fmNamePh: "输入名称…", fmRenameTitle: "重命名为：", fmNewMdTitle: "新建 Markdown 文件：", fmNewTxtTitle: "新建 TXT 文件：", fmNewDirTitle: "新建文件夹：",
     fmDelTitle: "删除确认", fmDelFileMsg: "确定删除该文件？不可恢复。", fmDelDirMsg: "确定删除该文件夹及其全部内容？不可恢复。",
     fmNoBase: "请先打开文件或在树中定位一个目录", untitledMd: "未命名.md", untitledDir: "新建文件夹", fmCopyDone: "已复制", fmOk: "确定", fileTooBigSuf: " 万字，上限 200 万字），已阻止打开以免长时间无响应，请拆分后再编辑。", bigLoad: "正在加载大文件，请稍候…",
+    statusSelected: "已选 {n}", extChanged: "文件「{f}」已被其他程序修改（磁盘内容变化）。", extChangedDirty: "文件「{f}」已被其他程序修改；本标签有未保存改动，重新加载将丢弃本地改动。", extDeleted: "文件「{f}」已不存在（可能被移动或删除）。",
+    extReload: "重新加载", extDismiss: "忽略",
+    bigDocBar: "大文档模式：编辑约 1.5 秒后生效（延迟保存通道），保存与撤销不受影响。", bigDocBarIr: "大文档在即时渲染模式下会严重卡顿，建议用顶部按钮切到所见即所得；编辑约 1.5 秒后生效。",
     tabClose: "关闭", tabCloseOthers: "关闭其它", tabCloseRight: "关闭右侧", tabCloseLeft: "关闭左侧", tabCloseAll: "全部关闭", tabCloseSelected: "关闭选中",
     themeTip: "界面主题：浅色 / 深色 / 护眼（未选过跟随系统）",
     appName: "MD 编辑器",
@@ -150,6 +153,9 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     fmNewIn: "在目前位置新增", fmNamePh: "輸入名稱…", fmRenameTitle: "重新命名為：", fmNewMdTitle: "新增 Markdown 檔案：", fmNewTxtTitle: "新增 TXT 檔案：", fmNewDirTitle: "新增資料夾：",
     fmDelTitle: "刪除確認", fmDelFileMsg: "確定刪除該檔案？無法復原。", fmDelDirMsg: "確定刪除該資料夾及其全部內容？無法復原。",
     fmNoBase: "請先開啟檔案或在樹中定位一個目錄", untitledMd: "未命名.md", untitledDir: "新增資料夾", fmCopyDone: "已複製", fmOk: "確定", fileTooBigSuf: " 萬字，上限 200 萬字），已阻止開啟以免長時間無回應，請拆分後再編輯。", bigLoad: "正在載入大檔案，請稍候…",
+    statusSelected: "已選 {n}", extChanged: "檔案「{f}」已被其他程式修改（磁碟內容變化）。", extChangedDirty: "檔案「{f}」已被其他程式修改；本分頁有未儲存變更，重新載入將捨棄本機改動。", extDeleted: "檔案「{f}」已不存在（可能被移動或刪除）。",
+    extReload: "重新載入", extDismiss: "忽略",
+    bigDocBar: "大文件模式：編輯約 1.5 秒後生效（延遲儲存通道），儲存與復原不受影響。", bigDocBarIr: "大文件在即時渲染模式下會嚴重卡頓，建議用頂部按鈕切到所見即所得；編輯約 1.5 秒後生效。",
     tabClose: "關閉", tabCloseOthers: "關閉其它", tabCloseRight: "關閉右側", tabCloseLeft: "關閉左側", tabCloseAll: "全部關閉", tabCloseSelected: "關閉選中",
     themeTip: "介面主題：淺色 / 深色 / 護眼（未選過跟隨系統）",
     appName: "MD 編輯器",
@@ -200,6 +206,9 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     fmNewIn: "New item here", fmNamePh: "Enter a name…", fmRenameTitle: "Rename to:", fmNewMdTitle: "New Markdown file:", fmNewTxtTitle: "New TXT file:", fmNewDirTitle: "New folder:",
     fmDelTitle: "Delete", fmDelFileMsg: "Delete this file? This cannot be undone.", fmDelDirMsg: "Delete this folder and ALL its contents? This cannot be undone.",
     fmNoBase: "Open a file or locate a folder in the tree first", untitledMd: "Untitled.md", untitledDir: "New folder", fmCopyDone: "Copied", fmOk: "OK", fileTooBigSuf: "K chars, limit 2000K chars). Opening blocked to avoid unresponsiveness; please split the file first.", bigLoad: "Loading a large file…",
+    statusSelected: "{n} selected", extChanged: "File \"{f}\" was modified by another program (disk content changed).", extChangedDirty: "File \"{f}\" was modified by another program; this tab has unsaved changes — reloading will discard them.", extDeleted: "File \"{f}\" no longer exists (moved or deleted).",
+    extReload: "Reload", extDismiss: "Ignore",
+    bigDocBar: "Large-document mode: edits take effect after ~1.5s (deferred-save channel); saving and undo are unaffected.", bigDocBarIr: "Instant-render mode is extremely slow for large documents; switch to WYSIWYG via the top button. Edits take effect after ~1.5s.",
     tabClose: "Close", tabCloseOthers: "Close others", tabCloseRight: "Close to the right", tabCloseLeft: "Close to the left", tabCloseAll: "Close all", tabCloseSelected: "Close selected",
     themeTip: "Theme: light / dark / eye-care (follows system until chosen)",
     appName: "MD Editor",
@@ -375,6 +384,13 @@ interface Doc {
   base: string; // 磁盘版内容（撤销后判定 dirty 用）
   large: boolean; // v0.3.25 大文档（>262144 字符）：走延迟取值通道（getValue 57万字=465ms，
   // 逐键同步取值=每键~1s 阻塞，实测 headless 基准；400ms 空闲统一 flush，撤销粒度相应变粗为按输入串）
+  lazy: boolean; // v0.3.26 会话惰性恢复占位：未读盘（content=""），激活时才 open_file（#9 惰性恢复标签）
+  loading: boolean; // 惰性加载进行中（防连点重入）
+  restoreScroll: number | null; // v0.3.26 会话恢复：applyContent 后要回滚到的 scrollTop（一次性消费）
+  scrollTop: number; // 离开该文档时的阅读位置（switchDoc 开头存，会话保存用）
+  metaMtime: number; // v0.3.26 外部修改检测基准：打开/保存时的磁盘 mtime(ms)
+  metaSize: number; // 同上，字节数（双指标比对，单 mtime 在同尺寸改写时可能粒度不够）
+  bytes: number; // UTF-8 字节数缓存（状态栏文件大小；openDoc/flush/save 低频更新）
 }
 
 // v0.3.25 大文件上限（实测重设）：headless 基准 2.86M 字符渲染 10.9s 收敛、键入 466ms——
@@ -610,7 +626,7 @@ function renderTabs() {
   };
   docs.forEach((doc) => {
     const tab = document.createElement("div");
-    tab.className = "tab" + (doc.id === activeId ? " active" : "") + (tabSel.has(doc.id) ? " sel" : "");
+    tab.className = "tab" + (doc.id === activeId ? " active" : "") + (tabSel.has(doc.id) ? " sel" : "") + (doc.lazy ? " lazy" : ""); // v0.3.26 lazy=会话惰性占位（斜体灰显）
     tab.dataset.docId = doc.id;
     const name = document.createElement("span");
     name.className = "tab-name";
@@ -778,10 +794,12 @@ function flushValueSync(doc: Doc): void {
   valueSyncPending = false;
   if (switchApplyPending) return; // 切换装载期不取值（见 switchApplyPending 注释）
   if (!vditor || activeDoc()?.id !== doc.id) return; // 守卫：切换/关闭标签后 mdValue() 取到的已是
-  // 别的文档内容，回填会串文档（switchDoc 自己已同步存过离场文档的值）
+  // 别的文档内容，回填会串文档（switchDoc 自己已同步存离场文档的值）
+  if (doc.lazy || doc.loading) return; // v0.3.26 惰性装载窗口：定时器晚触发，丢弃
   const v = mdValue();
   if (v !== "" || doc.content === "") doc.content = v; // 空值守卫（同 options.input）
   doc.large = v.length > LARGE_DOC_CHARS; // 小文档长过阈值后也切换到延迟通道
+  doc.bytes = utf8Bytes(v); // v0.3.26 状态栏大小随 flush 更新
   snapOnInput(doc, v);
   scheduleOutline();
 }
@@ -857,6 +875,7 @@ document.addEventListener("input", (e) => {
   const t = e.target as Element | null;
   if (!t?.closest?.(".vditor")) return;
   const doc = activeDoc();
+  if (doc && (doc.lazy || doc.loading)) return; // v0.3.26 惰性装载窗口：旧文档信号丢弃（防串）
   if (doc && vditor) {
     // v0.3.25 大文档：逐键 mdValue(465ms@57万字) 不可承受——逐键只重置 400ms 空闲定时器（廉价
     // 信号保住"有编辑发生"的感知），空闲时 flushValueSync 一次取值回填（粒度=输入串）。
@@ -956,17 +975,32 @@ function switchDoc(id: string) {
   hideEmptyState(); // 切到有内容的文档，隐藏空状态
   tabSel.clear(); // 新激活产生=多选态作废（树上/最近/快开/ES 打开文件都应取消选中集，v0.3.21）
   document.getElementById("big-load")?.setAttribute("hidden", ""); // 新切换先清旧延迟加载留下的提示
+  document.getElementById("big-doc-bar")?.setAttribute("hidden", ""); // v0.3.26 大文档提示条随切换隐藏
+  document.getElementById("ext-mod-bar")?.setAttribute("hidden", ""); // 外改提示条绑定文档，切走即收
+  extBarDoc = "";
   // 保存当前文档内容到其 Doc（getValue 守卫：空值不覆盖）
   if (vditor) {
     const cur = activeDoc();
     if (cur) {
       const v = mdValue();
       if (v !== "" || cur.content === "") cur.content = v;
+      if (!cur.lazy) cur.scrollTop = editorScrollEl()?.scrollTop ?? cur.scrollTop; // v0.3.26 阅读位置随离开存档
     }
   }
   const doc = docs.find((d) => d.id === id);
   if (!doc) return;
+  // v0.3.26 惰性标签：先读盘再走正常装载（loading 防连点；大文档加载期 activeId 已指向它，
+  // renderTabs 高亮正确，读盘完成后此处再进 switchDoc 走 applyContent）
+  if (doc.lazy) {
+    activeId = id;
+    renderTabs();
+    updateTitle();
+    void loadLazyDoc(doc);
+    return;
+  }
   activeId = id;
+  scheduleSessionSave(); // v0.3.26 会话：活动标签变化
+  void checkExternalMod(doc); // v0.3.26 外改检测：切到即核（mtime+size 双指标）
   const seq = ++switchSeq;
   const applyContent = (): void => {
     switchApplyPending = null;
@@ -978,6 +1012,13 @@ function switchDoc(id: string) {
     suppressInput = false;
     snapReset(doc); // 撤销基线跟随新文档（per-doc 栈隔离）
     rebuildOutline();
+    // v0.3.26 会话恢复：setValue 会把滚动归零，装载完成后回滚到离开时的阅读位置（一次性消费）
+    if (doc.restoreScroll != null) {
+      const target = doc.restoreScroll;
+      doc.restoreScroll = null;
+      window.setTimeout(() => { const el = editorScrollEl(); if (el) el.scrollTop = target; }, 0);
+    }
+    updateStatus(); // v0.3.26 状态栏随文档切换刷新（大小/选中归零）
   };
   if (doc.large) {
     // v0.3.25 大文档：同步 setValue 阻塞 1-6s（57万字 1.2s），先亮加载提示并双 rAF 让出
@@ -1030,6 +1071,7 @@ async function closeDoc(id: string) {
     else showEmptyState(); // 全部标签关闭：显示空状态（允许关闭欢迎页，不再强制重开）
   }
   renderTabs();
+  scheduleSessionSave(); // v0.3.26 会话：标签结构变化
 }
 
 function openDoc(path: string | null, content: string, name?: string, encoding?: string) {
@@ -1067,9 +1109,19 @@ function openDoc(path: string | null, content: string, name?: string, encoding?:
     redoStack: [],
     base: content.replace(/\r\n/g, "\n"), // 同 snapReset 归一：磁盘 CRLF vs getValue LF，不归一则撤到底 dirty 不清
     large: content.length > LARGE_DOC_CHARS, // v0.3.25 大文档延迟取值通道
+    lazy: false,
+    loading: false,
+    restoreScroll: null,
+    scrollTop: 0,
+    metaMtime: 0,
+    metaSize: 0,
+    bytes: utf8Bytes(content),
   };
   docs.push(doc);
   switchDoc(doc.id);
+  refreshMeta(doc); // v0.3.26 外改检测基准（异步，不阻塞打开）
+  if (doc.large) showBigDocBar(); // v0.3.26 大文档提示条（ir 模式另有卡顿警告）
+  scheduleSessionSave(); // v0.3.26 会话：标签结构变化
   if (path) {
     pushRecent(path);
     // 树根联动：换目录才整树重建（含点"最近"里其它目录的文件），同目录只挪高亮
@@ -1077,6 +1129,254 @@ function openDoc(path: string | null, content: string, name?: string, encoding?:
     if (dir && dir.toLowerCase() !== (ftreeRoot || "").toLowerCase()) void locateTreeAt(dir);
     else markTreeCurrent();
   }
+}
+
+// ===== v0.3.26 会话持久化（Notepad++ session.xml 同构）+ 外部修改检测 + 状态栏 =====
+// 会话存 ui-state.json 的 session 键：{ v:1, tabs:[{p,n,s,m,z}], a }——
+// p=路径 n=文件名 s=scrollTop m=mtime z=size，a=活动标签路径。只收有路径的文档
+//（未命名/欢迎页不恢复）；恢复时活动标签真读盘、其余 lazy 占位（激活才读盘，#9 惰性恢复）。
+interface SessionTab { p: string; n: string; s: number; m: number; z: number }
+let sessionSaveTimer = 0;
+function utf8Bytes(s: string): number {
+  // 状态栏文件大小用（估 UTF-8 落盘字节数；仅低频路径调用——open/flush/save）
+  return new TextEncoder().encode(s).length;
+}
+function saveSession(): void {
+  // 无路径文档（未命名/欢迎页）不进会话；lazy 占位也存（有 path，激活时才读）
+  const active = activeDoc();
+  if (active && !active.lazy) active.scrollTop = editorScrollEl()?.scrollTop ?? active.scrollTop;
+  const tabs: SessionTab[] = docs
+    .filter((d) => !!d.path)
+    .map((d) => ({ p: d.path!, n: d.name, s: Math.round(d.scrollTop), m: d.metaMtime, z: d.metaSize }));
+  if (tabs.length === 0) { // 空会话也写（清掉旧会话：用户全关后下次不该再恢复）
+    if (uiStateAll.session) saveUiStateKey("session", null);
+    return;
+  }
+  saveUiStateKey("session", { v: 1, tabs, a: active?.path || tabs[0].p });
+}
+function scheduleSessionSave(): void {
+  window.clearTimeout(sessionSaveTimer);
+  sessionSaveTimer = window.setTimeout(saveSession, 800); // 防抖：连续开/关标签只写一次
+}
+
+// 惰性占位 doc 激活时读盘（switchDoc 检测 lazy 转入此处；完成后走正常 switchDoc 路径）
+async function loadLazyDoc(doc: Doc): Promise<void> {
+  if (doc.loading || !doc.lazy) return;
+  doc.loading = true;
+  try {
+    const [content, enc] = await invoke<[string, string]>("open_file", { path: doc.path });
+    if (content.length > MAX_OPEN_CHARS) { // 会话期间文件被撑大：同样过拒开线
+      alert(t("fileTooBig") + bigSizeLabel(content.length) + t("fileTooBigSuf"));
+      doc.loading = false;
+      closeDoc(doc.id);
+      return;
+    }
+    doc.content = content;
+    doc.encoding = enc || "";
+    doc.base = content.replace(/\r\n/g, "\n");
+    doc.large = content.length > LARGE_DOC_CHARS;
+    doc.bytes = utf8Bytes(content);
+    doc.dirty = false;
+    doc.lazy = false;
+    refreshMeta(doc);
+    if (doc.large) showBigDocBar();
+  } catch (e) {
+    // 文件已被删除/移走：去掉占位标签（提示而非静默消失）
+    alert(t("openFail") + e);
+    doc.loading = false;
+    closeDoc(doc.id);
+    return;
+  }
+  doc.loading = false;
+  switchDoc(doc.id); // lazy=false 走正常装载（restoreScroll 在 applyContent 尾部消费）
+}
+
+// 启动会话恢复：成功=true（boot 据此跳过欢迎页）。带启动文件时不恢复（双击 .md=明确意图）
+async function restoreSession(): Promise<boolean> {
+  const s = uiStateAll.session as { v?: number; tabs?: SessionTab[]; a?: string } | null | undefined;
+  if (!s || !Array.isArray(s.tabs) || s.tabs.length === 0) return false;
+  const tabs = s.tabs.filter((x) => x && typeof x.p === "string").slice(0, 20);
+  if (tabs.length === 0) return false;
+  const activePath = typeof s.a === "string" ? s.a : tabs[0].p;
+  let activeId = "";
+  for (const tab of tabs) {
+    const doc: Doc = {
+      id: newDocId(),
+      path: tab.p,
+      name: tab.n || tab.p.split(/[\\/]/).pop() || t("untitled"),
+      content: "",
+      dirty: false,
+      encoding: "",
+      undoStack: [],
+      redoStack: [],
+      base: "",
+      large: false,
+      lazy: tab.p !== activePath, // 活动标签立即加载，其余占位
+      loading: false,
+      restoreScroll: tab.s > 0 ? tab.s : null,
+      scrollTop: tab.s || 0,
+      metaMtime: tab.m || 0,
+      metaSize: tab.z || 0,
+      bytes: 0,
+    };
+    docs.push(doc);
+    if (tab.p === activePath) activeId = doc.id;
+  }
+  hideEmptyState();
+  if (activeId) {
+    const d = docs.find((x) => x.id === activeId)!;
+    await loadLazyDoc(d); // 活动标签同步加载（含大文档路径/防线）
+  }
+  return true;
+}
+
+// ----- 外部修改检测：mtime+size 双指标比对（N++ originalFileLastModifTimestamp 同构）-----
+async function refreshMeta(doc: Doc): Promise<void> {
+  if (!doc.path) return;
+  try {
+    const m = await invoke<{ mtimeMs: number; size: number }>("file_meta", { path: doc.path });
+    doc.metaMtime = m.mtimeMs;
+    doc.metaSize = m.size;
+  } catch { /* 文件暂不可读：基准不更新（下次比对仍会提示） */ }
+}
+let extBarDoc = ""; // 提示条当前指向的 docId（切换文档自动失效）
+async function checkExternalMod(doc: Doc): Promise<void> {
+  if (!doc.path || doc.lazy || !vditor) return;
+  try {
+    const m = await invoke<{ mtimeMs: number; size: number }>("file_meta", { path: doc.path });
+    if (activeDoc()?.id !== doc.id) return; // 异步回来时已切走：不弹
+    const changed = doc.metaMtime !== 0 && (m.mtimeMs !== doc.metaMtime || m.size !== doc.metaSize);
+    if (changed) showExtBar(doc, false);
+  } catch {
+    if (activeDoc()?.id === doc.id) showExtBar(doc, true); // 文件没了（被删/移走）
+  }
+}
+function showExtBar(doc: Doc, deleted: boolean): void {
+  const bar = document.getElementById("ext-mod-bar");
+  if (!bar) return;
+  extBarDoc = doc.id;
+  bar.hidden = false;
+  const msg = document.getElementById("ext-mod-msg")!;
+  msg.textContent = deleted
+    ? t("extDeleted").replace("{f}", doc.name)
+    : (doc.dirty ? t("extChangedDirty") : t("extChanged")).replace("{f}", doc.name);
+  const reloadBtn = document.getElementById("ext-reload") as HTMLButtonElement | null;
+  if (reloadBtn) reloadBtn.hidden = deleted; // 文件没了没有"重新加载"，只剩忽略/关闭
+  const disBtn = document.getElementById("ext-dismiss") as HTMLButtonElement | null;
+  if (reloadBtn) reloadBtn.textContent = t("extReload");
+  if (disBtn) disBtn.textContent = t("extDismiss");
+}
+async function reloadFromDisk(doc: Doc): Promise<void> {
+  try {
+    const [content, enc] = await invoke<[string, string]>("open_file", { path: doc.path });
+    if (content.length > MAX_OPEN_CHARS) { alert(t("fileTooBig") + bigSizeLabel(content.length) + t("fileTooBigSuf")); return; }
+    doc.content = content;
+    doc.base = content.replace(/\r\n/g, "\n");
+    doc.large = content.length > LARGE_DOC_CHARS;
+    doc.bytes = utf8Bytes(content);
+    doc.dirty = false;
+    doc.encoding = enc || "";
+    doc.undoStack = [];
+    doc.redoStack = [];
+    if (activeDoc()?.id === doc.id) {
+      suppressInput = true;
+      vditor!.setValue(content, true);
+      suppressInput = false;
+      snapReset(doc);
+      rebuildOutline();
+      doc.scrollTop = 0;
+    }
+    refreshMeta(doc);
+  } catch (e) {
+    alert(t("openFail") + e);
+  }
+}
+
+// ----- 状态栏（v0.3.26）：已选字符数 + 总字数(Vditor counter) + 文件大小，并入左下角 counter -----
+let counterLen = 0; // Vditor counter after(len) 的缓存（selectionchange 时重拼文案用）
+let statusSelLen = 0;
+function updateStatus(): void {
+  const el = document.querySelector<HTMLElement>(".vditor-counter");
+  if (!el) return;
+  const doc = activeDoc();
+  const parts: string[] = [];
+  if (statusSelLen > 0) parts.push(t("statusSelected").replace("{n}", String(statusSelLen)));
+  parts.push(`${counterLen} ${t("wordCount")}`);
+  if (doc && doc.bytes > 0) parts.push(doc.bytes >= 1024 ? `${(doc.bytes / 1024).toFixed(1)} KB` : `${doc.bytes} B`);
+  el.innerText = parts.join(" · ");
+}
+function trackSelectionStatus(): void {
+  const sel = getSelection();
+  const editable = document.querySelector(".vditor-wysiwyg pre.vditor-reset, .vditor-ir pre.vditor-reset");
+  if (!sel || sel.rangeCount === 0 || !editable || !sel.anchorNode || !editable.contains(sel.anchorNode)) {
+    if (statusSelLen !== 0) { statusSelLen = 0; updateStatus(); }
+    return;
+  }
+  const n = sel.toString().length;
+  if (n !== statusSelLen) { statusSelLen = n; updateStatus(); }
+}
+
+// ----- 大文档提示条（v0.3.26 降级模式）：编辑延迟说明 + ir 模式卡顿警告 -----
+function showBigDocBar(): void {
+  const bar = document.getElementById("big-doc-bar");
+  if (!bar) return;
+  const msg = document.getElementById("big-doc-msg")!;
+  msg.textContent = currentMode === "ir" ? t("bigDocBarIr") : t("bigDocBar");
+  bar.hidden = false;
+}
+
+// ----- 查找/替换历史（v0.3.26，N++ 10 条同构）：ui-state.json 持久化 + datalist 下拉 -----
+const FIND_HISTORY_MAX = 10;
+function findHistoryList(key: "findHist" | "repHist"): string[] {
+  const v = uiStateAll[key];
+  return Array.isArray(v) ? (v as unknown[]).filter((x): x is string => typeof x === "string" && x.length > 0) : [];
+}
+function pushFindHistory(key: "findHist" | "repHist", q: string): void {
+  q = q.trim();
+  if (!q) return;
+  const list = findHistoryList(key).filter((x) => x !== q);
+  list.unshift(q);
+  saveUiStateKey(key, list.slice(0, FIND_HISTORY_MAX));
+  renderFindHistory();
+}
+function renderFindHistory(): void {
+  // datalist 原生下拉（零自绘 UI 成本；WebView2 支持良好，空历史挂着 list 属性无副作用）
+  const mk = (dlId: string, items: string[]) => {
+    const dl = document.getElementById(dlId);
+    if (!dl) return;
+    dl.innerHTML = "";
+    for (const it of items) {
+      const o = document.createElement("option");
+      o.value = it;
+      dl.appendChild(o);
+    }
+  };
+  mk("find-hist-dl", findHistoryList("findHist"));
+  mk("rep-hist-dl", findHistoryList("repHist"));
+}
+
+// ----- 提示条按钮绑定（外改检测 / 大文档），boot 一次性挂 -----
+function initNoticeBars(): void {
+  const reloadBtn = document.getElementById("ext-reload");
+  if (reloadBtn) reloadBtn.addEventListener("click", () => {
+    const bar = document.getElementById("ext-mod-bar");
+    const doc = docs.find((d) => d.id === extBarDoc) || null;
+    if (bar) bar.hidden = true;
+    extBarDoc = "";
+    if (doc) void reloadFromDisk(doc);
+  });
+  const dismissBtn = document.getElementById("ext-dismiss");
+  if (dismissBtn) dismissBtn.addEventListener("click", () => {
+    const bar = document.getElementById("ext-mod-bar");
+    const doc = docs.find((d) => d.id === extBarDoc) || null;
+    if (bar) bar.hidden = true;
+    extBarDoc = "";
+    if (doc) refreshMeta(doc); // 选"忽略"=以磁盘新状态为新基准，不再反复弹
+  });
+  const bigClose = document.getElementById("big-doc-close");
+  if (bigClose) bigClose.addEventListener("click", () => {
+    document.getElementById("big-doc-bar")?.setAttribute("hidden", "");
+  });
 }
 
 // ===== v0.3.14 侧栏文件页（文件树/最近/跨文件搜索）+ 快速打开 + 暗色主题 =====
@@ -1837,11 +2137,20 @@ function updateTitle() {
 async function loadFile(path: string) {
   try {
     const [content, enc] = await invoke<[string, string]>("open_file", { path });
+    // v0.3.26 大文档 × ir 模式拦截：bench 实证 ir 大文档编辑 60s 不收敛（2026-09-07 三模式基准），
+    // 先切 wysiwyg 再开。复用 pendingFile 既有时序：switchMode 重建完成（after 恢复旧文档后）
+    // 才 openDoc 新文档，避免双 setValue 乱序。
+    if (content.length > LARGE_DOC_CHARS && currentMode === "ir") {
+      pendingLargeOpen = { path, content, enc: enc || "" };
+      switchMode("wysiwyg");
+      return;
+    }
     openDoc(path, content, undefined, enc);
   } catch (e) {
     alert(t("openFail") + e);
   }
 }
+let pendingLargeOpen: { path: string; content: string; enc: string } | null = null;
 
 // 打开 PDF：智能分流。不走 open_file（白名单只读文本类，PDF 会被拒）。
 // find_pdf_source 查同名 .md/.html 源：有源 → 打开源编辑（改完可重导出覆盖 PDF）；
@@ -1918,8 +2227,9 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
     counter: {
       enable: true, type: "text",
       after: (len: number) => {
-        const el = document.querySelector<HTMLElement>(".vditor-counter");
-        if (el) el.innerText = `${len} ${t("wordCount")}`;
+        // v0.3.26 状态栏并入 counter 位：已选 N · 共 N 字 · 大小（selectionchange 走 updateStatus 重拼）
+        counterLen = len;
+        updateStatus();
       },
     },
     // :emoji: 补全的表情图片走本地资源（默认 unpkg CDN，CSP 禁外联且离线不可用）
@@ -2026,6 +2336,7 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
       if (suppressInput) return;
       if (switchApplyPending) return; // v0.3.25 大文档切换装载期：旧 DOM 的信号丢弃（防串文档）
       const doc = activeDoc();
+      if (doc && (doc.lazy || doc.loading)) return; // v0.3.26 惰性装载窗口：vditor 里还是旧文档，丢弃（防串）
       if (doc && vditor) {
         if (doc.large) { // v0.3.25 大文档：延迟取值通道（原生 input 捕获层已置 dirty 并调度）
           scheduleValueSync(doc);
@@ -2069,13 +2380,17 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
       rebindTableResize(); // v0.3.11 表格列宽拖动（近缘判定+持久化重应用）
       closeFind(); // 模式/语言切换销毁重建：旧匹配节点全部失效
       if (!vditorInited) {
-        // 首次初始化：打开欢迎文档、处理命令行传入的文件
+        // 首次初始化：处理命令行传入的文件；否则恢复上次会话（v0.3.26：标签+阅读位置），
+        // 无会话才开欢迎页。带启动文件=用户明确意图，不叠加会话（双击 .md 场景）
         vditorInited = true;
-        openDoc(null, welcomeMd(), t("welcomeName"));
         if (pendingFile) {
           const f = pendingFile;
           pendingFile = null;
           loadFile(f);
+        } else {
+          void restoreSession().then((ok) => {
+            if (!ok) openDoc(null, welcomeMd(), t("welcomeName"));
+          });
         }
       } else {
         // 模式切换后重建：把当前文档内容恢复进新编辑器
@@ -2090,6 +2405,12 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
         rebuildOutline();
         renderTabs();
         updateTitle();
+        // v0.3.26 大文档×ir 拦截的接力：模式重建完成后开真正要开的文件（loadFile 置入）
+        if (pendingLargeOpen) {
+          const p = pendingLargeOpen;
+          pendingLargeOpen = null;
+          openDoc(p.path, p.content, undefined, p.enc || undefined);
+        }
       }
       updateModeUI();
       switchInFlight = false; // 重建完成，释放重入锁
@@ -2378,6 +2699,9 @@ async function saveDoc(doc: Doc): Promise<boolean> {
     await invoke("save_file", { path, content: doc.content });
     doc.dirty = false;
     doc.base = doc.content; // v0.3.21 撤销栈的干净态基线跟随保存
+    doc.bytes = utf8Bytes(doc.content); // v0.3.26 状态栏大小
+    refreshMeta(doc); // v0.3.26 保存后刷新外改基准（自己的写也变 mtime，不刷会立即误报）
+    scheduleSessionSave();
     return true;
   } catch (e) {
     alert(t("saveFail") + doc.name + " — " + e);
@@ -2399,6 +2723,7 @@ let autosaveTimer: number | undefined;
 async function autosaveDirty(): Promise<void> {
   if (!vditor) return;
   if (switchApplyPending) return; // v0.3.25 大文档切换装载期：此刻 mdValue 取到的是旧文档，本轮跳过
+  if (activeDoc()?.lazy || activeDoc()?.loading) return; // v0.3.26 惰性装载窗口：同上，防把旧文档写进占位标签
   // 兜底：键入后立刻失焦时，Vditor input 回调可能仍在防抖窗口内未跑（dirty 未置位）——
   // 主动从编辑器取真值对比，不等 input 回调（fullcheck A11b 实证：type 后立即 blur 会漏存最后一段）
   const a = activeDoc();
@@ -2420,6 +2745,8 @@ async function autosaveDirty(): Promise<void> {
       await invoke("save_file", { path: doc.path, content: doc.content });
       doc.dirty = false;
       doc.encoding = "UTF-8"; // 统一写 UTF-8 无 BOM（同手动保存）
+      refreshMeta(doc); // v0.3.26 自动保存同样刷新外改基准
+      doc.bytes = utf8Bytes(doc.content);
       if (activeDoc()?.id === doc.id) { updateTitle(); renderTabs(); }
     } catch { /* 静默失败：dirty 保留，下轮重试 */ }
   }
@@ -2728,13 +3055,19 @@ function replaceAllMatches() {
 let findInputDebounce: number | undefined;
 function bindFindBar() {
   const inp = document.getElementById("find-input") as HTMLInputElement;
+  inp.setAttribute("list", "find-hist-dl"); // v0.3.26 查找历史下拉（datalist）
+  (document.getElementById("replace-input") as HTMLInputElement)?.setAttribute("list", "rep-hist-dl");
   inp.addEventListener("input", () => {
     window.clearTimeout(findInputDebounce);
     findInputDebounce = window.setTimeout(() => refreshFind(true), 250);
   });
   inp.addEventListener("keydown", (e) => {
     if (e.isComposing) return; // IME 组合态的 Enter/Esc 交给输入法
-    if (e.key === "Enter") { e.preventDefault(); gotoMatch(e.shiftKey ? findIndex - 1 : findIndex + 1); }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (inp.value.trim()) pushFindHistory("findHist", inp.value); // v0.3.26 执行时记历史（N++ 同语义）
+      gotoMatch(e.shiftKey ? findIndex - 1 : findIndex + 1);
+    }
     else if (e.key === "Escape") { e.preventDefault(); closeFind(); }
   });
   // 查找条所有按钮统一 pointerdown（按下即触发）：click 需 down+up 落在同一元素，
@@ -2760,6 +3093,11 @@ function bindFindBar() {
   onDown("replace-one", replaceCurrent);
   onDown("replace-all", () => {
     if (findMatches.length > 500 && !confirm(t("replaceManyConfirm"))) return;
+    // v0.3.26 替换执行记历史（查找词+替换词）
+    const fq = (document.getElementById("find-input") as HTMLInputElement).value.trim();
+    const rq = (document.getElementById("replace-input") as HTMLInputElement).value.trim();
+    if (fq) pushFindHistory("findHist", fq);
+    if (rq) pushFindHistory("repHist", rq);
     replaceAllMatches();
   });
   (document.getElementById("replace-input") as HTMLInputElement).addEventListener("keydown", (e) => {
@@ -4000,6 +4338,15 @@ async function boot() {
   } catch {
     // 非 tauri 环境忽略
   }
+  // v0.3.26 会话恢复前置：ui-state 必须在 initVditor 之前就绪（after 首次初始化分支要用
+  // session 数据决定"恢复会话还是欢迎页"，then 异步会输给 Vditor 构造）。Rust 读一个小
+  // JSON <5ms，不拖启动感知。uiStateLoaded 同步置真，原 then 时序问题（memRecent 合并）不复存在。
+  try {
+    uiStateAll = (await invoke<Record<string, unknown> | null>("load_ui_state")) || {};
+  } catch {
+    uiStateAll = {};
+  }
+  uiStateLoaded = true;
 
   // 模式切换：顶部「所见即所得」按钮 + Ctrl+Alt+M 快捷键
   document.getElementById("btn-mode")!.addEventListener("click", () => {
@@ -4109,11 +4456,13 @@ async function boot() {
   try {
     const win = getCurrentWindow();
     await win.onCloseRequested(async (e) => {
+      saveSession(); // v0.3.26 会话：无论走哪条关闭路径都先落会话（防抖定时器等不到下次 tick）
       if (!docs.some((d) => d.dirty)) return; // 无未保存修改，正常关闭
       e.preventDefault();
       const action = await showCloseConfirm();
       if (action === "cancel") return; // 取消：不关闭
       if (action === "save") await saveAllDirty(); // 保存并关闭：先保存有路径的文档
+      saveSession(); // saveAllDirty 改了内容/结构：再落一次
       try {
         await win.destroy();
       } catch (e) {
@@ -4235,6 +4584,7 @@ async function boot() {
   initSidePanels();
   initTabMenu();
   initFtreeMenu();
+  initNoticeBars(); // v0.3.26 外改检测/大文档提示条按钮
   switchSidePane("outline"); // v0.3.21 默认显示大纲页（用户 2026-08-30 定调；文件页点页签可达）
   // Word 式显示比例：Ctrl+滚轮 / Ctrl+加减 / Ctrl+0 复位 / 右下角拉杆——只缩正文内容区
   // （.vditor-content），格式工具条(.vditor-toolbar)/应用工具栏/大纲/标签页都不缩。
@@ -4251,23 +4601,22 @@ async function boot() {
     if (zs) zs.value = String(Math.round(zoomLevel * 100));
     persistZoom();
   };
-  // ui-state.json 统一入口（v0.3.14）：zoom/theme/recent 合并读写；load 返回前 saveUiStateKey 不落盘
-  invoke<Record<string, unknown> | null>("load_ui_state").then((s) => {
-    const disk = s || {};
-    // recent 特殊合并：startup 开文件先于 load 返回，pushRecent 已写内存的条目不能被磁盘旧值
-    // 覆盖（否则重复/丢条目）；zoom/theme 只在 load 后才写，直接用磁盘值
-    const memRecent = Array.isArray(uiStateAll.recent) ? (uiStateAll.recent as unknown[]).filter((x): x is string => typeof x === "string") : [];
-    uiStateAll = disk;
-    if (memRecent.length > 0) {
-      const diskRecent = recentList();
-      uiStateAll.recent = [...memRecent, ...diskRecent.filter((p) => !memRecent.includes(p))].slice(0, 10);
-    }
-    uiStateLoaded = true;
-    initTheme();    // 主题：磁盘有选择用选择，没有跟随系统（不写盘）
-    renderRecent(); // 最近文件列表
-    const z = typeof uiStateAll.zoom === "number" ? (uiStateAll.zoom as number) : NaN;
-    if (z >= 0.5 && z <= 2.0) { zoomLevel = z; applyZoom(); }
-  }).catch(() => { uiStateLoaded = true; initTheme(); });
+  // v0.3.26：ui-state 已在 boot 开头同步 await 就绪，这里直接用（原 then 时序的 memRecent
+  // 合并不再需要——load 先于任何 pushRecent 完成）
+  initTheme();
+  renderRecent();
+  renderFindHistory(); // v0.3.26 查找历史 datalist
+  const diskZoom = typeof uiStateAll.zoom === "number" ? (uiStateAll.zoom as number) : NaN;
+  if (diskZoom >= 0.5 && diskZoom <= 2.0) zoomLevel = diskZoom;
+  // v0.3.26 状态栏：选区变化更新"已选 N 字"（与字号同步的 selectionchange 分开挂，职责不同）
+  document.addEventListener("selectionchange", trackSelectionStatus);
+  // v0.3.26 外改检测：窗口重获焦点即核当前文档（外部程序改动最常见的感知时机）
+  window.addEventListener("focus", () => {
+    const d = activeDoc();
+    if (d) void checkExternalMod(d);
+  });
+  // v0.3.26 会话兜底：崩溃/强杀等不经 onCloseRequested 的退出路径
+  window.addEventListener("beforeunload", saveSession);
   const zoomBy = (d: number) => {
     zoomLevel = Math.min(2.0, Math.max(0.5, Math.round((zoomLevel + d) * 100) / 100));
     applyZoom();

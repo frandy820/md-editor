@@ -812,6 +812,26 @@ fn export_selftest_dir() -> Option<String> {
     r
 }
 
+// ===== v0.3.26 外部修改检测：读文件元信息（mtime+size），前端比对是否被其他程序改动 =====
+#[derive(serde::Serialize)]
+struct FileMeta {
+    #[serde(rename = "mtimeMs")]
+    mtime_ms: u64,
+    size: u64,
+}
+
+#[tauri::command]
+fn file_meta(path: String) -> Result<FileMeta, String> {
+    let meta = fs::metadata(&path).map_err(|e| e.to_string())?;
+    let mtime_ms = meta
+        .modified()
+        .ok()
+        .and_then(|m| m.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+    Ok(FileMeta { mtime_ms, size: meta.len() })
+}
+
 // ===== UI 状态持久化（显示比例等）：写 %APPDATA%/<identifier>/ui-state.json =====
 // 不用 localStorage：WebView2 的 localStorage 磁盘刷盘异步，进程被强杀/崩溃即丢
 // （e2e 里 taskkill //F 复现），文件写入是同步可靠的。
@@ -1555,6 +1575,7 @@ pub fn run() {
             delete_entry,
             reveal_path,
             es_search,
+            file_meta,
             export_diagnostics,
             search_md_files,
             dnd_selftest_enabled,
@@ -1715,6 +1736,25 @@ mod tests {
             assert!(p.len() == 3 && p.ends_with(":\\"), "盘符形态: {p}");
             assert!(v["is_dir"].as_bool().unwrap());
         }
+    }
+
+    #[test]
+    fn file_meta_reports_mtime_and_size() {
+        // v0.3.26 外部修改检测：正常文件返回 mtime+size；mtime 单调（两次写之间）；不存在返回 Err
+        let dir = tempdir();
+        let p = dir.join("m.md");
+        fs::write(&p, "hello").unwrap();
+        let m1 = file_meta(p.to_str().unwrap().to_string()).unwrap();
+        assert_eq!(m1.size, 5, "size 应为字节数");
+        assert!(m1.mtime_ms > 1_500_000_000_000, "mtime 应为毫秒级现代时间戳: {}", m1.mtime_ms);
+        // 追加后 size 变化
+        fs::write(&p, "hello world").unwrap();
+        let m2 = file_meta(p.to_str().unwrap().to_string()).unwrap();
+        assert_eq!(m2.size, 11);
+        assert!(m2.mtime_ms >= m1.mtime_ms, "mtime 不应倒退");
+        // 不存在的文件：Err（前端据此视为"文件已被删除"）
+        assert!(file_meta(dir.join("nope.md").to_str().unwrap().to_string()).is_err());
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
