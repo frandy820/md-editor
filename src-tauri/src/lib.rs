@@ -161,10 +161,11 @@ fn open_file(path: String) -> Result<(String, String), String> {
         app_log("WARN", "open", &format!("拒绝打开(扩展名不符): {path}"));
         return Err("不支持的文件类型（仅 md/markdown/mdown/txt）".into());
     }
-    // 硬上限 2MB：超大文件读入+IPC 传输本身就慢，先在源头拒绝（渲染层 256KB 防线在前端）
+    // 硬上限 16MB（v0.3.25 从 2MB 放宽）：读入+IPC 在此量级仍是亚秒级，拒绝线只防病态巨型文件；
+    // 真正的体验防线在前端（200 万字符拒开 + 大文档延迟取值通道，2026-09-07 实测重设）
     if let Ok(meta) = fs::metadata(&path) {
-        if meta.len() > 2 * 1024 * 1024 {
-            return Err(format!("文件过大（{} KB，上限 2048 KB），已阻止打开以免卡死", meta.len() / 1024));
+        if meta.len() > 16 * 1024 * 1024 {
+            return Err(format!("文件过大（{} KB，上限 16384 KB），已阻止打开以免长时间无响应", meta.len() / 1024));
         }
     }
     let bytes = fs::read(&path).map_err(|e| {
@@ -1718,12 +1719,12 @@ mod tests {
 
     #[test]
     fn open_file_rejects_oversize() {
-        // >2MB 在读文件前就被拒（不读内容，Err 文案含"文件过大"）
+        // >16MB 在读文件前就被拒（不读内容，Err 文案含"文件过大"）；v0.3.25 从 2MB 放宽到 16MB
         let dir = std::env::temp_dir().join("md_verify_oversize");
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         let big = dir.join("big.md");
-        let mut buf = vec![b'a'; 2 * 1024 * 1024 + 1];
+        let mut buf = vec![b'a'; 16 * 1024 * 1024 + 1];
         buf[0] = b'#';
         fs::write(&big, &buf).unwrap();
         let err = open_file(big.to_string_lossy().to_string()).unwrap_err();

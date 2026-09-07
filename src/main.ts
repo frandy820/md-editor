@@ -99,7 +99,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     fmRename: "重命名", fmDelete: "删除", fmReveal: "在文件夹中显示", fmCopyPath: "复制路径",
     fmNewIn: "在当前位置新建", fmNamePh: "输入名称…", fmRenameTitle: "重命名为：", fmNewMdTitle: "新建 Markdown 文件：", fmNewTxtTitle: "新建 TXT 文件：", fmNewDirTitle: "新建文件夹：",
     fmDelTitle: "删除确认", fmDelFileMsg: "确定删除该文件？不可恢复。", fmDelDirMsg: "确定删除该文件夹及其全部内容？不可恢复。",
-    fmNoBase: "请先打开文件或在树中定位一个目录", untitledMd: "未命名.md", untitledDir: "新建文件夹", fmCopyDone: "已复制", fmOk: "确定", fileTooBigSuf: " KB，上限 256 KB），为避免卡死已阻止打开，请用记事本等工具查看。",
+    fmNoBase: "请先打开文件或在树中定位一个目录", untitledMd: "未命名.md", untitledDir: "新建文件夹", fmCopyDone: "已复制", fmOk: "确定", fileTooBigSuf: " 万字，上限 200 万字），已阻止打开以免长时间无响应，请拆分后再编辑。", bigLoad: "正在加载大文件，请稍候…",
     tabClose: "关闭", tabCloseOthers: "关闭其它", tabCloseRight: "关闭右侧", tabCloseLeft: "关闭左侧", tabCloseAll: "全部关闭", tabCloseSelected: "关闭选中",
     themeTip: "界面主题：浅色 / 深色 / 护眼（未选过跟随系统）",
     appName: "MD 编辑器",
@@ -149,7 +149,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     fmRename: "重新命名", fmDelete: "刪除", fmReveal: "在資料夾中顯示", fmCopyPath: "複製路徑",
     fmNewIn: "在目前位置新增", fmNamePh: "輸入名稱…", fmRenameTitle: "重新命名為：", fmNewMdTitle: "新增 Markdown 檔案：", fmNewTxtTitle: "新增 TXT 檔案：", fmNewDirTitle: "新增資料夾：",
     fmDelTitle: "刪除確認", fmDelFileMsg: "確定刪除該檔案？無法復原。", fmDelDirMsg: "確定刪除該資料夾及其全部內容？無法復原。",
-    fmNoBase: "請先開啟檔案或在樹中定位一個目錄", untitledMd: "未命名.md", untitledDir: "新增資料夾", fmCopyDone: "已複製", fmOk: "確定", fileTooBigSuf: " KB，上限 256 KB），為避免卡死已阻止開啟，請用記事本等工具查看。",
+    fmNoBase: "請先開啟檔案或在樹中定位一個目錄", untitledMd: "未命名.md", untitledDir: "新增資料夾", fmCopyDone: "已複製", fmOk: "確定", fileTooBigSuf: " 萬字，上限 200 萬字），已阻止開啟以免長時間無回應，請拆分後再編輯。", bigLoad: "正在載入大檔案，請稍候…",
     tabClose: "關閉", tabCloseOthers: "關閉其它", tabCloseRight: "關閉右側", tabCloseLeft: "關閉左側", tabCloseAll: "全部關閉", tabCloseSelected: "關閉選中",
     themeTip: "介面主題：淺色 / 深色 / 護眼（未選過跟隨系統）",
     appName: "MD 編輯器",
@@ -199,7 +199,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     fmRename: "Rename", fmDelete: "Delete", fmReveal: "Show in folder", fmCopyPath: "Copy path",
     fmNewIn: "New item here", fmNamePh: "Enter a name…", fmRenameTitle: "Rename to:", fmNewMdTitle: "New Markdown file:", fmNewTxtTitle: "New TXT file:", fmNewDirTitle: "New folder:",
     fmDelTitle: "Delete", fmDelFileMsg: "Delete this file? This cannot be undone.", fmDelDirMsg: "Delete this folder and ALL its contents? This cannot be undone.",
-    fmNoBase: "Open a file or locate a folder in the tree first", untitledMd: "Untitled.md", untitledDir: "New folder", fmCopyDone: "Copied", fmOk: "OK", fileTooBigSuf: " KB, limit 256 KB). Opening blocked to avoid freezing; use Notepad instead.",
+    fmNoBase: "Open a file or locate a folder in the tree first", untitledMd: "Untitled.md", untitledDir: "New folder", fmCopyDone: "Copied", fmOk: "OK", fileTooBigSuf: "K chars, limit 2000K chars). Opening blocked to avoid unresponsiveness; please split the file first.", bigLoad: "Loading a large file…",
     tabClose: "Close", tabCloseOthers: "Close others", tabCloseRight: "Close to the right", tabCloseLeft: "Close to the left", tabCloseAll: "Close all", tabCloseSelected: "Close selected",
     themeTip: "Theme: light / dark / eye-care (follows system until chosen)",
     appName: "MD Editor",
@@ -247,6 +247,11 @@ function detectLang(): Lang {
 }
 let currentLang: Lang = detectLang();
 function t(key: string): string { return UI_TEXT[currentLang][key] ?? UI_TEXT["en"][key] ?? key; }
+/** 大文件尺寸文案：中文按「万字」直觉展示，英文按 k chars（v0.3.25） */
+function bigSizeLabel(charCount: number): string {
+  if (currentLang === "en") return Math.round(charCount / 1000) + "K";
+  return (charCount / 10000).toFixed(1);
+}
 function welcomeMd(): string { return WELCOME_TEXT[currentLang]; }
 
 // ---- 编辑区字号（基于选区，独立于 PDF：PRINT_CSS 的 14px 固定不动）----
@@ -368,7 +373,15 @@ interface Doc {
   undoStack: string[]; // v0.3.21 自建撤销快照栈（per-doc；Vditor 内部栈粒度坏：一次 undo 撤光全部输入）
   redoStack: string[];
   base: string; // 磁盘版内容（撤销后判定 dirty 用）
+  large: boolean; // v0.3.25 大文档（>262144 字符）：走延迟取值通道（getValue 57万字=465ms，
+  // 逐键同步取值=每键~1s 阻塞，实测 headless 基准；400ms 空闲统一 flush，撤销粒度相应变粗为按输入串）
 }
+
+// v0.3.25 大文件上限（实测重设）：headless 基准 2.86M 字符渲染 10.9s 收敛、键入 466ms——
+// 超线性恶化从这里开始。2M 字符内可开（57万字=1.67MB 正常打开渲染 2.5s）。
+const MAX_OPEN_CHARS = 2_000_000;
+// 大文档延迟取值阈值：与旧拒开线一致（≤此值的文档走原逐键路径，行为字节级不变保回归）
+const LARGE_DOC_CHARS = 262144;
 let docs: Doc[] = [];
 let activeId: string | null = null;
 let docCounter = 0;
@@ -745,6 +758,32 @@ function snapOnInput(doc: Doc, cur: string): void {
   lastEditSignalAt = Date.now(); // 续编辑会话：紧随其后的导航键不切步
   snapTimer = window.setTimeout(() => { snapBase = cur; snapStepOpen = false; }, SNAP_STEP_MS);
 }
+
+// ===== v0.3.25 大文档延迟取值（Notepad++「单一数据源」思路的 DOM 系近似） =====
+// getValue() 对 57 万字符文档 = 465ms/次（Lute DOM→md 全量序列化，无缓存）。原 input 链每键
+// 调 1-2 次 = 每键近 1s 阻塞。大文档改为：逐键只置 dirty + 重置 400ms 空闲定时器，空闲时一次
+// 取值统一回填（doc.content / 撤销记步 / 大纲）。保存/导出/查找等消费方本就按需自取真值，不受影响。
+const LARGE_FLUSH_MS = 400;
+let valueSyncTimer = 0;
+let valueSyncPending = false;
+function scheduleValueSync(doc: Doc): void {
+  window.clearTimeout(valueSyncTimer);
+  valueSyncPending = true;
+  valueSyncTimer = window.setTimeout(() => flushValueSync(doc), LARGE_FLUSH_MS);
+}
+function flushValueSync(doc: Doc): void {
+  if (!valueSyncPending) return; // 无待同步（30s 自动保存的主动对账分支用：空闲阅读零成本）
+  window.clearTimeout(valueSyncTimer);
+  valueSyncPending = false;
+  if (switchApplyPending) return; // 切换装载期不取值（见 switchApplyPending 注释）
+  if (!vditor || activeDoc()?.id !== doc.id) return; // 守卫：切换/关闭标签后 mdValue() 取到的已是
+  // 别的文档内容，回填会串文档（switchDoc 自己已同步存过离场文档的值）
+  const v = mdValue();
+  if (v !== "" || doc.content === "") doc.content = v; // 空值守卫（同 options.input）
+  doc.large = v.length > LARGE_DOC_CHARS; // 小文档长过阈值后也切换到延迟通道
+  snapOnInput(doc, v);
+  scheduleOutline();
+}
 // 光标重定位=切步（Word 语义）：删完标题后 Ctrl+End/点击跳到别处再删=新的删除意图，应单独成步。
 // 不能用 selectionchange——行首 Backspace 删段落分隔时光标必然大跳（删除的结果而非用户意图），
 // 会被误封口并把 snapBase 刷成删后值，导致该删除永不进栈（实测丢步根因）。
@@ -752,6 +791,8 @@ function snapOnInput(doc: Doc, cur: string): void {
 let lastEditSignalAt = 0;
 const NAV_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);
 function navSealStep(): void {
+  if (activeDoc()?.large) return; // v0.3.25 大文档：封口须全量 mdValue(465ms)，浏览跳转每下都
+  // 卡不可接受——撤销分步退化为纯时间窗（1500ms 定时器自行封口），粒度变粗记入取舍
   if (snapStepOpen) {
     window.clearTimeout(snapTimer);
     snapBase = mdValue(); snapStepOpen = false; // 封口：跳转前的内容单独成步
@@ -785,7 +826,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key !== "Backspace" && e.key !== "Delete") return;
   if (e.isComposing) return; // 组合中的退格=删拼音串，交给输入法
   const now = Date.now();
-  if (now - lastDelKeyAt > 1500 && snapStepOpen) {
+  if (now - lastDelKeyAt > 1500 && snapStepOpen && !activeDoc()?.large) { // v0.3.25 大文档跳过（同 navSealStep：不为封口付 465ms）
     window.clearTimeout(snapTimer);
     snapBase = mdValue(); snapStepOpen = false; // 封口：删除动作之前的内容单独成步
   }
@@ -798,6 +839,7 @@ document.addEventListener("keyup", (e) => {
     if (suppressInput || !vditor) return;
     const doc = activeDoc();
     if (!doc || snapStepOpen) return; // 已有 input 信号开步则不重复
+    if (doc.large) { scheduleValueSync(doc); return; } // v0.3.25 大文档：删除兜底改走延迟通道
     const v = mdValue();
     if (v !== snapBase) snapOnInput(doc, v); // 基准用 snapBase：doc.content 会被 30s 自动保存刷新，用它判会漏记（用户实测删标题后按钮仍灰）
   }, 80);
@@ -809,11 +851,18 @@ document.addEventListener("keyup", (e) => {
 // 上屏终值由 options.input（composingLock 解除后触发）兜底记步。
 document.addEventListener("input", (e) => {
   if (suppressInput) return;
+  if (switchApplyPending) return; // v0.3.25 大文档切换装载期：旧 DOM 的信号丢弃（防串文档）
   if ((e as InputEvent).isComposing) return;
   const t = e.target as Element | null;
   if (!t?.closest?.(".vditor")) return;
   const doc = activeDoc();
-  if (doc && vditor) snapOnInput(doc, mdValue());
+  if (doc && vditor) {
+    // v0.3.25 大文档：逐键 mdValue(465ms@57万字) 不可承受——逐键只重置 400ms 空闲定时器（廉价
+    // 信号保住"有编辑发生"的感知），空闲时 flushValueSync 一次取值回填（粒度=输入串）。
+    // dirty 立即置位：options.input 挂 Vditor afterRender 防抖（大文档更慢），快速关标签不能依赖它
+    if (doc.large) { doc.dirty = true; scheduleValueSync(doc); return; }
+    snapOnInput(doc, mdValue());
+  }
 }, true);
 // v0.3.21 撤销/重做按钮（Word 式双通道）：劫持 Vditor 自带按钮点击走自建栈。
 // 捕获层挂 .vditor-toolbar（父层 capture 先于按钮自身 listener，Vditor 内部 undo 不再执行）。
@@ -898,9 +947,14 @@ function restoreDocValue(doc: Doc, v: string): void {
   syncUndoBtns();
 }
 
+// v0.3.25 大文档延迟加载：双 rAF 让帧期间编辑器还是旧文档 DOM，此刻的键入若进 input 链，
+// 会把「旧 DOM 序列化值」写进新 activeDoc（串文档）——切换期一律丢弃编辑信号
+let switchApplyPending: string | null = null;
+let switchSeq = 0; // 快速连切标签：旧 rAF 回调不得覆盖后来者
 function switchDoc(id: string) {
   hideEmptyState(); // 切到有内容的文档，隐藏空状态
   tabSel.clear(); // 新激活产生=多选态作废（树上/最近/快开/ES 打开文件都应取消选中集，v0.3.21）
+  document.getElementById("big-load")?.setAttribute("hidden", ""); // 新切换先清旧延迟加载留下的提示
   // 保存当前文档内容到其 Doc（getValue 守卫：空值不覆盖）
   if (vditor) {
     const cur = activeDoc();
@@ -912,15 +966,31 @@ function switchDoc(id: string) {
   const doc = docs.find((d) => d.id === id);
   if (!doc) return;
   activeId = id;
-  if (vditor) {
+  const seq = ++switchSeq;
+  const applyContent = (): void => {
+    switchApplyPending = null;
+    if (seq !== switchSeq || activeId !== id || !vditor) return; // 已被更快的切换接管
     // 切换文档时清空 undo/redo 栈并以新文档为唯一基线：Vditor 栈是 per-instance(非 per-doc)，
     // 不清栈会让新旧文档全文 diff 污染栈，导致一次 undo 回退整篇内容（"撤销一次撤多步"根因）。
     suppressInput = true;
     vditor.setValue(doc.content, true);
     suppressInput = false;
     snapReset(doc); // 撤销基线跟随新文档（per-doc 栈隔离）
+    rebuildOutline();
+  };
+  if (doc.large) {
+    // v0.3.25 大文档：同步 setValue 阻塞 1-6s（57万字 1.2s），先亮加载提示并双 rAF 让出
+    // （保证提示先绘制）再装载，阻塞期用户有反馈；applyContent 兜底清提示（含被接管时）
+    switchApplyPending = id;
+    const hint = document.getElementById("big-load");
+    if (hint) { hint.textContent = t("bigLoad"); hint.removeAttribute("hidden"); }
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      applyContent();
+      document.getElementById("big-load")?.setAttribute("hidden", "");
+    }));
+  } else {
+    applyContent();
   }
-  rebuildOutline();
   renderTabs();
   updateTitle();
   markTreeCurrent(); // 文件树当前文件高亮随标签切换（树不重载，保住展开态）
@@ -928,6 +998,7 @@ function switchDoc(id: string) {
 
 // 全部标签关闭后的空状态（允许关闭欢迎页）：遮住编辑区，提示打开文件
 function showEmptyState() {
+  document.getElementById("big-load")?.setAttribute("hidden", ""); // 清可能残留的大文件加载提示
   document.getElementById("empty-state")!.hidden = false;
   if (vditor) { suppressInput = true; vditor.setValue("", true); suppressInput = false; }
   const ul = document.getElementById("outline");
@@ -963,10 +1034,13 @@ async function closeDoc(id: string) {
 function openDoc(path: string | null, content: string, name?: string, encoding?: string) {
   hideEmptyState(); // 打开文档时隐藏空状态
   closeFind(); // 文档切换后旧匹配节点失效，收起查找条
-  // 大文件防线（v0.3.16）：实测 300KB 秒开、500KB 起渲染冻结（Vditor wysiwyg 超线性），
-  // 用户双击大 TXT 卡死即此因。所有打开路径（树/最近/快开/dnd/命令行）统一在此拦截。
-  if (content.length > 262144) {
-    alert(t("fileTooBig") + Math.round(content.length / 1024) + t("fileTooBigSuf"));
+  // 大文件防线（v0.3.25 实测重设）：v0.3.16 的 256KB 拒开线源自当年 500KB 渲染冻结；
+  // 2026-09-07 headless 基准复测当前引擎不复现（57万字渲染 2.5s 收敛、2.86M 字符 10.9s，
+  // 伸缩近线性），真根因是每键 getValue 全量序列化（465ms）——已由大文档延迟取值通道解决。
+  // 新拒开线 2M 字符：超过后键入延迟超 400ms、渲染超 8s，体验不成立。所有打开路径
+  // （树/最近/快开/dnd/命令行）统一在此拦截。
+  if (content.length > MAX_OPEN_CHARS) {
+    alert(t("fileTooBig") + bigSizeLabel(content.length) + t("fileTooBigSuf"));
     return;
   }
   // 同路径已打开 → 直接切换过去，不重复开
@@ -991,6 +1065,7 @@ function openDoc(path: string | null, content: string, name?: string, encoding?:
     undoStack: [],
     redoStack: [],
     base: content.replace(/\r\n/g, "\n"), // 同 snapReset 归一：磁盘 CRLF vs getValue LF，不归一则撤到底 dirty 不清
+    large: content.length > LARGE_DOC_CHARS, // v0.3.25 大文档延迟取值通道
   };
   docs.push(doc);
   switchDoc(doc.id);
@@ -1948,12 +2023,18 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
     ],
     input: () => {
       if (suppressInput) return;
+      if (switchApplyPending) return; // v0.3.25 大文档切换装载期：旧 DOM 的信号丢弃（防串文档）
       const doc = activeDoc();
       if (doc && vditor) {
-        const v = mdValue();
-        if (v !== "" || doc.content === "") doc.content = v; // 守卫：空值不覆盖
-        doc.dirty = true;
-        snapOnInput(doc, v); // v0.3.21 自建撤销栈：按输入停顿分步记快照
+        if (doc.large) { // v0.3.25 大文档：延迟取值通道（原生 input 捕获层已置 dirty 并调度）
+          scheduleValueSync(doc);
+        } else {
+          const v = mdValue();
+          if (v !== "" || doc.content === "") doc.content = v; // 守卫：空值不覆盖
+          doc.dirty = true;
+          doc.large = v.length > LARGE_DOC_CHARS; // 小文档长过阈值（如整段粘贴）后切到延迟通道
+          snapOnInput(doc, v); // v0.3.21 自建撤销栈：按输入停顿分步记快照
+        }
       }
       updateTitle();
       renderTabs();
@@ -1982,7 +2063,7 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
       // 编辑区元素固定不重建，after 统一改回 true 即可持续生效（模式/语言切换重建也会再进 after）。
       // WebView2/Chromium 内建检查：英文错词红波浪线+右键建议；中文无拼写概念不受影响。
       document.querySelector(".vditor-wysiwyg pre.vditor-reset, .vditor-ir pre.vditor-reset")
-        ?.setAttribute("spellcheck", "true");
+        ?.setAttribute("spellcheck", activeDoc()?.large ? "false" : "true"); // v0.3.25 大文档关拼写（万级节点拼写检查烧 CPU）
       rebindImagePreview(); // v0.3.11 编辑器内本地图片预览（wysiwyg；重建后重挂 observer）
       rebindTableResize(); // v0.3.11 表格列宽拖动（近缘判定+持久化重应用）
       closeFind(); // 模式/语言切换销毁重建：旧匹配节点全部失效
@@ -2316,16 +2397,20 @@ const AUTOSAVE_INTERVAL_MS = 30_000;
 let autosaveTimer: number | undefined;
 async function autosaveDirty(): Promise<void> {
   if (!vditor) return;
+  if (switchApplyPending) return; // v0.3.25 大文档切换装载期：此刻 mdValue 取到的是旧文档，本轮跳过
   // 兜底：键入后立刻失焦时，Vditor input 回调可能仍在防抖窗口内未跑（dirty 未置位）——
   // 主动从编辑器取真值对比，不等 input 回调（fullcheck A11b 实证：type 后立即 blur 会漏存最后一段）
   const a = activeDoc();
   if (a?.path) {
-    const v = mdValue();
-    if ((v !== "" || a.content === "") && v !== a.content) { a.content = v; a.dirty = true; }
+    if (a.large) { flushValueSync(a); } // v0.3.25 大文档：有待同步才取值（阅读闲置时 30s tick 零取值成本）
+    else {
+      const v = mdValue();
+      if ((v !== "" || a.content === "") && v !== a.content) { a.content = v; a.dirty = true; }
+    }
   }
   for (const doc of docs) {
     if (!doc.dirty || !doc.path) continue;
-    if (activeDoc()?.id === doc.id) {
+    if (activeDoc()?.id === doc.id && !doc.large) { // v0.3.25 大文档刚在上面 flushValueSync 取过真值，不再二次付 465ms
       const v = mdValue();
       if (v !== "" || doc.content === "") doc.content = v; // 守卫：空值不覆盖（同 saveDoc）
     }

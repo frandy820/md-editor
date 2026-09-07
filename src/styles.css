@@ -348,6 +348,9 @@ html[data-theme="dark"] #gsearch-results mark { background: rgba(255,180,0,0.4);
 #editor .vditor { border-radius: 0; border: none; }
 #empty-state { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--bg-panel); z-index: 5; }
 #empty-state[hidden] { display: none; }
+/* v0.3.25 大文件加载提示：盖在编辑区上层（z 高于 empty-state，低于 modal），双 rAF 先绘制再装载 */
+#big-load { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 10px; background: var(--bg-panel); z-index: 6; font-size: 15px; opacity: 0.92; }
+#big-load[hidden] { display: none; }
 .empty-hint { color: var(--muted2); font-size: 14px; text-align: center; line-height: 1.9; padding: 0 24px; }
 
 /* table / edit-mode 带下拉面板，tooltip 易被面板遮挡，单独提高层级 */
