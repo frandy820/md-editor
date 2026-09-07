@@ -16,7 +16,7 @@
 | 技术栈 | Tauri 2（Rust）· TypeScript + Vite · Vditor 3（编辑核心）· markdown-it（导出渲染）|
 | 前端 | `src/main.ts`（主逻辑大文件：撤销栈/标签页/文件树/导出/全盘索引）· `i18n-zh-CN|zh-TW|en.ts` · `styles.css` · `index.html` |
 | 后端 | `src-tauri/src/lib.rs` + `main.rs`（Rust 命令：文件 IO/编码识别/全盘索引/单实例转发） |
-| 测试 | `tests/TEST-PLAN.md`（唯一入口：五层体系 + 模块→组映射 + 盲区对策）；脚本在 `F:/claudecode/output/md-editor-typora-scan/`（e2e_user_J_v0321.py · ahk_smoke_v1.ahk） |
+| 测试 | `tests/TEST-PLAN.md`（唯一入口：五层体系 + 模块→组映射 + 盲区对策）；脚本在 `F:/claudecode/output/md-editor-typora-scan/`（e2e_user_J_v0321.py · ahk_smoke_v1.ahk）+ `F:/claudecode/output/md-editor-largefile-v0325/`（e2e_user_L_v0325.py 大文件专项 + headless 基准脚本） |
 | 版本 | package.json 0.1.0（未跟随）；实际版本看 git tag/README（v0.3.23）【版本唯一真值源待确认】 |
 
 **启动链路**：`npm run dev`（Vite）→ `npm run tauri dev`；生产：见下方部署链。
@@ -36,6 +36,7 @@
 | 改动模块 | 必跑 |
 |---|---|
 | 撤销/保存/自动保存（main.ts snap*/saveDoc/autosaveDirty） | B、fullcheck(A11)、AHK |
+| 大文档延迟取值（valueSync*/openDoc 上限/switchDoc 装载） | L、B、AHK |
 | 标签页（renderTabs/多选/溢出） | B、J |
 | 文件树/全盘搜索/定位 | E、H、I、J |
 | 主题/样式（styles.css/applyTheme） | D、J |
@@ -57,7 +58,7 @@
 - **IME 组合态**：拼音组合中 Ctrl+Z 先结束组合再回退；AHK 键入一律纯数字（字母会被拼音 IME 组合成中文）。
 - **Vditor 热键抢占**：Vditor 元素层拦截合成 KeyboardEvent——带修饰键的真键盘行为只能在 AHK 层验证。
 - **blur 保存时序**：失焦自动保存取值有异步竞争，改动保存链路必跑 B 组 + fullcheck(A11)。
-- 大文件防护（>256KB 阻止打开）、编码识别（UTF-8/BOM/GBK，保存统一 UTF-8 无 BOM）。
+- 大文件防线（v0.3.25 重设：>200 万字符拒开 / >262144 字符进大文档延迟取值通道；Rust 16MB 硬上限）、编码识别（UTF-8/BOM/GBK，保存统一 UTF-8 无 BOM）。
 
 ## 3. 常用命令
 
@@ -106,7 +107,7 @@ npm run build && cd src-tauri && cargo build --release --bins --features tauri/c
 - **隐私**：无联网上报；全盘索引只建文件名/路径，不进内容——新增任何索引/日志功能不得把文档内容写出 exe 目录外。
 - **运行日志**（v0.3.23 起）：512KB 滚动留三代；诊断包导出只含系统信息+日志，**不得含文档内容**。
 - **须人工确认（R3）**：对外发布/GitHub 推送 · 删除版本历史归档 · 改变保存编码策略（统一 UTF-8 无 BOM 是既定行为）。
-- **禁止**：绕过 256KB 大文件防护 · 在 Vditor options.input 上挂撤销分步信号（已被证实失效）· AHK 脚本去 BOM。
+- **禁止**：绕过大文件防线（v0.3.25 起=前端 200 万字符 + Rust 16MB + 大文档延迟取值通道，实测依据见 output/md-editor-largefile-v0325/，勿在无新基准下放宽或收紧）· 在 Vditor options.input 上挂撤销分步信号（已被证实失效）· AHK 脚本去 BOM。
 - 本地多版未推 GitHub——**推送前须人工过一遍提交序列与敏感信息**。
 
 ## 7. 当前重点与待办
@@ -119,6 +120,7 @@ npm run build && cd src-tauri && cargo build --release --bins --features tauri/c
 | 合成事件被 Vditor 元素层拦截 | 产品暴露 __md* 只读测试钩子绕过 |
 | 中文 SendText 后 isComposing 残留 | AHK 键入一律英文/纯数字 + SetEng() |
 | 长脚本元素引用过期（#file-title 教训） | fullcheck 引用随版本更新，防假阴 |
+| 部署 exe 的 WebView2 不向 CDP 派发 dialog 事件（2026-09-07 裸 alert 实证） | 弹窗类断言改走副作用（docs 状态/磁盘文件），勿依赖 dialog handler |
 | AHK 无 BOM 中文断言全废 | 脚本保存 UTF-8 带 BOM，改动后先跑一次确认非假 FAIL |
 
 ### 功能快捷键速查（改键位冲突时对照）

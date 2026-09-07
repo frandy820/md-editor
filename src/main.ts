@@ -763,7 +763,8 @@ function snapOnInput(doc: Doc, cur: string): void {
 // getValue() 对 57 万字符文档 = 465ms/次（Lute DOM→md 全量序列化，无缓存）。原 input 链每键
 // 调 1-2 次 = 每键近 1s 阻塞。大文档改为：逐键只置 dirty + 重置 400ms 空闲定时器，空闲时一次
 // 取值统一回填（doc.content / 撤销记步 / 大纲）。保存/导出/查找等消费方本就按需自取真值，不受影响。
-const LARGE_FLUSH_MS = 400;
+const LARGE_FLUSH_MS = 1500; // 须盖过 Vditor 内部 afterRender 防抖(~1s)：过早取值拿到的是编辑前的
+// 旧缓存值（WebView2 实测键入后 400ms 取 getValue 仍无新字符，1.5s 后才有）——与 SNAP_STEP_MS 同窗
 let valueSyncTimer = 0;
 let valueSyncPending = false;
 function scheduleValueSync(doc: Doc): void {
