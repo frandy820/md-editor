@@ -4,7 +4,7 @@
 ![platform](https://img.shields.io/badge/platform-Windows-0078D4?style=flat-square)
 ![tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=flat-square)
 ![size](https://img.shields.io/badge/size-~7.5MB-9cf?style=flat-square)
-![i18n](https://img.shields.io/badge/UI-中文%20%7C%20EN-4470e0?style=flat-square)
+![i18n](https://img.shields.io/badge/UI-中文%20%7C%20EN-002fa7?style=flat-square)
 
 ![MD 编辑器 · 表格可视化编辑](docs/screenshots/table-edit.png)
 
