@@ -1356,12 +1356,38 @@ fn es_search(query: String, limit: u32) -> Result<Vec<EsHit>, String> {
         ));
     }
     // 空格拆词 AND 匹配文件名（ASCII 忽略大小写）；路径短的相关度高更靠前
-    let terms: Vec<String> = q.split_whitespace().map(str::to_string).collect();
+    // v0.3.28 ext: 过滤语法恢复（v0.3.22 自建索引切替时丢失）：ext:md=只留 .md 文件
+    // （可多个 ext:token 取并集，多个扩展名写法 ext:md,txt 也接受）；其余词仍 AND 匹配文件名
+    let mut terms: Vec<String> = Vec::new();
+    let mut exts: Vec<String> = Vec::new();
+    for tok in q.split_whitespace() {
+        if let Some(e) = tok.strip_prefix("ext:") {
+            if !e.is_empty() {
+                for x in e.split(',') {
+                    let x = x.trim().trim_start_matches('.');
+                    if !x.is_empty() { exts.push(x.to_string()); }
+                }
+                continue;
+            }
+        }
+        terms.push(tok.to_string());
+    }
     let mut hits: Vec<EsHit> = idx
         .iter()
         .filter(|e| {
             let name = &e.path[e.name_at.min(e.path.len())..];
-            terms.iter().all(|t| ascii_ci_contains(name, t))
+            if !terms.iter().all(|t| ascii_ci_contains(name, t)) { return false; }
+            if !exts.is_empty() {
+                if e.is_dir { return false; }
+                match name.rfind('.') {
+                    Some(d) => {
+                        let ex = &name[d + 1..];
+                        if !exts.iter().any(|x| x.eq_ignore_ascii_case(ex)) { return false; }
+                    }
+                    None => return false,
+                }
+            }
+            true
         })
         .take(limit.clamp(1, 2000) as usize)
         .map(|e| EsHit { path: e.path.clone(), is_dir: e.is_dir })
@@ -1616,6 +1642,18 @@ mod tests {
         // limit 截断
         let hits = es_search("md".into(), 1).unwrap();
         assert_eq!(hits.len(), 1);
+        // v0.3.28 ext: 过滤（切自建索引时丢的语法）：词+扩展名 AND；ext: 排除目录；
+        // 多扩展名并集（逗号）；纯 ext: 也有效
+        let hits = es_search("报告 ext:md".into(), 10).unwrap();
+        assert_eq!(hits.len(), 1, "{hits:?}");
+        assert!(hits[0].path.ends_with("年度报告.md"));
+        let hits = es_search("报告 ext:md,txt".into(), 10).unwrap();
+        assert_eq!(hits.len(), 1, "{hits:?}");
+        assert!(hits[0].path.ends_with("年度报告.md"));
+        let hits = es_search("ext:txt".into(), 10).unwrap();
+        assert!(hits.iter().all(|h| h.path.ends_with(".txt")) && !hits.is_empty(), "{hits:?}");
+        let hits = es_search("todo ext:txt".into(), 10).unwrap();
+        assert!(hits.iter().any(|h| h.path.ends_with("todo.txt")), "{hits:?}");
         // 空查询
         assert!(es_search("  ".into(), 10).unwrap().is_empty());
         // 清空索引+构建中 → 未就绪语义

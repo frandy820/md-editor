@@ -1,6 +1,6 @@
 [package]
 name = "md-editor"
-version = "0.3.27"
+version = "0.3.28"
 description = "A Tauri App"
 authors = ["frandy820"]
 edition = "2021"
@@ -29,3 +29,12 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 base64 = "0.22"
+
+# v0.3.28 体积优化（用户要求软件尽量小方便传）：链接期优化+符号剥离+体积优先代码生成。
+# 注意：改此段后必须 cargo clean（target 缓存混合会静默回退旧配置）。
+[profile.release]
+strip = true
+lto = "fat"
+codegen-units = 1
+opt-level = "s"
+panic = "abort"

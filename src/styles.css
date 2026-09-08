@@ -127,20 +127,50 @@ html[data-theme="paper"] .vditor-reset kbd { background-color: #ead9b5 !importan
 
 #toolbar {
   height: 42px; flex: 0 0 auto;
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 6px;
   padding: 0 12px;
   background: var(--bg); border-bottom: 1px solid var(--border2);
+  container-type: inline-size; /* v0.3.28 工具栏自适应：容器查询分档降级 */
 }
+/* v0.3.28 分组布局：文件/输出/工具 …（弹性空隙）… 模式/设置 */
+.tb-group { display: flex; align-items: center; gap: 5px; flex: 0 0 auto; }
+.tb-divider { width: 1px; height: 20px; background: var(--border2); flex: 0 0 auto; margin: 0 4px; }
+.tb-spacer { flex: 1 1 auto; min-width: 10px; }
+.tb-ico { line-height: 1; }
+.tb-label { white-space: nowrap; }
 #toolbar button {
-  padding: 4px 12px; cursor: pointer;
+  padding: 4px 11px; cursor: pointer;
   border: 1px solid var(--border); background: var(--bg-surface); border-radius: 4px;
   font-size: 13px; color: var(--text);
+  display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
 }
 #toolbar button:hover { background: var(--bg-hover); }
-#btn-mode { margin-left: 4px; background: var(--accent-soft); border-color: var(--accent-border); }
+/* 工具组（专注/查找/历史/诊断）：ghost 淡化，主次分级 */
+.tb-tools button { border-color: transparent; background: none; color: var(--text3); }
+.tb-tools button:hover { background: var(--bg-hover); color: var(--text); }
+#btn-mode { background: var(--accent-soft); border-color: var(--accent-border); }
 #btn-mode:hover { background: var(--bg-active); }
-#btn-theme { padding: 4px 10px; font-size: 14px; }
-/* 导出下拉菜单：绝对定位于导出按钮下方，点外部收起（与查找条同模式） */
+/* 档1（<1150px）：按钮收图标档。:has(.tb-ico) 只收应用按钮——#export-menu 菜单项
+   无 ico 结构，不依赖源顺序防止误伤（特异性耦合教训） */
+@container (max-width: 1150px) {
+  #toolbar button .tb-label { display: none; }
+  #toolbar button:has(> .tb-ico) { padding: 4px 8px; }
+  .tb-ico { font-size: 14px; }
+}
+/* 档2（<950px）：尾部信息徽标让位 */
+@container (max-width: 950px) {
+  #app-version, #encoding-badge, #mode-badge { display: none; }
+}
+/* 档3（<820px）：输入/下拉收窄。窗口 minWidth=800（tauri.conf.json），阈值须 >800 才可达 */
+@container (max-width: 820px) {
+  #font-size-select { width: 3.2em !important; }
+  #lang-select, #theme-select { padding: 4px 2px; max-width: 92px; }
+  .tb-divider { margin: 0 2px; }
+  .tb-group { gap: 3px; }
+}
+/* 导出下拉菜单：绝对定位于导出按钮下方，点外部收起（与查找条同模式）。
+   注意：#toolbar 的 container-type 使其成为 stacking context（z=0 参与根上下文），
+   此 z-index 只在 #toolbar 内排序——新增顶部 UI 若 z>0 会盖住本菜单，发现遮挡先查这里 */
 #export-wrap { position: relative; }
 #export-menu {
   position: absolute; top: 100%; left: 0; z-index: 2100000; margin-top: 3px;
@@ -154,8 +184,6 @@ html[data-theme="paper"] .vditor-reset kbd { background-color: #ead9b5 !importan
 #export-menu button:hover { background: var(--bg-hover); }
 #export-menu button:disabled { color: var(--muted3); cursor: default; }
 #export-menu button:disabled:hover { background: none; }
-#export-menu .menu-sep { border-top: 1px solid var(--border4); margin: 4px 6px; }
-#export-menu .menu-label { font-size: 11px; color: var(--muted2); padding: 4px 12px 2px; }
 #lang-select, #font-size-select, #theme-select { padding: 4px 6px; font-size: 13px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-surface); color: var(--text); cursor: pointer; }
 #encoding-badge { color: var(--muted2); font-size: 12px; }
 #app-version { color: var(--muted4); font-size: 11px; margin-left: 2px; white-space: nowrap; }

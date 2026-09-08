@@ -55,7 +55,7 @@ const VDITOR_LANG: Record<Lang, "zh_CN" | "zh_TW" | "en_US"> = { "zh-CN": "zh_CN
 
 const UI_TEXT: Record<Lang, Record<string, string>> = {
   "zh-CN": {
-    open: "📂 打开", save: "💾 保存", welcomeName: "欢迎", untitled: "未命名", noDoc: "（无）",
+    open: "📂 打开", save: "💾 保存", openTip: "打开 .md/.markdown/.txt 文件（可拖入窗口）", saveTip: "保存当前文档（Ctrl+S）", welcomeName: "欢迎", untitled: "未命名", noDoc: "（无）",
     emptyHint: "📋 点击顶部「📂 打开」，或把 .md 文件拖入窗口，开始编辑",
     noHeadings: "（暂无标题：用 # 添加章节）",
     noOpenFile: "（暂无打开的文件：点顶部「打开」或把 .md 拖入窗口）",
@@ -64,11 +64,11 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     saveEmptySuf: "」内容为空，已跳过保存（避免清空文件）",
     delTitle: "删除章节", delConfirmSuf: "」及其所有子内容？",
     closeSaveMsg: "有未保存的修改，是否保存？", closeSave: "保存并关闭", closeDiscard: "不保存关闭", closeCancel: "取消",
-    modeWYSIWYG: "所见即所得", modeIR: "即时渲染", switchToIR: "切回即时渲染", switchToWYSIWYG: "所见即所得",
+    modeWYSIWYG: "所见即所得", modeIR: "即时渲染", switchToIR: "⇄ 切回即时渲染", switchToWYSIWYG: "⇄ 所见即所得",
     modeWYSIWYGTip: "当前：所见即所得模式（可直接编辑表格）", modeIRTip: "当前：即时渲染模式",
     switchToIRTip: "切回即时渲染模式（Ctrl+Alt+M）", switchToWYSIWYGTip: "切到所见即所得模式以编辑表格（Ctrl+Alt+M）",
     panelTitle: "大纲 · 点击定位 · ✕删除 · 拖动重排",
-    export: "💾 导出 ▾", exportNoDoc: "（请先打开或新建文档再导出）", exportEmptyConfirm: "文档内容为空，仍要导出吗？", exportFail: "导出失败：", exporting: "正在导出 PDF，请稍候…",
+    export: "📤 导出 ▾", exportNoDoc: "（请先打开或新建文档再导出）", exportEmptyConfirm: "文档内容为空，仍要导出吗？", exportFail: "导出失败：", exporting: "正在导出 PDF，请稍候…",
     exportDone: "导出完成：",
     exportImageSlices: "文档较长，已分片导出多张 PNG：", pasteImgUntitledHint: "（提示：文档尚未保存，截图存到了应用目录，保存文档后建议用「另存为」整理）",
     exportStagePage: "正在生成页面…", exportStagePrint: "正在打印为 PDF…", exportStageSave: "正在保存文件…",
@@ -89,6 +89,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     outlineFilterPh: "过滤大纲…", filterFilesPh: "过滤树 / 全盘搜文件名…",
     esSearching: "全盘搜索中…", esNone: "全盘无命中", esIndexing: "正在建立全盘文件索引（已扫描 {n} 项）——数十秒后即可搜到部分结果，期间逐步补全", esFail: "全盘查询失败",
   diagOk: "诊断包已导出（含运行日志+版本+系统信息），可直接发给反馈者：", diagFail: "诊断包导出失败：", esSplitTip: "拖动调整文件名列宽，双击复位",
+    diagBtn: "🧰 诊断", diagTip: "导出诊断包：运行日志+版本+系统信息，单个文本文件，用于问题反馈",
     recentTitle: "最近", clearRecentTip: "清空最近文件列表", clearRecent: "🗑 清空",
     treePathPh: "路径，回车跳转", treeRefreshTip: "刷新目录",
     gsearchPh: "搜同级文件内容，回车执行（Ctrl+Shift+F）", gsearchNone: "（无匹配）",
@@ -108,7 +109,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     appName: "MD 编辑器",
   },
   "zh-TW": {
-    open: "📂 開啟", save: "💾 儲存", welcomeName: "歡迎", untitled: "未命名", noDoc: "（無）",
+    open: "📂 開啟", save: "💾 儲存", openTip: "開啟 .md/.markdown/.txt 文件（可拖入視窗）", saveTip: "儲存當前文件（Ctrl+S）", welcomeName: "歡迎", untitled: "未命名", noDoc: "（無）",
     emptyHint: "📋 點擊頂部「📂 開啟」，或把 .md 檔案拖入視窗，開始編輯",
     noHeadings: "（暫無標題：用 # 新增章節）",
     noOpenFile: "（暫無開啟的檔案：點頂部「開啟」或把 .md 拖入視窗）",
@@ -117,11 +118,11 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     saveEmptySuf: "」內容為空，已跳過儲存（避免清空檔案）",
     delTitle: "刪除章節", delConfirmSuf: "」及其所有子內容？",
     closeSaveMsg: "有未儲存的修改，是否儲存？", closeSave: "儲存並關閉", closeDiscard: "不儲存關閉", closeCancel: "取消",
-    modeWYSIWYG: "所見即所得", modeIR: "即時渲染", switchToIR: "切回即時渲染", switchToWYSIWYG: "所見即所得",
+    modeWYSIWYG: "所見即所得", modeIR: "即時渲染", switchToIR: "⇄ 切回即時渲染", switchToWYSIWYG: "⇄ 所見即所得",
     modeWYSIWYGTip: "當前：所見即所得模式（可直接編輯表格）", modeIRTip: "當前：即時渲染模式",
     switchToIRTip: "切回即時渲染模式（Ctrl+Alt+M）", switchToWYSIWYGTip: "切到所見即所得模式以編輯表格（Ctrl+Alt+M）",
     panelTitle: "大綱 · 點擊定位 · ✕刪除 · 拖曳重排",
-    export: "💾 匯出 ▾", exportNoDoc: "（請先開啟或新增文件再匯出）", exportEmptyConfirm: "文件內容為空，仍要匯出嗎？", exportFail: "匯出失敗：", exporting: "正在匯出 PDF，請稍候…",
+    export: "📤 匯出 ▾", exportNoDoc: "（請先開啟或新增文件再匯出）", exportEmptyConfirm: "文件內容為空，仍要匯出嗎？", exportFail: "匯出失敗：", exporting: "正在匯出 PDF，請稍候…",
     exportDone: "匯出完成：",
     exportImageSlices: "文件較長，已分片匯出多張 PNG：", pasteImgUntitledHint: "（提示：文件尚未儲存，截圖存到了應用目錄，儲存文件後建議整理）",
     exportStagePage: "正在產生頁面…", exportStagePrint: "正在列印為 PDF…", exportStageSave: "正在儲存檔案…",
@@ -142,6 +143,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     outlineFilterPh: "過濾大綱…", filterFilesPh: "過濾樹 / 全碟搜檔名…",
     esSearching: "全碟搜尋中…", esNone: "全碟無命中", esIndexing: "正在建立全碟文件索引（已掃描 {n} 項）——數十秒後即可搜到部分結果，期間逐步補全", esFail: "全碟查詢失敗",
   diagOk: "診斷包已導出（含運行日誌+版本+系統信息），可直接發給反饋者：", diagFail: "診斷包導出失敗：", esSplitTip: "拖動調整文件名列寬，雙擊復位",
+    diagBtn: "🧰 診斷", diagTip: "導出診斷包：運行日誌+版本+系統信息，單個文本文件，用於問題反饋",
     recentTitle: "最近", clearRecentTip: "清空最近檔案列表", clearRecent: "🗑 清空",
     treePathPh: "路徑，Enter 跳轉", treeRefreshTip: "重新整理目錄",
     gsearchPh: "搜同層檔案內容，Enter 執行（Ctrl+Shift+F）", gsearchNone: "（無符合）",
@@ -161,7 +163,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     appName: "MD 編輯器",
   },
   "en": {
-    open: "📂 Open", save: "💾 Save", welcomeName: "Welcome", untitled: "Untitled", noDoc: "(none)",
+    open: "📂 Open", save: "💾 Save", openTip: "Open a .md/.markdown/.txt file (or drag one into the window)", saveTip: "Save the current document (Ctrl+S)", welcomeName: "Welcome", untitled: "Untitled", noDoc: "(none)",
     emptyHint: '📋 Click "Open" above, or drag a .md file into the window to start editing',
     noHeadings: "(No headings yet: use # to add a section)",
     noOpenFile: '(No file open: click "Open" above or drag a .md file here)',
@@ -170,11 +172,11 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     saveEmptySuf: '" is empty, save skipped (to avoid clearing the file)',
     delTitle: "Delete section", delConfirmSuf: '" and all its content?',
     closeSaveMsg: "Unsaved changes. Save?", closeSave: "Save and close", closeDiscard: "Close without saving", closeCancel: "Cancel",
-    modeWYSIWYG: "WYSIWYG", modeIR: "Instant Rendering", switchToIR: "Markdown (IR)", switchToWYSIWYG: "WYSIWYG",
+    modeWYSIWYG: "WYSIWYG", modeIR: "Instant Rendering", switchToIR: "⇄ Markdown (IR)", switchToWYSIWYG: "⇄ WYSIWYG",
     modeWYSIWYGTip: "Current: WYSIWYG mode (visual table editing)", modeIRTip: "Current: Markdown (IR) mode",
     switchToIRTip: "Switch to Markdown (IR) (Ctrl+Alt+M)", switchToWYSIWYGTip: "Switch to WYSIWYG to edit tables (Ctrl+Alt+M)",
     panelTitle: "Outline · click to navigate · ✕ delete · drag to reorder",
-    export: "💾 Export ▾", exportNoDoc: "(Open or create a document first)", exportEmptyConfirm: "The document is empty. Export anyway?", exportFail: "Export failed: ", exporting: "Exporting PDF, please wait…",
+    export: "📤 Export ▾", exportNoDoc: "(Open or create a document first)", exportEmptyConfirm: "The document is empty. Export anyway?", exportFail: "Export failed: ", exporting: "Exporting PDF, please wait…",
     exportDone: "Exported: ",
     exportImageSlices: "Long document, exported as multiple PNG slices: ", pasteImgUntitledHint: "(Tip: document not saved yet; screenshot stored in app folder)",
     exportStagePage: "Generating pages…", exportStagePrint: "Printing to PDF…", exportStageSave: "Saving file…",
@@ -195,6 +197,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     outlineFilterPh: "Filter outline…", filterFilesPh: "Filter tree / search all drives…",
     esSearching: "Searching all drives…", esNone: "No matches on this computer", esIndexing: "Building drive-wide file index ({n} items scanned) — partial results become searchable within a minute", esFail: "Query failed",
   diagOk: "Diagnostics exported (logs + version + system info). Send this file for bug reports:", diagFail: "Failed to export diagnostics:", esSplitTip: "Drag to resize the name column, double-click to reset",
+    diagBtn: "🧰 Diagnostics", diagTip: "Export diagnostics: logs + version + system info in one text file, for bug reports",
     recentTitle: "Recent", clearRecentTip: "Clear recent files", clearRecent: "🗑 Clear",
     treePathPh: "Path, Enter to go", treeRefreshTip: "Refresh folder",
     gsearchPh: "Search sibling files here, Enter (Ctrl+Shift+F)", gsearchNone: "(no match)",
@@ -1161,7 +1164,7 @@ function scheduleSessionSave(): void {
 }
 
 // 惰性占位 doc 激活时读盘（switchDoc 检测 lazy 转入此处；完成后走正常 switchDoc 路径）
-async function loadLazyDoc(doc: Doc): Promise<void> {
+async function loadLazyDoc(doc: Doc, silent = false): Promise<void> {
   if (doc.loading || !doc.lazy) return;
   doc.loading = true;
   try {
@@ -1182,10 +1185,11 @@ async function loadLazyDoc(doc: Doc): Promise<void> {
     refreshMeta(doc);
     if (doc.large) showBigDocBar();
   } catch (e) {
-    // 文件已被删除/移走：去掉占位标签（提示而非静默消失）
-    alert(t("openFail") + e);
+    // 文件已被删除/移走：去掉占位标签。silent（启动会话恢复）不打扰——测试/清理留下的
+    // 死标签一批弹 N 个 alert 不可接受（2026-09-08 实况）；用户主动点开仍提示
     doc.loading = false;
     closeDoc(doc.id);
+    if (!silent) alert(t("openFail") + e);
     return;
   }
   doc.loading = false;
@@ -1227,7 +1231,16 @@ async function restoreSession(): Promise<boolean> {
   hideEmptyState();
   if (activeId) {
     const d = docs.find((x) => x.id === activeId)!;
-    await loadLazyDoc(d); // 活动标签同步加载（含大文档路径/防线）
+    await loadLazyDoc(d, true); // 活动标签同步加载（含大文档路径/防线）；silent=死文件静默清
+    if (!docs.some((x) => x.id === activeId)) {
+      // 活动标签死了：剩标签→激活第一个（lazy，switchDoc 内会读盘）；全灭→当无会话开欢迎页
+      if (docs.length === 0) return false;
+      const next = docs[0];
+      activeId = next.id;
+      renderTabs();
+      updateTitle();
+      void loadLazyDoc(next, true);
+    }
   }
   return true;
 }
@@ -2025,9 +2038,16 @@ function applyTheme(name: ThemeName, persist = true): void {
   if (vditor) {
     // v0.3.21 新增 oled(墨黑)/paper(暖纸)：编辑区底色走 CSS 覆盖（eye 同模式），Vditor 侧只分深浅两档
     const vd = name === "dark" || name === "oled" ? "dark" : "classic";
-    try { vditor.setTheme(vd, name, undefined, "/vditor-assets/dist/css/content-theme"); } catch { /* 未就绪：重建时随 options 生效 */ }
+    // contentTheme 必须映射到真实存在的 css（目录仅 light/dark/eye）：oled→dark、paper→light。
+    // v0.3.28 修：直接传 name 时 oled.css 404 回退 light=墨黑下正文黑字黑底（用户实报）
+    const ct = name === "oled" ? "dark" : name === "paper" ? "light" : name;
+    try { vditor.setTheme(vd, ct, undefined, "/vditor-assets/dist/css/content-theme"); } catch { /* 未就绪：重建时随 options 生效 */ }
   }
   if (persist) saveUiStateKey("theme", name);
+}
+/** content-theme 实名（boot options 与 applyTheme 共用）：oled→dark、paper→light，其余原样 */
+function contentThemeOf(name: ThemeName): string {
+  return name === "oled" ? "dark" : name === "paper" ? "light" : name;
 }
 function initTheme(): void {
   // 未选过（磁盘无合法 theme 值）→ 跟随系统，且不写盘（选过才固定）
@@ -2309,7 +2329,7 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
     },
     preview: {
       // 内容主题随主题切换（light/dark/eye 三态；eye=自建护眼豆沙绿）
-      theme: { current: themeName, path: "/vditor-assets/dist/css/content-theme" },
+      theme: { current: contentThemeOf(themeName), path: "/vditor-assets/dist/css/content-theme" },
       hljs: { lineNumber: true, style: "github" },
       // 数学公式 KaTeX（引擎资源已本地化；inlineDigit 允许行内 $ 后跟数字，兼容中文排版场景）
       math: { engine: "KaTeX", inlineDigit: true },
@@ -2470,7 +2490,7 @@ function updateModeUI() {
   const badge = document.getElementById("mode-badge");
   if (currentMode === "wysiwyg") {
     if (btn) {
-      btn.textContent = t("switchToIR");
+      setBtn("btn-mode", t("switchToIR"));
       btn.title = t("switchToIRTip");
     }
     if (badge) {
@@ -2480,7 +2500,7 @@ function updateModeUI() {
     }
   } else {
     if (btn) {
-      btn.textContent = t("switchToWYSIWYG");
+      setBtn("btn-mode", t("switchToWYSIWYG"));
       btn.title = t("switchToWYSIWYGTip");
     }
     if (badge) {
@@ -2491,14 +2511,33 @@ function updateModeUI() {
   }
 }
 
+// v0.3.28 工具栏按钮文本：拆「图标 + 文字」双 span（窄窗口 @container 只留图标）。
+// 匹配行首 emoji（含变体选择符 U+FE0F/肤色修饰）或 ⇄；无图标则整段作 label（btn-mode 切换文案）。
+// 注意：ZWJ 组合 emoji（如家庭序列）不在此防御——当前 i18n 无此形态，引入时需先扩展此处。
+function setBtn(id: string, text: string) {
+  const b = document.getElementById(id);
+  if (!b) return;
+  const m = /^([⇄\p{Extended_Pictographic}](?:\u{FE0F}|\p{Emoji_Modifier})*)\s?([\s\S]*)$/u.exec(text);
+  b.textContent = "";
+  if (m) {
+    const ico = document.createElement("span"); ico.className = "tb-ico"; ico.textContent = m[1];
+    b.appendChild(ico);
+    if (m[2]) { const lb = document.createElement("span"); lb.className = "tb-label"; lb.textContent = m[2]; b.appendChild(lb); }
+  } else {
+    b.textContent = text;
+  }
+}
+
 // 把所有静态 DOM 文案更新到当前语言（语言切换 / 初始化时调用）
 function applyAllText() {
-  document.getElementById("btn-open")!.textContent = t("open");
-  document.getElementById("btn-save")!.textContent = t("save");
-  document.getElementById("btn-export")!.textContent = t("export");
-  const bp = document.getElementById("btn-print"); if (bp) { bp.textContent = t("printBtn"); bp.title = t("printTip"); }
-  const bfw = document.getElementById("btn-focus-mode"); if (bfw) { bfw.textContent = t("focusMode"); bfw.title = t("focusTip"); }
-  const bfd = document.getElementById("btn-find"); if (bfd) { bfd.textContent = t("findBtn"); bfd.title = t("findTip"); }
+  const bo = document.getElementById("btn-open"); if (bo) { setBtn("btn-open", t("open")); bo.title = t("openTip"); }
+  const bs = document.getElementById("btn-save"); if (bs) { setBtn("btn-save", t("save")); bs.title = t("saveTip"); }
+  setBtn("btn-export", t("export"));
+  const bp = document.getElementById("btn-print"); if (bp) { setBtn("btn-print", t("printBtn")); bp.title = t("printTip"); }
+  const bfw = document.getElementById("btn-focus-mode"); if (bfw) { setBtn("btn-focus-mode", t("focusMode")); bfw.title = t("focusTip"); }
+  const bfd = document.getElementById("btn-find"); if (bfd) { setBtn("btn-find", t("findBtn")); bfd.title = t("findTip"); }
+  const bh = document.getElementById("btn-history"); if (bh) { setBtn("btn-history", t("histBtn")); bh.title = t("histTitle"); }
+  const bd = document.getElementById("btn-diag"); if (bd) { setBtn("btn-diag", t("diagBtn")); bd.title = t("diagTip"); }
   const fi = document.getElementById("find-input") as HTMLInputElement | null; if (fi) fi.placeholder = t("findPlaceholder");
   const ri = document.getElementById("replace-input") as HTMLInputElement | null; if (ri) ri.placeholder = t("replacePlaceholder");
   const ro = document.getElementById("replace-one"); if (ro) ro.textContent = t("replaceOne");

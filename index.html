@@ -9,40 +9,54 @@
   </head>
   <body>
     <div id="toolbar">
-      <button id="btn-open" type="button">📂 打开</button>
-      <button id="btn-save" type="button">💾 保存</button>
-      <span id="export-wrap">
-        <button id="btn-export" type="button" title="导出：PDF / HTML / 图片 / Word">💾 导出 ▾</button>
-        <div id="export-menu" hidden>
-          <button data-export="pdf" type="button">📄 PDF（矢量）</button>
-          <button data-export="html" type="button">🌐 HTML（带样式）</button>
-          <button data-export="html-plain" type="button">📝 HTML（纯净）</button>
-          <button data-export="image" type="button">🖼 图片 PNG（长图）</button>
-          <button data-export="docx" type="button">📄 Word (.docx)</button>
-        </div>
-      </span>
-      <button id="btn-print" type="button" title="打印正文（Ctrl+P）：弹系统打印预览，可选打印机/份数/双面">🖨 打印</button>
-      <button id="btn-focus-mode" type="button" title="专注模式（F8）：淡化非当前段落">🎯 专注</button>
-      <button id="btn-find" type="button" title="查找替换（Ctrl+F / Ctrl+H）">🔍 查找</button>
-      <button id="btn-history" type="button" title="版本历史：保存时自动归档旧版，可预览/一键恢复">🕘 历史</button>
-      <button id="btn-diag" type="button" title="导出诊断包：运行日志+版本+系统信息，单个文本文件，用于问题反馈">🧰 诊断</button>
-      <button id="btn-mode" type="button" title="切回即时渲染模式（Ctrl+Alt+M）">切回即时渲染</button>
-      <span id="mode-badge" class="mode-badge wysiwyg" title="当前：所见即所得模式（可直接编辑表格）">所见即所得</span>
-      <input id="font-size-select" type="number" min="8" max="72" step="1" value="16" title="编辑区字号" style="width: 4em" />
-      <select id="theme-select" title="界面主题：浅色 / 深色 / 护眼（未选过跟随系统）">
-        <option value="light">🌙 浅色</option>
-        <option value="dark">☀️ 深色</option>
-        <option value="eye">🌿 护眼</option>
-        <option value="oled">🌑 墨黑</option>
-        <option value="paper">📜 暖纸</option>
-      </select>
-      <select id="lang-select" title="Language / 语言">
-        <option value="zh-CN">简体中文</option>
-        <option value="zh-TW">繁體中文</option>
-        <option value="en">English</option>
-      </select>
-      <span id="encoding-badge"></span>
-      <span id="app-version" title="软件版本（报问题时先看这里）">v0.3.27</span>
+      <div class="tb-group">
+        <button id="btn-open" type="button"><span class="tb-ico">📂</span><span class="tb-label">打开</span></button>
+        <button id="btn-save" type="button"><span class="tb-ico">💾</span><span class="tb-label">保存</span></button>
+      </div>
+      <span class="tb-divider"></span>
+      <div class="tb-group">
+        <span id="export-wrap">
+          <button id="btn-export" type="button" title="导出：PDF / HTML / 图片 / Word"><span class="tb-ico">📤</span><span class="tb-label">导出 ▾</span></button>
+          <div id="export-menu" hidden>
+            <button data-export="pdf" type="button">📄 PDF（矢量）</button>
+            <button data-export="html" type="button">🌐 HTML（带样式）</button>
+            <button data-export="html-plain" type="button">📝 HTML（纯净）</button>
+            <button data-export="image" type="button">🖼 图片 PNG（长图）</button>
+            <button data-export="docx" type="button">📄 Word (.docx)</button>
+          </div>
+        </span>
+        <button id="btn-print" type="button" title="打印正文（Ctrl+P）：弹系统打印预览，可选打印机/份数/双面"><span class="tb-ico">🖨</span><span class="tb-label">打印</span></button>
+      </div>
+      <span class="tb-divider"></span>
+      <div class="tb-group tb-tools">
+        <button id="btn-focus-mode" type="button" title="专注模式（F8）：淡化非当前段落"><span class="tb-ico">🎯</span><span class="tb-label">专注</span></button>
+        <button id="btn-find" type="button" title="查找替换（Ctrl+F / Ctrl+H）"><span class="tb-ico">🔍</span><span class="tb-label">查找</span></button>
+        <button id="btn-history" type="button" title="版本历史：保存时自动归档旧版，可预览/一键恢复"><span class="tb-ico">🕘</span><span class="tb-label">历史</span></button>
+        <button id="btn-diag" type="button" title="导出诊断包：运行日志+版本+系统信息，单个文本文件，用于问题反馈"><span class="tb-ico">🧰</span><span class="tb-label">诊断</span></button>
+      </div>
+      <div class="tb-spacer"></div>
+      <div class="tb-group">
+        <button id="btn-mode" type="button" title="切回即时渲染模式（Ctrl+Alt+M）"><span class="tb-ico">⇄</span><span class="tb-label">切回即时渲染</span></button>
+        <span id="mode-badge" class="mode-badge wysiwyg" title="当前：所见即所得模式（可直接编辑表格）">所见即所得</span>
+      </div>
+      <span class="tb-divider"></span>
+      <div class="tb-group">
+        <input id="font-size-select" type="number" min="8" max="72" step="1" value="16" title="编辑区字号" style="width: 4em" />
+        <select id="theme-select" title="界面主题：浅色 / 深色 / 护眼（未选过跟随系统）">
+          <option value="light">🌙 浅色</option>
+          <option value="dark">☀️ 深色</option>
+          <option value="eye">🌿 护眼</option>
+          <option value="oled">🌑 墨黑</option>
+          <option value="paper">📜 暖纸</option>
+        </select>
+        <select id="lang-select" title="Language / 语言">
+          <option value="zh-CN">简体中文</option>
+          <option value="zh-TW">繁體中文</option>
+          <option value="en">English</option>
+        </select>
+        <span id="encoding-badge"></span>
+        <span id="app-version" title="软件版本（报问题时先看这里）">v0.3.28</span>
+      </div>
     </div>
     <div id="tabs"></div>
     <div id="main">

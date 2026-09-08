@@ -3,12 +3,12 @@
 ![license](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
 ![platform](https://img.shields.io/badge/platform-Windows-0078D4?style=flat-square)
 ![tauri](https://img.shields.io/badge/Tauri-2-FFC131?style=flat-square)
-![size](https://img.shields.io/badge/size-~15MB-9cf?style=flat-square)
+![size](https://img.shields.io/badge/size-~7.5MB-9cf?style=flat-square)
 ![i18n](https://img.shields.io/badge/UI-中文%20%7C%20EN-4470e0?style=flat-square)
 
 ![MD 编辑器 · 表格可视化编辑](docs/screenshots/table-edit.png)
 
-一款轻量的 Windows 桌面 Markdown 编辑器，**默认所见即所得，支持表格可视化增删改**，内置**中英双语界面**（中文支持简体/繁体）。基于 Tauri 2 + Vditor，单文件便携 exe（约 15 MB），不依赖网络，无账号、无联网上报。
+一款轻量的 Windows 桌面 Markdown 编辑器，**默认所见即所得，支持表格可视化增删改**，内置**中英双语界面**（中文支持简体/繁体）。基于 Tauri 2 + Vditor，单文件便携 exe（约 7.5 MB），不依赖网络，无账号、无联网上报。
 
 ### ✨ 功能
 
