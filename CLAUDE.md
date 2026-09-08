@@ -6,7 +6,7 @@
 ## 1. 项目定位
 
 - **解决什么**：本地 MD 编辑（表格可视化/多标签/五主题/全盘文件名搜索/多格式导出），单 exe 零依赖分发。
-- **当前状态**：交付并持续迭代（v0.3.23，2026-08-31 仍在提交；本地 c13db25 之后多版未推 GitHub）。
+- **当前状态**：交付并持续迭代（v0.3.26，2026-09-08）。
 - **不做什么**：不做云同步/账号/联网协作；不做所见即所得模式下相对路径图片缩略图（保源码可移植性，导出时才嵌入——已知取舍）。
 
 ## 2. 架构与目录
@@ -16,8 +16,8 @@
 | 技术栈 | Tauri 2（Rust）· TypeScript + Vite · Vditor 3（编辑核心）· markdown-it（导出渲染）|
 | 前端 | `src/main.ts`（主逻辑大文件：撤销栈/标签页/文件树/导出/全盘索引）· `i18n-zh-CN|zh-TW|en.ts` · `styles.css` · `index.html` |
 | 后端 | `src-tauri/src/lib.rs` + `main.rs`（Rust 命令：文件 IO/编码识别/全盘索引/单实例转发） |
-| 测试 | `tests/TEST-PLAN.md`（唯一入口：五层体系 + 模块→组映射 + 盲区对策）；脚本在 `F:/claudecode/output/md-editor-typora-scan/`（e2e_user_J_v0321.py · ahk_smoke_v1.ahk）+ `F:/claudecode/output/md-editor-largefile-v0325/`（e2e_user_L_v0325.py 大文件专项 + headless 基准脚本） |
-| 版本 | package.json 0.1.0（未跟随）；实际版本看 git tag/README（v0.3.23）【版本唯一真值源待确认】 |
+| 测试 | `tests/TEST-PLAN.md`（唯一入口：五层体系 + 模块→组映射 + 盲区对策）；脚本在 `output/md-editor-typora-scan/`（e2e_user_J_v0321.py · ahk_smoke_v1.ahk）+ `output/md-editor-largefile-v0325/`（e2e_user_L_v0325.py 大文件专项 + headless 基准脚本） |
+| 版本 | package.json 0.1.0（未跟随）；实际版本看 git tag/README（v0.3.26）【版本唯一真值源待确认】 |
 
 **启动链路**：`npm run dev`（Vite）→ `npm run tauri dev`；生产：见下方部署链。
 
@@ -26,7 +26,7 @@
 | 层 | 内容 | 触发时机 | 耗时 |
 |---|---|---|---|
 | L0 | `cd src-tauri && cargo test`（49 用例） | 每次改 Rust | ~10s |
-| L1 | 冒烟：e2e_user_J_v0321.py（18 断言）+ ahk_smoke_v1.ahk（6 断言） | 每次交付/部署 | ~3min |
+| L1 | 冒烟：e2e_user_J_v0321.py（18 断言）+ ahk_smoke_v26.ahk（7 断言） | 每次交付/部署 | ~3min |
 | L2 | 专项回归：按「模块→组映射」跑受影响组 | 改动对应模块 | ~1min/组 |
 | L3 | 全量：B/C/D/E/F/G/H/I/J + e2e_fullcheck | 发版前 | ~15min |
 | L4 | AHK 真实键鼠（OS 级，走真实副作用不注入 JS） | 发版前（需桌面在线） | ~2min |
@@ -44,7 +44,7 @@
 | 导出/打印 | fullcheck(E)、C |
 | lib.rs（Rust 命令） | cargo test + 相关组 |
 
-M 组脚本：`F:/claudecode/output/md-editor-session-v0326/`（e2e_user_M_v0326.py M1-13 + m_big_ws.py/m_ir2.py M14-18；**禁 playwright connect_over_cdp**——对部署 WebView 偶发握手后挂死，一律纯 CDP websocket + suppress_origin=True）。fullcheck 三处历史漂移（2026-09-08 定性，非产品问题）：A1/B2=v0.3.26 带参启动不再开欢迎页+会话不含欢迎页（预期变更）；D2=脚本打字-点✕时序漂移（产品弹窗独立验证正常）。
+M 组脚本：`output/md-editor-session-v0326/`（e2e_user_M_v0326.py M1-13 + m_big_ws.py/m_ir2.py M14-18；**禁 playwright connect_over_cdp**——对部署 WebView 偶发握手后挂死，一律纯 CDP websocket + suppress_origin=True）。fullcheck 三处历史漂移（2026-09-08 定性，非产品问题）：A1/B2=v0.3.26 带参启动不再开欢迎页+会话不含欢迎页（预期变更）；D2=脚本打字-点✕时序漂移（产品弹窗独立验证正常）。
 
 ### AHK 外测铁律（历史实测教训，逐条有效）
 
@@ -56,7 +56,7 @@ M 组脚本：`F:/claudecode/output/md-editor-session-v0326/`（e2e_user_M_v0326
 - 脚本+日志放 **C 盘 Temp** 且 TEMP/TMP 指回 C 盘跑（2026-09-07 实锤：AHK 写 F 盘整脚本挂死零输出）；ExitApp-only 最小脚本可区分解释器挂 vs IO 挂。
 - **用户在场=实时键鼠干扰源**（2026-09-08 实锤：首跑 4/7，三项键入零进正文——长 Sleep 空窗里用户切窗口，点击落别处；有 WinWaitActive 保护的 AHK5 独过=反证）：每个键入断言前一律 `WinActivate + WinWaitActive` 重锁前台，键入后顺手 Log WinActive 诊断位；"键入零进+文件纯基线"先怀疑干扰再怀疑产品。
 - 对照旧版 exe 测试后必查 `tasklist | grep md-editor` 反向清点：改名副本（如 .prev0）进程名跟文件名走，`taskkill /IM md-editor.exe` 杀不到 → 单实例转发黑洞吞掉后续所有启动，极易误诊为产品回归。
-- 6 断言：键入+^S / ^Z 一步撤销 / ^Y 重做 / 失焦自动保存 / 双击标签新建+另存 / 干净退出。
+- 7 断言：键入+^S / ^Z 一步撤销 / ^Y 重做 / 失焦自动保存 / 双击标签新建+另存 / 干净退出 / 退出后会话落盘（AHK7，v0.3.26）。
 - 页面诊断钩子（只读）：`window.__mdUndo/__mdRedo/__mdDocs/__sLog/__zTrace`。
 
 **不可轻易改动的边界（高风险交互区）**：
@@ -71,7 +71,6 @@ M 组脚本：`F:/claudecode/output/md-editor-session-v0326/`（e2e_user_M_v0326
 ## 3. 常用命令
 
 ```bash
-cd F:/claudecode/projects/active/md-editor
 
 npm run dev                     # Vite 前端开发
 npm run tauri dev               # 桌面壳开发
@@ -82,7 +81,7 @@ cd src-tauri && cargo test
 
 # L1 冒烟（交付前，~3min；脚本在 output/md-editor-typora-scan/）
 python e2e_user_J_v0321.py                              # 18 断言
-"/c/Program Files/AutoHotkey/v2/AutoHotkey64.exe" ahk_smoke_v1.ahk   # 6 断言，需桌面在线
+"/c/Program Files/AutoHotkey/v2/AutoHotkey64.exe" ahk_smoke_v26.ahk  # 7 断言，需桌面在线（脚本放 C 盘 Temp 跑）
 
 # 生产部署链
 npm run build && cd src-tauri && cargo build --release --bins --features tauri/custom-protocol
@@ -104,7 +103,7 @@ npm run build && cd src-tauri && cargo build --release --bins --features tauri/c
 | 项 | 硬指标 |
 |---|---|
 | Rust | cargo test 49 用例全绿 |
-| 冒烟 | e2e_user_J 18 断言全过 + AHK 6 断言全过（真键鼠、真实副作用） |
+| 冒烟 | e2e_user_J 18 断言全过 + AHK 7 断言全过（真键鼠、真实副作用） |
 | 撤销语义 | 连打一段→撤销按小段回退（非整段飞回）；IME 组合中 Ctrl+Z 不破坏文本；全替/表格批量操作一步一撤销 |
 | 保存 | Ctrl+S / 失焦 / 30s 自动三种路径落盘内容一致；版本历史归档生效（50 版/30 天） |
 | 导出 | PDF 文本可选中可搜索；docx 表格/脚注/图片真嵌入；相对路径图片导出时嵌入 |
@@ -148,7 +147,6 @@ npm run build && cd src-tauri && cargo build --release --bins --features tauri/c
 - **P0**：v0.3.23 运行日志+诊断包已提交——观察真实使用中日志滚动与诊断包导出稳定性。
 - **P1**：自建全盘索引（替代 es.exe）首版已上——冷启动索引耗时 1-3 分钟的用户感知优化。
 - **P1**：撤销/重做六处病灶已闭环（a4d258a）——回归 B 组+fullcheck(A11) 保持全绿，防复发。
-- **待确认**：GitHub 远端同步策略（多版积压未推，推送范围需用户拍板）。
 - **待确认**：package.json version 0.1.0 是否改为随发版递增（当前版本真值在 README/git）。
 
 ### i18n 与文案纪律

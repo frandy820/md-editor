@@ -27,7 +27,7 @@
 ## 三、冒烟集命令
 
 ```bash
-cd F:/claudecode/output/md-editor-typora-scan
+cd output/md-editor-typora-scan
 python e2e_user_J_v0321.py          # 18 断言（v0.3.21 全功能）
 "/c/Program Files/AutoHotkey/v2/AutoHotkey64.exe" ahk_smoke_v1.ahk   # 需桌面在线
 ```
