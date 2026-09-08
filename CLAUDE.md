@@ -54,6 +54,7 @@ M 组脚本：`F:/claudecode/output/md-editor-session-v0326/`（e2e_user_M_v0326
 - 另存对话框路径用**剪贴板粘贴**（Send 打路径被 IME/焦点层吞）。
 - 失焦用 `WinActivate ahk_class Progman`；窗口位置每轮漂移，坐标断言只用相对客户区。
 - 脚本+日志放 **C 盘 Temp** 且 TEMP/TMP 指回 C 盘跑（2026-09-07 实锤：AHK 写 F 盘整脚本挂死零输出）；ExitApp-only 最小脚本可区分解释器挂 vs IO 挂。
+- **用户在场=实时键鼠干扰源**（2026-09-08 实锤：首跑 4/7，三项键入零进正文——长 Sleep 空窗里用户切窗口，点击落别处；有 WinWaitActive 保护的 AHK5 独过=反证）：每个键入断言前一律 `WinActivate + WinWaitActive` 重锁前台，键入后顺手 Log WinActive 诊断位；"键入零进+文件纯基线"先怀疑干扰再怀疑产品。
 - 对照旧版 exe 测试后必查 `tasklist | grep md-editor` 反向清点：改名副本（如 .prev0）进程名跟文件名走，`taskkill /IM md-editor.exe` 杀不到 → 单实例转发黑洞吞掉后续所有启动，极易误诊为产品回归。
 - 6 断言：键入+^S / ^Z 一步撤销 / ^Y 重做 / 失焦自动保存 / 双击标签新建+另存 / 干净退出。
 - 页面诊断钩子（只读）：`window.__mdUndo/__mdRedo/__mdDocs/__sLog/__zTrace`。
