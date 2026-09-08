@@ -1294,17 +1294,15 @@ async function reloadFromDisk(doc: Doc): Promise<void> {
   }
 }
 
-// ----- 状态栏（v0.3.26）：已选字符数 + 总字数(Vditor counter) + 文件大小，并入左下角 counter -----
+// ----- 状态栏（v0.3.26 起；v0.3.27 删文件大小段）：已选字符数 + 总字数(Vditor counter)，并入左下角 counter -----
 let counterLen = 0; // Vditor counter after(len) 的缓存（selectionchange 时重拼文案用）
 let statusSelLen = 0;
 function updateStatus(): void {
   const el = document.querySelector<HTMLElement>(".vditor-counter");
   if (!el) return;
-  const doc = activeDoc();
   const parts: string[] = [];
   if (statusSelLen > 0) parts.push(t("statusSelected").replace("{n}", String(statusSelLen)));
   parts.push(`${counterLen} ${t("wordCount")}`);
-  if (doc && doc.bytes > 0) parts.push(doc.bytes >= 1024 ? `${(doc.bytes / 1024).toFixed(1)} KB` : `${doc.bytes} B`);
   el.innerText = parts.join(" · ");
 }
 function trackSelectionStatus(): void {
@@ -4619,13 +4617,24 @@ async function boot() {
   });
   // v0.3.26 会话兜底：崩溃/强杀等不经 onCloseRequested 的退出路径
   window.addEventListener("beforeunload", saveSession);
+  // v0.3.27 缩放拉杆默认隐藏：仅缩放操作（滚轮/加减/0/滑杆/按钮）时自动浮现 3s，
+  // 悬停/拖动期间不消失（拖动连续触发 input 不断重置定时器）；平时右下角不占位。
+  let zoomHideTimer = 0;
+  const revealZoomBar = () => {
+    const bar = document.getElementById("zoom-bar");
+    if (!bar) return;
+    bar.classList.add("zoom-show");
+    window.clearTimeout(zoomHideTimer);
+    zoomHideTimer = window.setTimeout(() => bar.classList.remove("zoom-show"), 3000);
+  };
   const zoomBy = (d: number) => {
     zoomLevel = Math.min(2.0, Math.max(0.5, Math.round((zoomLevel + d) * 100) / 100));
     applyZoom();
+    revealZoomBar();
   };
   document.getElementById("zoom-slider")?.addEventListener("input", (e) => {
     const v = parseInt((e.target as HTMLInputElement).value, 10) / 100;
-    if (v >= 0.5 && v <= 2.0) { zoomLevel = v; applyZoom(); }
+    if (v >= 0.5 && v <= 2.0) { zoomLevel = v; applyZoom(); revealZoomBar(); }
   });
   document.getElementById("zoom-out")?.addEventListener("click", () => zoomBy(-0.1));
   document.getElementById("zoom-in")?.addEventListener("click", () => zoomBy(0.1));
@@ -4642,8 +4651,12 @@ async function boot() {
     if (!(e.ctrlKey || e.metaKey)) return;
     if (e.key === "+" || e.key === "=") { e.preventDefault(); zoomBy(0.1); }
     else if (e.key === "-" || e.key === "_") { e.preventDefault(); zoomBy(-0.1); }
-    else if (e.key === "0") { e.preventDefault(); zoomLevel = 1.0; applyZoom(); }
+    else if (e.key === "0") { e.preventDefault(); zoomLevel = 1.0; applyZoom(); revealZoomBar(); }
   });
+  // 悬停拉杆期间不自动隐藏（拖完停 3s 再淡出）
+  const zbEl = document.getElementById("zoom-bar");
+  zbEl?.addEventListener("mouseenter", () => window.clearTimeout(zoomHideTimer));
+  zbEl?.addEventListener("mouseleave", revealZoomBar);
   applyZoom();
 }
 
