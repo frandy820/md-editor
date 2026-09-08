@@ -1,42 +1,45 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; font-family: "Microsoft YaHei", "Segoe UI", sans-serif; }
+html, body { height: 100%; font-family: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif; }
 body { display: flex; flex-direction: column; overflow: hidden; }
 
 /* ===== v0.3.14 主题变量：亮色为默认，html[data-theme="dark"] 整套覆盖。
    Vditor 编辑区自身由 vditor.setTheme("dark") 换装（content-theme/dark.css 本地内联），
    这里管应用外壳（工具栏/侧栏/标签/浮条/弹窗）。打印态强制回亮色（见文件尾 @media print）。 */
+/* v0.3.29 瑞士网格改版（用户在 4 方向设计稿中选定 C）：纯白底 + 近黑文字 +
+   克莱因蓝 #002FA7 唯一强调色 + 发丝线分隔 + 无框文字按钮 + 下划线式标签。 */
 :root {
-  --bg: #f3f3f3;            /* 应用工具栏底 */
-  --bg-elem: #ececec;       /* 标签条底 */
-  --bg-panel: #fafafa;      /* 侧栏/空态底 */
-  --bg-panel2: #f5f5f5;     /* 面板标题底 */
-  --bg-input: #f6f6f6;      /* 小按钮底 */
+  --bg: #ffffff;            /* 应用工具栏底 */
+  --bg-elem: #ffffff;       /* 标签条底 */
+  --bg-panel: #fafafb;      /* 侧栏/空态底 */
+  --bg-panel2: #f6f6f8;     /* 面板标题底 */
+  --bg-input: #ffffff;      /* 小按钮底 */
   --bg-surface: #fff;       /* 按钮面/菜单/浮条 */
-  --bg-float: rgba(255,255,255,0.92); /* 浮动拉杆半透明底 */
-  --bg-hover: #e8eefc;
-  --bg-hover2: #eaf2ff;     /* 大纲项 hover */
-  --bg-active: #dbe6ff;
-  --accent: #4470e0; --accent2: #3560d0;
-  --accent-soft: #eef3ff; --accent-border: #9db4e8;
-  --border: #ccc; --border2: #ddd; --border3: #e5e5e5; --border4: #eee;
-  --text: #333; --text2: #555; --text3: #666;
-  --muted: #888; --muted2: #999; --muted3: #aaa; --muted4: #bbb;
-  --danger: #c33;
-  /* v0.3.21 标题分级配色：H1-H6 各一色，级别越低越沉静 */
-  --h1c: #1a56b0; --h2c: #0e7a6c; --h3c: #b3540d; --h4c: #6d3fa8; --h5c: #47678a; --h6c: #75758a;
-  --shadow: 0 4px 16px rgba(0,0,0,.18);
+  --bg-float: rgba(255,255,255,0.95); /* 浮动拉杆半透明底 */
+  --bg-hover: #f2f3f5;
+  --bg-hover2: #f4f5f7;     /* 大纲项 hover */
+  --bg-active: #edf0ff;
+  --accent: #002fa7; --accent2: #00248c;
+  --accent-soft: #edf0ff; --accent-border: #b9c4ee;
+  --border: #d9dade; --border2: #ebebee; --border3: #e8e8ec; --border4: #efeff2;
+  --text: #16181d; --text2: #3e4048; --text3: #6e7078;
+  --muted: #8a8c94; --muted2: #9a9ca4; --muted3: #a8aab2; --muted4: #b6b8c0;
+  --danger: #d5353c;
+  /* v0.3.29 瑞士网格：light 标题改单色阶（黑→灰，级别递减）；eye/oled/paper 保留 v0.3.21 六级分色 */
+  --h1c: #16181d; --h2c: #16181d; --h3c: #3e4048; --h4c: #3e4048; --h5c: #6e7078; --h6c: #6e7078;
+  --shadow: 0 8px 24px rgba(22,24,29,.10);
 }
 html[data-theme="dark"] {
-  --bg: #26272b; --bg-elem: #2a2b2f; --bg-panel: #202124; --bg-panel2: #2a2b2f;
-  --bg-input: #33353a; --bg-surface: #2d2e33; --bg-float: rgba(45,46,51,0.95);
-  --bg-hover: #3a4152; --bg-hover2: #343b4d; --bg-active: #3d4a6d;
-  --accent: #6c8cff; --accent2: #8aa4ff; --accent-soft: #2e3550; --accent-border: #4a5a8a;
-  --border: #4a4b52; --border2: #3c3d44; --border3: #3a3b42; --border4: #35363c;
-  --text: #d8d9de; --text2: #c0c1c7; --text3: #a9aab1;
-  --muted: #8f9098; --muted2: #7f8088; --muted3: #6d6e76; --muted4: #5d5e66;
+  --bg: #101116; --bg-elem: #101116; --bg-panel: #0c0d10; --bg-panel2: #101116;
+  --bg-input: #1a1b20; --bg-surface: #16171c; --bg-float: rgba(22,23,28,0.95);
+  --bg-hover: #1e1f26; --bg-hover2: #191a20; --bg-active: #1d2540;
+  --accent: #7b96ff; --accent2: #93aaff; --accent-soft: #1c2440; --accent-border: #3d4f86;
+  --border: #3a3b44; --border2: #26272e; --border3: #24252c; --border4: #1f2026;
+  --text: #e6e8ec; --text2: #c6c8cf; --text3: #a4a6b0;
+  --muted: #8a8c96; --muted2: #7a7c86; --muted3: #686a74; --muted4: #585a64;
   --danger: #e06c5f;
-  --h1c: #82abf8; --h2c: #58c6b2; --h3c: #f2a55f; --h4c: #b78ee4; --h5c: #8fa9cb; --h6c: #9b9bb0;
-  --shadow: 0 4px 16px rgba(0,0,0,.5);
+  /* v0.3.29 瑞士网格深色配套：单色阶标题（浅→灰），与 light 同一语言 */
+  --h1c: #f0f1f5; --h2c: #f0f1f5; --h3c: #d0d2d9; --h4c: #d0d2d9; --h5c: #b0b2bc; --h6c: #b0b2bc;
+  --shadow: 0 8px 24px rgba(0,0,0,.5);
   color-scheme: dark; /* 原生控件（input/select/scrollbar）跟暗 */
 }
 
@@ -125,37 +128,75 @@ html[data-theme="paper"] .vditor-reset hr { border: none; border-top: 1px solid 
 html[data-theme="paper"] .vditor-reset mark { background: #f2d98c !important; }
 html[data-theme="paper"] .vditor-reset kbd { background-color: #ead9b5 !important; border: 1px solid #c9b283 !important; }
 
+/* ===== v0.3.29 瑞士网格正文排版（light 主题内容覆盖，设计稿 C）：
+   近黑粗标题 / 细克莱因蓝引用线 / 行内码浅灰底 / 代码块深底浅字 /
+   表头小写字距+2px 近黑底线 / 链接克莱因蓝。特异性 (0,2,1) 压过 Vditor light.css
+   的 (0,1,1)，无需 !important；paper 主题自身带 !important 覆盖不受影响 ===== */
+html[data-theme="light"] .vditor-reset h1 { font-weight: 700; letter-spacing: -0.01em; }
+html[data-theme="light"] .vditor-reset h2,
+html[data-theme="light"] .vditor-reset h3 { font-weight: 700; }
+html[data-theme="light"] .vditor-reset a { color: var(--accent); }
+html[data-theme="light"] .vditor-reset blockquote {
+  border-left: 2px solid var(--accent); padding: 2px 0 2px 16px;
+  background: none; color: var(--text2);
+}
+html[data-theme="light"] .vditor-reset code:not(.hljs):not(.highlight-chroma) {
+  background: var(--bg-hover); color: #b0272d; border: none; border-radius: 3px;
+}
+html[data-theme="light"] .vditor-reset pre {
+  background: #16181d; border: none; border-radius: 6px;
+}
+/* :not 链镜像 light.css 的 code:not(.hljs):not(.highlight-chroma)(0,3,1)，pre code 再加一层防行内码规则倒灌 */
+html[data-theme="light"] .vditor-reset pre code:not(.hljs):not(.highlight-chroma) {
+  background: none; color: #e6e8ec; border: none;
+}
+/* 表格：行发丝线 + 表头 2px 近黑底线；保留列向发丝线（wysiwyg 编辑定位需要列边界） */
+html[data-theme="light"] .vditor-reset table th,
+html[data-theme="light"] .vditor-reset table td {
+  border-top: none; border-bottom: 1px solid var(--border3); border-left: none;
+  background: none;
+}
+html[data-theme="light"] .vditor-reset table th:not(:last-child),
+html[data-theme="light"] .vditor-reset table td:not(:last-child) { border-right: 1px solid var(--border4); }
+html[data-theme="light"] .vditor-reset table th,
+html[data-theme="light"] .vditor-reset table thead th {
+  font-size: .86em; font-weight: 600; letter-spacing: .05em; color: var(--text3);
+  border-bottom: 2px solid var(--text);
+}
+html[data-theme="light"] .vditor-reset hr { border: none; border-top: 1px solid var(--border2); background: none; }
+
 #toolbar {
-  height: 42px; flex: 0 0 auto;
+  height: 44px; flex: 0 0 auto;
   display: flex; align-items: center; gap: 6px;
-  padding: 0 12px;
+  padding: 0 14px;
   background: var(--bg); border-bottom: 1px solid var(--border2);
   container-type: inline-size; /* v0.3.28 工具栏自适应：容器查询分档降级 */
 }
 /* v0.3.28 分组布局：文件/输出/工具 …（弹性空隙）… 模式/设置 */
 .tb-group { display: flex; align-items: center; gap: 5px; flex: 0 0 auto; }
-.tb-divider { width: 1px; height: 20px; background: var(--border2); flex: 0 0 auto; margin: 0 4px; }
+.tb-divider { width: 1px; height: 18px; background: var(--border2); flex: 0 0 auto; margin: 0 6px; }
 .tb-spacer { flex: 1 1 auto; min-width: 10px; }
 .tb-ico { line-height: 1; }
 .tb-label { white-space: nowrap; }
+/* v0.3.29 瑞士网格：无框文字按钮（设计稿 C 形态）——主操作组加粗近黑，工具组灰，
+   hover 全组变强调色；active（开关态）= 强调色 + 浅强调底 */
 #toolbar button {
-  padding: 4px 11px; cursor: pointer;
-  border: 1px solid var(--border); background: var(--bg-surface); border-radius: 4px;
-  font-size: 13px; color: var(--text);
+  padding: 5px 9px; cursor: pointer;
+  border: none; background: none; border-radius: 3px;
+  font-size: 12.5px; color: var(--text3); letter-spacing: .02em;
   display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
 }
-#toolbar button:hover { background: var(--bg-hover); }
-/* 工具组（专注/查找/历史/诊断）：ghost 淡化，主次分级 */
-.tb-tools button { border-color: transparent; background: none; color: var(--text3); }
-.tb-tools button:hover { background: var(--bg-hover); color: var(--text); }
-#btn-mode { background: var(--accent-soft); border-color: var(--accent-border); }
-#btn-mode:hover { background: var(--bg-active); }
-/* 档1（<1150px）：按钮收图标档。:has(.tb-ico) 只收应用按钮——#export-menu 菜单项
-   无 ico 结构，不依赖源顺序防止误伤（特异性耦合教训） */
+#toolbar .tb-group:not(.tb-tools) button { color: var(--text); font-weight: 600; }
+#toolbar button:hover { color: var(--accent); }
+#toolbar button.active { color: var(--accent); background: var(--accent-soft); }
+#btn-mode { color: var(--accent); }
+#btn-mode:hover { color: var(--accent2); }
+/* 档1（<1150px）：收紧内距。v0.3.29 起 i18n 去 emoji 无图标兜底，禁隐 label（会出空按钮） */
 @container (max-width: 1150px) {
-  #toolbar button .tb-label { display: none; }
-  #toolbar button:has(> .tb-ico) { padding: 4px 8px; }
-  .tb-ico { font-size: 14px; }
+  #toolbar { gap: 4px; padding: 0 10px; }
+  #toolbar button { padding: 5px 6px; }
+  .tb-group { gap: 3px; }
+  .tb-divider { margin: 0 3px; }
 }
 /* 档2（<950px）：尾部信息徽标让位 */
 @container (max-width: 950px) {
@@ -166,7 +207,7 @@ html[data-theme="paper"] .vditor-reset kbd { background-color: #ead9b5 !importan
   #font-size-select { width: 3.2em !important; }
   #lang-select, #theme-select { padding: 4px 2px; max-width: 92px; }
   .tb-divider { margin: 0 2px; }
-  .tb-group { gap: 3px; }
+  .tb-group { gap: 2px; }
 }
 /* 导出下拉菜单：绝对定位于导出按钮下方，点外部收起（与查找条同模式）。
    注意：#toolbar 的 container-type 使其成为 stacking context（z=0 参与根上下文），
@@ -174,29 +215,31 @@ html[data-theme="paper"] .vditor-reset kbd { background-color: #ead9b5 !importan
 #export-wrap { position: relative; }
 #export-menu {
   position: absolute; top: 100%; left: 0; z-index: 2100000; margin-top: 3px;
-  background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px;
-  box-shadow: var(--shadow); padding: 4px; min-width: 190px;
+  background: var(--bg-surface); border: 1px solid var(--border2); border-radius: 4px;
+  box-shadow: var(--shadow); padding: 5px; min-width: 190px;
 }
 #export-menu button {
-  display: block; width: 100%; text-align: left; padding: 7px 12px;
-  border: none; background: none; border-radius: 4px; font-size: 13px; cursor: pointer; color: var(--text);
+  display: block; width: 100%; text-align: left; padding: 6px 12px;
+  border: none; background: none; border-radius: 3px; font-size: 12.5px; cursor: pointer; color: var(--text2);
 }
-#export-menu button:hover { background: var(--bg-hover); }
+#export-menu button:hover { background: var(--bg-hover); color: var(--text); }
 #export-menu button:disabled { color: var(--muted3); cursor: default; }
 #export-menu button:disabled:hover { background: none; }
-#lang-select, #font-size-select, #theme-select { padding: 4px 6px; font-size: 13px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-surface); color: var(--text); cursor: pointer; }
+#lang-select, #font-size-select, #theme-select { padding: 4px 6px; font-size: 12px; border: 1px solid var(--border2); border-radius: 3px; background: var(--bg-input); color: var(--text3); cursor: pointer; }
+#lang-select:hover, #font-size-select:hover, #theme-select:hover { border-color: var(--border); color: var(--text); }
 #encoding-badge { color: var(--muted2); font-size: 12px; }
-#app-version { color: var(--muted4); font-size: 11px; margin-left: 2px; white-space: nowrap; }
-.mode-badge { font-size: 12px; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--border2); white-space: nowrap; line-height: 18px; }
-.mode-badge.ir { color: var(--text3); background: var(--bg); }
+#app-version { color: var(--muted4); font-size: 11px; margin-left: 2px; white-space: nowrap; font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+.mode-badge { font-size: 10.5px; letter-spacing: .08em; padding: 2px 8px; border-radius: 3px; border: 1px solid var(--border2); white-space: nowrap; line-height: 17px; }
+.mode-badge.ir { color: var(--muted); background: none; }
 .mode-badge.wysiwyg { color: #fff; background: var(--accent); border-color: var(--accent); }
 
 /* v0.3.21 多行标签（Notepad++ 式）：标签数超窗口宽自动折行，全部可见；上限 4 行后内部滚动防挤占编辑区 */
-#tabs { display: flex; flex-wrap: wrap; min-height: 32px; max-height: 136px; overflow-y: auto; user-select: none; flex: 0 0 auto; background: var(--bg-elem); border-bottom: 1px solid var(--border2); }
+#tabs { display: flex; flex-wrap: wrap; min-height: 32px; max-height: 136px; overflow-y: auto; user-select: none; flex: 0 0 auto; background: var(--bg-elem); border-bottom: 1px solid var(--border2); padding: 0 8px; }
 #tabs::-webkit-scrollbar { height: 4px; }
-.tab { display: flex; align-items: center; gap: 6px; padding: 0 10px; height: 30px; cursor: pointer; font-size: 13px; border-right: 1px solid var(--border2); white-space: nowrap; } /* v0.3.21 固定行高（原 height:100% 在 wrap 多行容器内失效） */
-.tab:hover { background: var(--bg-panel); }
-.tab.active { background: var(--bg-surface); border-bottom: 2px solid var(--accent); }
+/* v0.3.29 瑞士网格：下划线式标签（设计稿 C）——激活=强调色文字+2px 强调底线，无竖分隔线 */
+.tab { display: flex; align-items: center; gap: 6px; padding: 0 10px; height: 30px; cursor: pointer; font-size: 12.5px; color: var(--muted); white-space: nowrap; border-bottom: 2px solid transparent; } /* v0.3.21 固定行高（原 height:100% 在 wrap 多行容器内失效） */
+.tab:hover { color: var(--text2); background: var(--bg-hover2); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; background: none; }
 
 /* v0.3.21 undo/redo 按钮仅作 Vditor 键盘分支开关（存在=Vditor 让出 ⌘Z/⌘Y），UI 隐藏走自建栈 */
 /* v0.3.21 撤销/重做按钮可见（Word 式双通道）：toolbar 配置保留使 Vditor 自禁键盘 ⌘Z 分支
@@ -219,14 +262,14 @@ html[data-theme="paper"] .vditor-reset kbd { background-color: #ead9b5 !importan
 /* ===== v0.3.15 标签右键菜单（Notepad++：关闭/关闭其它/关闭右侧/全部；Ctrl+Click 多选加"关闭选中"） ===== */
 #tab-menu, #ftree-menu {
   position: fixed; z-index: 2147483646; min-width: 150px;
-  background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px;
-  box-shadow: var(--shadow); padding: 4px;
+  background: var(--bg-surface); border: 1px solid var(--border2); border-radius: 4px;
+  box-shadow: var(--shadow); padding: 5px;
 }
 #tab-menu[hidden], #ftree-menu[hidden] { display: none; }
 #tab-menu button, #ftree-menu button {
   display: block; width: 100%; text-align: left; padding: 6px 12px;
-  border: none; background: none; border-radius: 4px; font-size: 13px;
-  color: var(--text); cursor: pointer;
+  border: none; background: none; border-radius: 3px; font-size: 12.5px;
+  color: var(--text2); cursor: pointer;
 }
 #tab-menu button:hover, #ftree-menu button:hover { background: var(--bg-hover); }
 .tab-name { color: var(--text); }
@@ -257,7 +300,7 @@ html[data-theme="paper"] .vditor-reset kbd { background-color: #ead9b5 !importan
   border-bottom: 1px solid var(--border4); background: var(--bg-panel2);
 }
 .side-tab {
-  flex: 1 1 50%; padding: 7px 0; font-size: 12px; cursor: pointer;
+  flex: 1 1 50%; padding: 7px 0; font-size: 11px; letter-spacing: .18em; cursor: pointer;
   border: none; background: none; color: var(--muted);
   border-bottom: 2px solid transparent;
 }
@@ -422,10 +465,10 @@ html[data-theme="dark"] #gsearch-results mark { background: rgba(255,180,0,0.4);
 /* 关闭确认对话框（保存并关闭 / 不保存关闭 / 取消）—— z-index 必须高于 Vditor 浮层(1000005) */
 .modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 2147483647 !important; }
 .modal-mask[hidden] { display: none; }
-.modal { position: relative; z-index: 2147483647 !important; background: var(--bg-surface); color: var(--text); border-radius: 8px; padding: 20px 24px; box-shadow: 0 8px 30px rgba(0,0,0,0.3); min-width: 320px; }
+.modal { position: relative; z-index: 2147483647 !important; background: var(--bg-surface); color: var(--text); border-radius: 6px; padding: 20px 24px; box-shadow: var(--shadow); min-width: 320px; }
 .modal-msg { font-size: 14px; color: var(--text); margin-bottom: 16px; }
 .modal-btns { display: flex; gap: 8px; justify-content: flex-end; }
-.modal-btns button { padding: 6px 14px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-surface); color: var(--text); cursor: pointer; font-size: 13px; }
+.modal-btns button { padding: 6px 14px; border: 1px solid var(--border2); border-radius: 3px; background: var(--bg-surface); color: var(--text2); cursor: pointer; font-size: 12.5px; }
 .modal-btns button:hover { background: var(--bg-hover); }
 #cc-save { background: var(--accent); color: #fff; border-color: var(--accent); }
 #cc-cancel { color: var(--text3); }
@@ -463,8 +506,8 @@ html[data-theme="dark"] #gsearch-results mark { background: rgba(255,180,0,0.4);
 #zoom-bar {
   position: absolute; right: 14px; bottom: 8px; z-index: 2000001;
   display: flex; align-items: center; gap: 6px;
-  background: var(--bg-float); border: 1px solid var(--border2); border-radius: 14px;
-  padding: 2px 10px; box-shadow: 0 1px 6px rgba(0,0,0,.12);
+  background: var(--bg-float); border: 1px solid var(--border2); border-radius: 6px;
+  padding: 2px 10px; box-shadow: var(--shadow);
   /* v0.3.27 默认隐藏，缩放操作时自动浮现（.zoom-show），3s 后淡出 */
   opacity: 0; visibility: hidden; pointer-events: none;
   transition: opacity .18s ease, visibility .18s ease;
@@ -472,16 +515,16 @@ html[data-theme="dark"] #gsearch-results mark { background: rgba(255,180,0,0.4);
 #zoom-bar.zoom-show { opacity: 1; visibility: visible; pointer-events: auto; }
 #zoom-bar button {
   width: 22px; height: 22px; line-height: 1; cursor: pointer;
-  border: 1px solid var(--border); background: var(--bg-input); border-radius: 11px;
-  font-size: 14px; color: var(--text); user-select: none; -webkit-user-select: none;
+  border: 1px solid var(--border2); background: var(--bg-input); border-radius: 4px;
+  font-size: 14px; color: var(--text2); user-select: none; -webkit-user-select: none;
   display: flex; align-items: center; justify-content: center;
 }
 #zoom-bar button:hover { background: var(--bg-hover); }
 #zoom-bar button:active { background: var(--accent); color: #fff; }
 #zoom-slider { width: 120px; height: 4px; cursor: pointer; accent-color: var(--accent); }
 #zoom-badge { font-size: 12px; color: var(--text2); min-width: 38px; text-align: center; user-select: none; }
-/* 工具栏按钮激活态（专注/打字机开关） */
-#toolbar button.active { background: var(--bg-active); border-color: var(--accent); }
+/* 工具栏按钮激活态（专注/打字机开关）——v0.3.29 无框形态：强调色文字+浅强调底（规则同工具栏段，此处留作锚点） */
+#toolbar button.active { color: var(--accent); background: var(--accent-soft); }
 /* 专注模式：当前块之外的顶层块淡化（F8） */
 body.focus-mode .vditor-reset > :not(.fw-current) { opacity: 0.22; transition: opacity 0.25s; }
 body.focus-mode .vditor-reset > .fw-current { opacity: 1; }
@@ -494,23 +537,23 @@ body.focus-mode .vditor-reset > .fw-current { opacity: 1; }
 #find-bar {
   /* top 必须让开 Vditor 工具栏(35px)：曾用 6px 压在工具栏右端"全屏切换/切换编辑模式"上 */
   position: absolute; top: 44px; right: 14px; z-index: 2000000;
-  background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px;
-  box-shadow: 0 2px 10px rgba(0,0,0,.15); padding: 6px 8px;
+  background: var(--bg-surface); border: 1px solid var(--border2); border-radius: 4px;
+  box-shadow: var(--shadow); padding: 6px 8px;
   display: flex; flex-direction: column; gap: 6px;
 }
 .find-row { display: flex; align-items: center; gap: 5px; }
 #find-input, #replace-input {
-  width: 200px; padding: 3px 8px; font-size: 13px;
-  border: 1px solid var(--border); border-radius: 4px;
+  width: 200px; padding: 3px 8px; font-size: 12.5px;
+  border: 1px solid var(--border2); border-radius: 3px;
   background: var(--bg-surface); color: var(--text);
 }
 #find-input:focus, #replace-input:focus { outline: none; border-color: var(--accent); }
-.find-count { font-size: 12px; color: var(--muted); min-width: 38px; text-align: center; }
+.find-count { font-size: 12px; color: var(--muted); min-width: 38px; text-align: center; font-variant-numeric: tabular-nums; }
 .find-row button {
   padding: 2px 8px; cursor: pointer; font-size: 12px;
   min-height: 26px; min-width: 26px; /* 热区加大：命中偏移数像素也在按钮上 */
   user-select: none; -webkit-user-select: none; /* 防双击连点选中按钮文字 */
-  border: 1px solid var(--border); background: var(--bg-input); color: var(--text); border-radius: 4px;
+  border: 1px solid var(--border2); background: var(--bg-input); color: var(--text2); border-radius: 3px;
 }
 .find-row button:hover { background: var(--bg-hover); }
 /* 按下即时变色：用户肉眼可见"系统收到了点击"（排查"点不动"的反馈通道） */
