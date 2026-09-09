@@ -2431,11 +2431,15 @@ function vditorThemeTrio(): ["dark" | "classic", string] {
 }
 /** Vditor 档位应用统一入口。v0.4.1 根修：setTheme 第三参 codeTheme 不传时恒默认亮色
  *  github（.hljs{background:#fff}）→ 深色档下代码块/公式源码态 code 白底（实测
- *  CODE.language-js.hljs=rgb(255,255,255)）。dark 档同步换 github-dark。 */
+ *  CODE.language-js.hljs=rgb(255,255,255)）。dark 档同步换 github-dark。
+ *  v0.4.1b 修正：codeTheme 按「代码块底色深浅」分而非 Vditor 档位——light 档代码块是
+ *  瑞士深底(#16181d)，配 github(白底深字 token)既白底回归又字不可读，改配 github-dark；
+ *  eye/paper/user浅 代码块浅底，保持 github。背景由 styles.css 透明化规则统一接管。 */
 function vditorApplyTheme(): void {
   const [vd, ct] = vditorThemeTrio();
+  const darkCode = themeName === "dark" || themeName === "light" || (themeName.startsWith("user:") && userThemeDark);
   try {
-    vditor?.setTheme(vd, ct, vd === "dark" ? "github-dark" : "github", "/vditor-assets/dist/css/content-theme");
+    vditor?.setTheme(vd, ct, darkCode ? "github-dark" : "github", "/vditor-assets/dist/css/content-theme");
   } catch { /* 未就绪：after 回调挂载后补应用 */ }
 }
 function applyTheme(name: string, persist = true): void {

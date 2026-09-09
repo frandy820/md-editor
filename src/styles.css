@@ -170,6 +170,14 @@ html[data-theme="paper"] .vditor-reset kbd { background-color: #ead9b5 !importan
 html[data-theme] .vditor-reset pre:has(.language-math) { background: transparent !important; border: none !important; }
 html[data-theme] .vditor-reset pre:has(.language-math) code { background: transparent !important; }
 
+/* v0.4.1b light 档代码块 hljs 背景透明化：codeTheme 真加载后 github.min.css 的
+   .hljs{background:#fff}(0,1,0) 压过下方 pre code :not(.hljs) 透明规则（该链有意排除
+   hljs）→ 深底 pre 内嵌白底 code 块（v0.4.1 回归，README 截图实测实锤）。
+   此处 (0,3,2) 压回，背景由 L188 pre 深底统治，codeTheme 只出 token 色；
+   eye 档由 eye.css .vditor-reset pre>code (0,2,2) 域内自管、paper 档 L153 带
+   !important 均不受本规则影响（本规则仅 light 档命中）。 */
+html[data-theme="light"] .vditor-reset pre code.hljs { background: transparent; }
+
 /* ===== v0.3.29 瑞士网格正文排版（light 主题内容覆盖，设计稿 C）：
    近黑粗标题 / 细克莱因蓝引用线 / 行内码浅灰底 / 代码块深底浅字 /
    表头小写字距+2px 近黑底线 / 链接克莱因蓝。特异性 (0,2,1) 压过 Vditor light.css
