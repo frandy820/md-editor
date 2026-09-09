@@ -121,12 +121,13 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     extReload: "重新加载", extDismiss: "忽略",
     bigDocBar: "大文档模式：编辑约 1.5 秒后生效（延迟保存通道），保存与撤销不受影响。", bigDocBarIr: "大文档在即时渲染模式下会严重卡顿，建议用顶部按钮切到所见即所得；编辑约 1.5 秒后生效。",
     tabClose: "关闭", tabCloseOthers: "关闭其它", tabCloseRight: "关闭右侧", tabCloseLeft: "关闭左侧", tabCloseAll: "全部关闭", tabCloseSelected: "关闭选中",
-    themeTip: "界面主题：浅色 / 深色 / 护眼（未选过跟随系统）",
+    themeTip: "界面主题：浅色 / 深色 / 护眼（未选过跟随系统）；themes 目录可放 Typora 社区主题",
     appName: "MD 编辑器",
     statusSaved: "已保存", statusUnsaved: "未保存", readMin: "分钟", sbSide: "侧栏",
     sbShowSide: "显示侧栏（Ctrl+Shift+B）", sbHideSide: "隐藏侧栏（Ctrl+Shift+B）",
     zoomResetTip: "显示比例：点击复位 100%（Ctrl+滚轮缩放）",
     themeLight: "浅色", themeDark: "深色", themeEye: "护眼", themePaper: "暖纸",
+    themeLoadFail: "主题加载失败",
     copyCode: "复制", copied: "已复制", copyFail: "复制失败",
     cmdkOpen: "打开文件…", cmdkGroupCmd: "命 令", cmdkGroupRecent: "最近文件", cmdkEmpty: "（无匹配的命令或文件）", cmdkPh: "输入命令或文件名…", cmdkFoot: "↑↓ 选择 · Enter 执行 · Esc 关闭 · Ctrl+K 呼出",
   },
@@ -182,12 +183,13 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     extReload: "重新載入", extDismiss: "忽略",
     bigDocBar: "大文件模式：編輯約 1.5 秒後生效（延遲儲存通道），儲存與復原不受影響。", bigDocBarIr: "大文件在即時渲染模式下會嚴重卡頓，建議用頂部按鈕切到所見即所得；編輯約 1.5 秒後生效。",
     tabClose: "關閉", tabCloseOthers: "關閉其它", tabCloseRight: "關閉右側", tabCloseLeft: "關閉左側", tabCloseAll: "全部關閉", tabCloseSelected: "關閉選中",
-    themeTip: "介面主題：淺色 / 深色 / 護眼（未選過跟隨系統）",
+    themeTip: "介面主題：淺色 / 深色 / 護眼（未選過跟隨系統）；themes 目錄可放 Typora 社群主題",
     appName: "MD 編輯器",
     statusSaved: "已儲存", statusUnsaved: "未儲存", readMin: "分鐘", sbSide: "側欄",
     sbShowSide: "顯示側欄（Ctrl+Shift+B）", sbHideSide: "隱藏側欄（Ctrl+Shift+B）",
     zoomResetTip: "顯示比例：點擊復位 100%（Ctrl+滾輪縮放）",
     themeLight: "淺色", themeDark: "深色", themeEye: "護眼", themePaper: "暖紙",
+    themeLoadFail: "主題載入失敗",
     copyCode: "複製", copied: "已複製", copyFail: "複製失敗",
     readingFocus: "閱讀專注", cmdkOpen: "開啟檔案…", cmdkGroupCmd: "命 令", cmdkGroupRecent: "最近檔案", cmdkEmpty: "（無匹配的命令或檔案）", cmdkPh: "輸入命令或檔名…", cmdkFoot: "↑↓ 選擇 · Enter 執行 · Esc 關閉 · Ctrl+K 呼出",
   },
@@ -243,12 +245,13 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     extReload: "Reload", extDismiss: "Ignore",
     bigDocBar: "Large-document mode: edits take effect after ~1.5s (deferred-save channel); saving and undo are unaffected.", bigDocBarIr: "Instant-render mode is extremely slow for large documents; switch to WYSIWYG via the top button. Edits take effect after ~1.5s.",
     tabClose: "Close", tabCloseOthers: "Close others", tabCloseRight: "Close to the right", tabCloseLeft: "Close to the left", tabCloseAll: "Close all", tabCloseSelected: "Close selected",
-    themeTip: "Theme: light / dark / eye-care (follows system until chosen)",
+    themeTip: "Theme: light / dark / eye-care (follows system); drop Typora community themes into the themes folder",
     appName: "MD Editor",
     statusSaved: "Saved", statusUnsaved: "Unsaved", readMin: "min", sbSide: "Sidebar",
     sbShowSide: "Show sidebar (Ctrl+Shift+B)", sbHideSide: "Hide sidebar (Ctrl+Shift+B)",
     zoomResetTip: "Zoom: click to reset 100% (Ctrl+wheel)",
     themeLight: "Light", themeDark: "Dark", themeEye: "Eye care", themePaper: "Warm Paper",
+    themeLoadFail: "Failed to load theme",
     copyCode: "Copy", copied: "Copied", copyFail: "Copy failed",
     readingFocus: "Reading focus", cmdkOpen: "Open file…", cmdkGroupCmd: "COMMANDS", cmdkGroupRecent: "Recent files", cmdkEmpty: "(no matching command or file)", cmdkPh: "Type a command or file name…", cmdkFoot: "↑↓ Select · Enter Run · Esc Close · Ctrl+K Toggle",
   },
@@ -2302,6 +2305,9 @@ function buildCmdkItems(): CmdkItem[] {
   for (const nm of ["light", "dark", "eye", "paper"] as ThemeName[]) {
     items.push({ kind: "cmd", label: t(themeNameKey(nm)), run: () => applyTheme(nm) });
   }
+  for (const un of userThemeNames) { // v0.4.0 自定义主题（themes 目录扫描结果）
+    items.push({ kind: "cmd", label: un, run: () => applyTheme("user:" + un) });
+  }
   // —— 工具 ——
   items.push({ kind: "cmd", label: t("findBtn"), kbd: "Ctrl+F", run: click("btn-find") });
   items.push({ kind: "cmd", label: t("histBtn"), run: click("btn-history") });
@@ -2414,41 +2420,203 @@ function setReadingFocus(on: boolean): void {
 // ⚠ setTheme 真实签名=(theme, contentTheme, codeTheme, contentThemePath)：v0.3.14 曾把
 // cdn 误传到第二参——界面主题切了但内容主题仍 light（暗色下表格发白的根因）。
 type ThemeName = "light" | "dark" | "eye" | "paper"; // v0.4.0 墨黑(oled)并入深色
-let themeName: ThemeName = "light";
-function applyTheme(name: ThemeName, persist = true): void {
+let themeName: string = "light"; // 内置四值或 "user:<文件名>"（v0.4.0 自定义主题）
+/** 当前主题的 Vditor (界面档, contentTheme) 二元组——applyTheme/loadUserTheme/after 重建共用。
+ *  contentTheme 必须映射到真实存在的 css（目录仅 light/dark/eye）：light/paper→light；
+ *  user:* 档位由 loadUserTheme 探测的 userThemeDark 定（探测完成前/无背景值时按浅色）。 */
+function vditorThemeTrio(): ["dark" | "classic", string] {
+  if (themeName === "dark" || (themeName.startsWith("user:") && userThemeDark)) return ["dark", "dark"];
+  if (themeName === "eye") return ["classic", "eye"];
+  return ["classic", "light"];
+}
+/** Vditor 档位应用统一入口。v0.4.1 根修：setTheme 第三参 codeTheme 不传时恒默认亮色
+ *  github（.hljs{background:#fff}）→ 深色档下代码块/公式源码态 code 白底（实测
+ *  CODE.language-js.hljs=rgb(255,255,255)）。dark 档同步换 github-dark。 */
+function vditorApplyTheme(): void {
+  const [vd, ct] = vditorThemeTrio();
+  try {
+    vditor?.setTheme(vd, ct, vd === "dark" ? "github-dark" : "github", "/vditor-assets/dist/css/content-theme");
+  } catch { /* 未就绪：after 回调挂载后补应用 */ }
+}
+function applyTheme(name: string, persist = true): void {
   themeName = name;
-  document.documentElement.dataset.theme = name;
+  if (name.startsWith("user:")) {
+    // 自定义主题：外壳由注入 CSS + inline 变量桥接管，data-theme 落浅色基础档（token 随后被覆盖）
+    document.documentElement.dataset.theme = "light";
+    void loadUserTheme(name.slice(5));
+  } else {
+    unloadUserTheme();
+    document.documentElement.dataset.theme = name;
+    vditorApplyTheme();
+  }
   // v0.4.0 主题入口移到状态栏（工具栏减负）：按钮文案 + 弹出菜单勾选态
   const sbt = document.getElementById("sb-theme");
   if (sbt) { sbt.textContent = t(themeNameKey(name)); sbt.title = t("themeTip"); }
   document.querySelectorAll("#theme-menu button").forEach((b) => {
     b.classList.toggle("cur", (b as HTMLElement).dataset.theme === name);
   });
-  if (vditor) {
-    const vd = name === "dark" ? "dark" : "classic"; // Vditor 侧只分深浅两档
-    // contentTheme 必须映射到真实存在的 css（目录仅 light/dark/eye）：paper→light
-    const ct = name === "paper" ? "light" : name;
-    try { vditor.setTheme(vd, ct, undefined, "/vditor-assets/dist/css/content-theme"); } catch { /* 未就绪：重建时随 options 生效 */ }
-  }
   if (persist) saveUiStateKey("theme", name);
 }
-/** content-theme 实名（boot options 与 applyTheme 共用）：paper→light，其余原样 */
-function contentThemeOf(name: ThemeName): string {
-  return name === "paper" ? "light" : name;
+/** content-theme 实名（boot options 与 applyTheme 共用）：paper→light，user:*→light（档位由 loadUserTheme 校正） */
+function contentThemeOf(name: string): string {
+  if (name === "paper" || name.startsWith("user:")) return "light";
+  return name;
 }
 function initTheme(): void {
   // 未选过（磁盘无合法 theme 值）→ 跟随系统，且不写盘（选过才固定）
   const v = uiStateAll.theme;
   // v0.4.0 oled 并入 dark：旧 ui-state 存 oled 的映射到 dark，不丢深色体验
-  const v0 = v === "oled" ? "dark" : v;
-  const saved = (typeof v0 === "string" && ["light", "dark", "eye", "paper"].includes(v0)) ? (v0 as ThemeName) : null;
-  const name: ThemeName = saved ?? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  const v0 = typeof v === "string" ? (v === "oled" ? "dark" : v) : "";
+  const okUser = v0.startsWith("user:") && userThemeNames.includes(v0.slice(5)); // 主题文件已删→回落
+  const saved = okUser || ["light", "dark", "eye", "paper"].includes(v0) ? v0 : null;
+  const name = saved ?? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
   applyTheme(name, saved !== null);
 }
-/** 主题名 → i18n 键（状态栏按钮 + 弹出菜单共用） */
-function themeNameKey(name: ThemeName): string {
+/** 主题名 → i18n 键（状态栏按钮 + 弹出菜单共用）。user: 前缀返回文件名（t() 查无此键原样回落） */
+function themeNameKey(name: string): string {
+  if (name.startsWith("user:")) return name.slice(5);
   return name === "light" ? "themeLight" : name === "dark" ? "themeDark"
     : name === "eye" ? "themeEye" : "themePaper";
+}
+
+// ===== v0.4.0 自定义主题（Typora 社区主题兼容）=====
+// themes 目录（%APPDATA%/<identifier>/themes/）一个 .css = 一个主题（文件名即主题名，同
+// Typora 的 themes 目录约定；_ 前缀=禁用）。加载链：Rust 读原文 → typoraCompat() 运行时
+// 转换选择器（#write→#editor .vditor-reset 等）→ 注入 <style id="user-theme-style"> →
+// 抽 :root 的 Typora 变量桥接到应用语义 token（inline 覆盖一切主题块）→ --bg-color 亮度
+// 判深浅档（Vditor 控件/content-theme 跟档）。
+let userThemeNames: string[] = []; // scanUserThemes 填充；initTheme 合法性校验/cmk 命令用
+let userThemeActive = "";
+let userThemeDark = false; // 深色档记忆：模式切换重建 Vditor 时 options.theme 用（2674 行）
+/** Typora 核心变量 → 应用语义 token（未定义的桥不过去，保基础档值） */
+const TOKEN_BRIDGE: Array<[string, string]> = [
+  ["--side-bar-bg-color", "--canvas"],
+  ["--bg-color", "--surface"],
+  ["--text-color", "--text-primary"],
+  ["--primary-color", "--accent"],
+];
+/** 选择器转换表：Typora DOM → 本应用/Vditor DOM（字面替换，前缀形态天然兼容 #write h1 等） */
+function typoraCompat(css: string): string {
+  const rep = (s: string, from: string, to: string) => s.split(from).join(to); // lib<es2021 无 replaceAll
+  return rep(rep(css, "#write", "#editor .vditor-reset"), // 正文容器；保 id 使 (1,1,0) 压过 content-theme 的 (0,1,0)
+    ".md-fences", "pre");                                  // 代码块容器（#write .md-fences → #editor .vditor-reset pre）
+}
+/** 从 CSS 文本抽变量值（全文搜：Typora 主题变量多在 :root/html 块；var() 链原样返回，inline 同样可解析） */
+function cssVarOf(css: string, name: string): string | null {
+  const m = new RegExp(name.replace(/[-]/g, "\\-") + "\\s*:\\s*([^;{}]+)").exec(css);
+  return m ? m[1].trim() : null;
+}
+/** 解析 #hex/#rgba/rgb() 为 [r,g,b]（解析失败返回 null——var() 引用链等情况） */
+function parseColor(s: string): [number, number, number] | null {
+  s = s.trim();
+  let m = /^#([0-9a-f]{3,8})$/i.exec(s);
+  if (m) {
+    const h = m[1];
+    if (h.length === 3) return [parseInt(h[0] + h[0], 16), parseInt(h[1] + h[1], 16), parseInt(h[2] + h[2], 16)];
+    if (h.length >= 6) return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+    return null;
+  }
+  m = /rgba?\(\s*(\d+)\s*[,\s]\s*(\d+)\s*[,\s]\s*(\d+)/.exec(s);
+  return m ? [+m[1], +m[2], +m[3]] : null;
+}
+/** RGB 线性混色：f>0 向白，f<0 向黑（深浅推导用） */
+function shade(c: [number, number, number], f: number): string {
+  const m = (v: number) => Math.max(0, Math.min(255, Math.round(f > 0 ? v + (255 - v) * f : v * (1 + f))));
+  return `rgb(${m(c[0])}, ${m(c[1])}, ${m(c[2])})`;
+}
+async function loadUserTheme(name: string): Promise<void> {
+  let css = "";
+  try {
+    css = await invoke<string>("read_theme_css", { name });
+  } catch (e) {
+    // 文件被删/读取失败：卸载+回落浅色（不持久化——磁盘旧值由 initTheme 下次启动校验回落）
+    showToast(t("themeLoadFail") + ": " + name + " (" + e + ")", "danger");
+    unloadUserTheme();
+    applyTheme("light", false);
+    return;
+  }
+  userThemeActive = name;
+  let el = document.getElementById("user-theme-style") as HTMLStyleElement | null;
+  if (!el) {
+    el = document.createElement("style");
+    el.id = "user-theme-style";
+    document.head.appendChild(el);
+  }
+  // 首条保底：正文底/文字色跟主题变量（主题没写 #write 背景时防 content-theme 白底漏出；
+  // 特异性 (1,1,0) 同级在前，用户自己的规则可覆盖）
+  el.textContent =
+    "#editor .vditor-reset{background-color:var(--bg-color,#fff);color:var(--text-color,#000);}\n" +
+    typoraCompat(css);
+  // 外壳 token 桥：inline 变量覆盖一切 html[data-theme] 主题块（含基础档值）。
+  // --canvas 回落 --bg-color：drake 系主题只定义 --bg-color 无 --side-bar-bg-color（实测）
+  const root = document.documentElement;
+  for (const [src, dst] of TOKEN_BRIDGE) {
+    const val = cssVarOf(css, src) || (dst === "--canvas" ? cssVarOf(css, "--bg-color") : null);
+    if (val) root.style.setProperty(dst, val);
+    if (val && dst === "--accent") root.style.setProperty("--accent2", val);
+  }
+  // 深浅推导：bg 可解析时补边框/次级文字/悬停面（深色主题只桥四核心会留 light 灰线，层次不可用）。
+  // 取值链按"解析成功为止"——drake-dark 的 --side-bar-bg-color 是 var(--bg-color) 引用，
+  // 直接拼接会 parseColor 失败误判浅色（实测）；var() 引用本身桥接仍有效（inline 可解析）
+  const bgVal = ["--side-bar-bg-color", "--bg-color"]
+    .map((n) => cssVarOf(css, n))
+    .find((v) => v && parseColor(v)) || "";
+  const bg = parseColor(bgVal);
+  const txtVal = cssVarOf(css, "--text-color") || "";
+  const txt = parseColor(txtVal);
+  if (bg && txt) {
+    const dark = bg[0] * 0.299 + bg[1] * 0.587 + bg[2] * 0.114 < 140; // ITU-R BT.601 加权亮度
+    userThemeDark = dark;
+    root.style.setProperty("--border-subtle", shade(bg, dark ? 0.14 : -0.08));
+    root.style.setProperty("--border-strong", shade(bg, dark ? 0.26 : -0.18));
+    root.style.setProperty("--surface-hover", shade(bg, dark ? 0.07 : -0.045));
+    root.style.setProperty("--surface-raised", shade(bg, dark ? 0.05 : -0.02));
+    root.style.setProperty("--text-secondary", txtVal);
+    root.style.setProperty("--text-tertiary", txtVal);
+    vditorApplyTheme(); // userThemeDark 已更新，vditorThemeTrio 按其定档（含 hljs codeTheme）
+  } else {
+    userThemeDark = false;
+    vditorApplyTheme();
+  }
+}
+/** 卸载自定义主题：移除注入样式 + 清 inline token（html[data-theme] 主题块值自动恢复生效） */
+function unloadUserTheme(): void {
+  if (!userThemeActive && !document.getElementById("user-theme-style")) return;
+  userThemeActive = "";
+  userThemeDark = false;
+  document.getElementById("user-theme-style")?.remove();
+  const rs = document.documentElement.style;
+  for (const [, dst] of TOKEN_BRIDGE) rs.removeProperty(dst);
+  rs.removeProperty("--accent2");
+  for (const p of ["--border-subtle", "--border-strong", "--surface-hover", "--surface-raised", "--text-secondary", "--text-tertiary"]) {
+    rs.removeProperty(p);
+  }
+}
+/** 扫描 themes 目录并渲染主题菜单动态项（boot 时与刷新时机调用） */
+async function scanUserThemes(): Promise<void> {
+  try {
+    userThemeNames = await invoke<string[]>("list_theme_files");
+  } catch {
+    userThemeNames = [];
+  }
+  const menu = document.getElementById("theme-menu");
+  if (!menu) return;
+  menu.querySelectorAll("button[data-theme^='user:'], .menu-sep.user-sep").forEach((n) => n.remove());
+  if (userThemeNames.length === 0) return;
+  const sep = document.createElement("div");
+  sep.className = "menu-sep user-sep";
+  menu.appendChild(sep);
+  for (const n of userThemeNames) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.dataset.theme = "user:" + n;
+    b.textContent = n;
+    b.addEventListener("click", () => {
+      applyTheme("user:" + n);
+      menu.hidden = true;
+    });
+    menu.appendChild(b);
+  }
 }
 
 // ---- v0.4.0 侧栏折叠（阅读专注的前提之一；瞬时切换——拖宽交互要求 width 即时跟手）----
@@ -2671,7 +2839,8 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
     i18n: VDITOR_I18N[currentLang], // 注入本地 i18n（当前语言），工具栏 tooltip 自动走 i18n
     cdn: "/vditor-assets", // lute(markdown 引擎)/icons/method 等本地加载，符合 CSP，不依赖 unpkg
     // v0.3.14+ 主题：重建（模式/语言切换）时随当前主题；运行中切换走 vditor.setTheme
-    theme: themeName === "dark" ? ("dark" as const) : ("classic" as const),
+    // v0.4.0 自定义主题：data-theme 恒 light，档位由 loadUserTheme 探测的 userThemeDark 记忆
+    theme: (themeName === "dark" || userThemeDark) ? ("dark" as const) : ("classic" as const),
     height: "100%",
     cache: { enable: false },
     // 字数统计（type text = 按渲染后文本统计，符合中文字数直觉；after 补三语单位）。
@@ -2807,6 +2976,9 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
     after: () => {
       fixToolbarTooltipDirection();
       setupUndoToolbar(); // v0.3.21 撤销/重做按钮劫持（模式/语言切换重建 toolbar 后重绑）
+      // v0.4.1 每次挂载/重建后重申 Vditor 档位（含 hljs codeTheme——options 无此字段，
+      // 不补则深色档重建后代码块/公式源码回落亮色 hljs 白底）
+      vditorApplyTheme();
       // v0.3.21 根修「撤销亮但点了没反应/重做恒灰」：Vditor 内置 Undo.resetIcon 按**它自己的栈**
       // enable/disable 按钮——它的 redo 栈恒空（undo 分支已禁用）→ 每次编辑后 disable redo、
       // 打开文档后 enable undo，与自建栈按钮态打时序竞赛，抢设即症状（dist 14274 实锤）。
@@ -3014,8 +3186,8 @@ function applyAllText() {
   const sbz = document.getElementById("sb-zoom"); if (sbz) sbz.title = t("zoomResetTip");
   setSideCollapsed(sideCollapsed, false); // 重刷侧栏按钮文案（不动状态不落盘）
   document.querySelectorAll<HTMLElement>("#theme-menu button").forEach((b) => {
-    const nm = b.dataset.theme as ThemeName | undefined;
-    if (nm) b.textContent = t(themeNameKey(nm));
+    const nm = b.dataset.theme as string | undefined;
+    if (nm) b.textContent = t(themeNameKey(nm)); // user: 前缀返回文件名，t() 原样回落
   });
   const tm = document.getElementById("tab-menu");
   if (tm) {
@@ -5176,6 +5348,7 @@ async function boot() {
   });
   // v0.3.26：ui-state 已在 boot 开头同步 await 就绪，这里直接用（原 then 时序的 memRecent
   // 合并不再需要——load 先于任何 pushRecent 完成）
+  await scanUserThemes(); // v0.4.0 自定义主题：先扫描（initTheme 合法性校验/菜单动态项依赖结果）
   initTheme();
   if (uiStateAll.sideCollapsed === true) setSideCollapsed(true, false); // v0.4.0 恢复侧栏折叠态（不回写）
   renderRecent();

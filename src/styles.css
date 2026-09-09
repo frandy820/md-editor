@@ -162,6 +162,14 @@ html[data-theme="paper"] .vditor-reset hr { border: none; border-top: 1px solid 
 html[data-theme="paper"] .vditor-reset mark { background: #f2d98c !important; }
 html[data-theme="paper"] .vditor-reset kbd { background-color: #ead9b5 !important; border: 1px solid #c9b283 !important; }
 
+/* v0.4.1 公式块源码态防误伤：Vditor 把块级公式渲染在 pre.vditor-wysiwyg__preview 内
+   （含 .language-math），上面代码块的 pre 深底规则会连它一起命中——浅色=近黑块、
+   暖纸=深棕块、深色档 code 吃行内码蓝底（用户实报"公式背景跟正文不一样/好深/发白"）。
+   公式源码只是编辑辅助态，背景一律归正文；代码块（pre 内无 .language-math）不受影响。
+   html[data-theme] 前缀把特异性抬到 (0,3,2)，压过 paper 带 !important 的 (0,2,2)。 */
+html[data-theme] .vditor-reset pre:has(.language-math) { background: transparent !important; border: none !important; }
+html[data-theme] .vditor-reset pre:has(.language-math) code { background: transparent !important; }
+
 /* ===== v0.3.29 瑞士网格正文排版（light 主题内容覆盖，设计稿 C）：
    近黑粗标题 / 细克莱因蓝引用线 / 行内码浅灰底 / 代码块深底浅字 /
    表头小写字距+2px 近黑底线 / 链接克莱因蓝。特异性 (0,2,1) 压过 Vditor light.css

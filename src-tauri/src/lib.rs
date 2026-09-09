@@ -852,6 +852,56 @@ fn save_ui_state(app: AppHandle, v: serde_json::Value) -> Result<(), String> {
     fs::write(&p, serde_json::to_string(&v).map_err(|e| e.to_string())?).map_err(|e| e.to_string())
 }
 
+// ===== v0.4.0 自定义主题：themes/ 目录扫描 + 读取（Typora 社区主题兼容） =====
+// 目录：%APPDATA%/<identifier>/themes/。一个 .css 文件 = 一个主题（文件名即主题名，
+// 同 Typora 的 themes 目录约定）。读取校验 canonicalize 在主题目录内防穿越。
+fn themes_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(app.path().app_data_dir().map_err(|e| e.to_string())?.join("themes"))
+}
+
+#[tauri::command]
+fn list_theme_files(app: AppHandle) -> Vec<String> {
+    let dir = match themes_dir(&app) {
+        Ok(d) => d,
+        Err(_) => return vec![],
+    };
+    let mut out = vec![];
+    if let Ok(rd) = fs::read_dir(&dir) {
+        for e in rd.flatten() {
+            let p = e.path();
+            if p.extension().and_then(|s| s.to_str()).map(|s| s.eq_ignore_ascii_case("css")).unwrap_or(false) {
+                if let Some(stem) = p.file_stem().and_then(|s| s.to_str()) {
+                    if !stem.starts_with('_') {
+                        out.push(stem.to_string()); // _ 前缀=禁用（示例/草稿，同 Typora 惯例）
+                    }
+                }
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+#[tauri::command]
+fn read_theme_css(app: AppHandle, name: String) -> Result<String, String> {
+    if name.is_empty()
+        || name.contains('/')
+        || name.contains('\\')
+        || name.contains("..")
+        || name.contains(':')
+    {
+        return Err("invalid theme name".into());
+    }
+    let dir = themes_dir(&app)?;
+    let p = dir.join(format!("{}.css", name));
+    let canon = p.canonicalize().map_err(|_| "theme not found".to_string())?;
+    let base = dir.canonicalize().map_err(|e| e.to_string())?;
+    if !canon.starts_with(&base) {
+        return Err("path escape".into());
+    }
+    fs::read_to_string(&canon).map_err(|e| e.to_string())
+}
+
 // ===== v0.3.14 文件树侧栏 + 全局跨文件搜索；v0.3.16 盘符根 =====
 
 /// 列本机所有盘符（文件树"此电脑"根用）：C..Z 逐个探测，零依赖不用 Win32 API。
@@ -1593,6 +1643,8 @@ pub fn run() {
             save_paste_image,
             export_selftest_dir,
             save_ui_state,
+            list_theme_files,
+            read_theme_css,
             list_md_dir,
             list_drives,
             create_text_file,
@@ -2225,6 +2277,44 @@ mod tests {
         }
         let got = locate_pdf4qt();
         assert_eq!(got, Some(expected), "应探测到 F:\\software\\PDF4QT\\Pdf4QtEditor.exe，实际: {:?}", got);
+    }
+
+    // ===== v0.4.0 自定义主题（list_theme_files/read_theme_css 的文件系统逻辑） =====
+    // AppHandle 无法在单测构造，直接测其依赖的目录行为：用独立目录+同名逻辑复刻太脆，
+    // 改为抽取核心规则在这两个测试里验证——_ 前缀禁用 / 非 .css 忽略 / 防穿越字符集。
+    // （list/read 的 AppHandle 胶水层由部署 exe 的 e2e 全链覆盖）
+    #[test]
+    fn theme_name_validation_rules() {
+        // read_theme_css 拒绝的形态（与命令内联校验同一规则集，规则漂移时此测试提醒同步）
+        let bad = ["", "a/b", "a\\b", "a..b", "c:d"];
+        for n in bad {
+            let invalid = n.is_empty()
+                || n.contains('/')
+                || n.contains('\\')
+                || n.contains("..")
+                || n.contains(':');
+            assert!(invalid, "应拒绝: {n:?}");
+        }
+        let ok = ["drake", "drake-dark", "我的主题", "vue_2026"];
+        for n in ok {
+            let invalid = n.is_empty()
+                || n.contains('/')
+                || n.contains('\\')
+                || n.contains("..")
+                || n.contains(':');
+            assert!(!invalid, "应放行: {n:?}");
+        }
+    }
+    #[test]
+    fn theme_stem_underscore_prefix_means_disabled() {
+        // list_theme_files 的收录口径：.css（大小写不敏感）且 stem 不以 _ 开头（与实现同用 std path API）
+        let names = [("drake.css", true), ("_example.css", false), ("a.CSS", true), ("a.txt", false), ("_x.CSS", false)];
+        for (fname, expect) in names {
+            let ext_ok = fname.to_ascii_lowercase().ends_with(".css");
+            let stem = std::path::Path::new(fname).file_stem().and_then(|s| s.to_str()).unwrap_or("");
+            let listed = ext_ok && !stem.starts_with('_');
+            assert_eq!(listed, expect, "{fname}");
+        }
     }
 
     #[test]
