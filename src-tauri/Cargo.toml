@@ -1,6 +1,6 @@
 [package]
 name = "md-editor"
-version = "0.4.2"
+version = "0.4.3"
 description = "A Tauri App"
 authors = ["frandy820"]
 edition = "2021"

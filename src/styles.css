@@ -178,6 +178,17 @@ html[data-theme] .vditor-reset pre:has(.language-math) code { background: transp
    !important 均不受本规则影响（本规则仅 light 档命中）。 */
 html[data-theme="light"] .vditor-reset pre code.hljs { background: transparent; }
 
+/* v0.4.3 Vditor 块 popover 防遮挡钳制：popover（front-matter/表格等块左上角的
+   上移/下移/删除按钮条）由 Vditor JS 写 inline left = min(target.offsetLeft,
+   clientWidth - popW)。正常恒 8px 贴编辑区左缘（min 第一支恒赢）；用户实报特定
+   状态下按钮条伸进左侧导航栏被挡看不全（7 组视口×侧栏几何扫描 + 启动时序探测
+   均未复现越界——min 第一支恒 ≥0 且 offsetParent 恒 .vditor-wysiwyg，物理上
+   不应越界，疑似特定运行时态挂错定位）。作者 !important 压非 important inline
+   将左定位钉死 8px：正常态零行为变化，异常态兜底。min 第二支（防右溢出）被
+   一并接管——编辑区最窄 279px（800 窗-520 侧栏）> popover 最大宽 ~149px，
+   右溢出不可达。 */
+.vditor-wysiwyg > .vditor-panel.vditor-panel--none { left: 8px !important; }
+
 /* ===== v0.3.29 瑞士网格正文排版（light 主题内容覆盖，设计稿 C）：
    近黑粗标题 / 细克莱因蓝引用线 / 行内码浅灰底 / 代码块深底浅字 /
    表头小写字距+2px 近黑底线 / 链接克莱因蓝。特异性 (0,2,1) 压过 Vditor light.css
