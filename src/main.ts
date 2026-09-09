@@ -42,6 +42,20 @@ window.addEventListener("keydown", (e) => {
     e.preventDefault(); e.stopPropagation();
     const d = activeDoc();
     if (d) void saveDoc(d);
+  } else if ((e.key === "k" || e.key === "K") && !e.shiftKey) {
+    // v0.4.0 命令面板：⚠ Vditor 的 ⌘K=插入链接且同在 window 捕获层「先注册先执行」——
+    // 拦截必须与撤销键同批次（模块顶层），boot 里注册会晚于它而收不到
+    e.preventDefault(); e.stopPropagation();
+    toggleCmdk();
+  }
+}, true);
+// v0.4.0 阅读专注 Ctrl+Shift+D：同顶层捕获（焦点在编辑区时元素层会截获，Ctrl+F/H 同因）
+window.addEventListener("keydown", (e) => {
+  if (e.isComposing) return;
+  if (!(e.ctrlKey || e.metaKey) || !e.shiftKey || e.altKey) return;
+  if (e.key === "D" || e.key === "d") {
+    e.preventDefault(); e.stopPropagation();
+    setReadingFocus(!readingFocusOn);
   }
 }, true);
 let currentMode: "ir" | "wysiwyg" = "wysiwyg"; // 当前编辑模式（默认所见即所得，可直接编辑表格；可切回即时渲染）
@@ -75,8 +89,9 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     fontSizeTip: "字号：先框选文字，再选字号",
     selectFirstTip: "请先在编辑区框选要改字号的文字，再选字号",
     wordCount: "字",
-    focusMode: "专注", findBtn: "查找",
-    focusTip: "专注模式（F8）：淡化非当前段落",
+    focusMode: "打字专注", findBtn: "查找",
+    focusTip: "打字专注（F8）：淡化非当前段落，适合写作",
+    readingFocus: "阅读专注",
     findTip: "查找替换（Ctrl+F / Ctrl+H）",
     findPlaceholder: "查找…", replacePlaceholder: "替换为…",
     replaceOne: "替换", replaceAll: "全部替换",
@@ -90,7 +105,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     esSearching: "全盘搜索中…", esNone: "全盘无命中", esIndexing: "正在建立全盘文件索引（已扫描 {n} 项）——数十秒后即可搜到部分结果，期间逐步补全", esFail: "全盘查询失败",
   diagOk: "诊断包已导出（含运行日志+版本+系统信息），可直接发给反馈者：", diagFail: "诊断包导出失败：", esSplitTip: "拖动调整文件名列宽，双击复位",
     diagBtn: "诊断", diagTip: "导出诊断包：运行日志+版本+系统信息，单个文本文件，用于问题反馈",
-    recentTitle: "最近", clearRecentTip: "清空最近文件列表", clearRecent: "🗑 清空",
+    recentTitle: "最近", clearRecentTip: "清空最近文件列表", clearRecent: "清空",
     treePathPh: "路径，回车跳转", treeRefreshTip: "刷新目录",
     gsearchPh: "搜同级文件内容，回车执行（Ctrl+Shift+F）", gsearchNone: "（无匹配）",
     gsearchNoDoc: "（打开文件后可搜其所在目录）", gsearchEmpty: "（输入关键词）",
@@ -107,6 +122,12 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     tabClose: "关闭", tabCloseOthers: "关闭其它", tabCloseRight: "关闭右侧", tabCloseLeft: "关闭左侧", tabCloseAll: "全部关闭", tabCloseSelected: "关闭选中",
     themeTip: "界面主题：浅色 / 深色 / 护眼（未选过跟随系统）",
     appName: "MD 编辑器",
+    statusSaved: "已保存", statusUnsaved: "未保存", readMin: "分钟", sbSide: "侧栏",
+    sbShowSide: "显示侧栏（Ctrl+Shift+B）", sbHideSide: "隐藏侧栏（Ctrl+Shift+B）",
+    zoomResetTip: "显示比例：点击复位 100%（Ctrl+滚轮缩放）",
+    themeLight: "浅色", themeDark: "深色", themeEye: "护眼", themeOled: "墨黑", themePaper: "暖纸",
+    copyCode: "复制", copied: "已复制", copyFail: "复制失败",
+    cmdkOpen: "打开文件…", cmdkGroupCmd: "命 令", cmdkGroupRecent: "最近文件", cmdkEmpty: "（无匹配的命令或文件）", cmdkPh: "输入命令或文件名…", cmdkFoot: "↑↓ 选择 · Enter 执行 · Esc 关闭 · Ctrl+K 呼出",
   },
   "zh-TW": {
     open: "開啟", save: "儲存", openTip: "開啟 .md/.markdown/.txt 文件（可拖入視窗）", saveTip: "儲存當前文件（Ctrl+S）", welcomeName: "歡迎", untitled: "未命名", noDoc: "（無）",
@@ -129,8 +150,8 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     fontSizeTip: "字號：先框選文字，再選字號",
     selectFirstTip: "請先在編輯區框選要改字號的文字，再選字號",
     wordCount: "字",
-    focusMode: "專注", findBtn: "尋找",
-    focusTip: "專注模式（F8）：淡化非當前段落",
+    focusMode: "打字專注", findBtn: "尋找",
+    focusTip: "打字專注（F8）：淡化非當前段落，適合寫作",
     findTip: "尋找替換（Ctrl+F / Ctrl+H）",
     findPlaceholder: "尋找…", replacePlaceholder: "替換為…",
     replaceOne: "替換", replaceAll: "全部替換",
@@ -144,7 +165,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     esSearching: "全碟搜尋中…", esNone: "全碟無命中", esIndexing: "正在建立全碟文件索引（已掃描 {n} 項）——數十秒後即可搜到部分結果，期間逐步補全", esFail: "全碟查詢失敗",
   diagOk: "診斷包已導出（含運行日誌+版本+系統信息），可直接發給反饋者：", diagFail: "診斷包導出失敗：", esSplitTip: "拖動調整文件名列寬，雙擊復位",
     diagBtn: "診斷", diagTip: "導出診斷包：運行日誌+版本+系統信息，單個文本文件，用於問題反饋",
-    recentTitle: "最近", clearRecentTip: "清空最近檔案列表", clearRecent: "🗑 清空",
+    recentTitle: "最近", clearRecentTip: "清空最近檔案列表", clearRecent: "清空",
     treePathPh: "路徑，Enter 跳轉", treeRefreshTip: "重新整理目錄",
     gsearchPh: "搜同層檔案內容，Enter 執行（Ctrl+Shift+F）", gsearchNone: "（無符合）",
     gsearchNoDoc: "（開啟檔案後可搜其所在目錄）", gsearchEmpty: "（輸入關鍵詞）",
@@ -161,6 +182,12 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     tabClose: "關閉", tabCloseOthers: "關閉其它", tabCloseRight: "關閉右側", tabCloseLeft: "關閉左側", tabCloseAll: "全部關閉", tabCloseSelected: "關閉選中",
     themeTip: "介面主題：淺色 / 深色 / 護眼（未選過跟隨系統）",
     appName: "MD 編輯器",
+    statusSaved: "已儲存", statusUnsaved: "未儲存", readMin: "分鐘", sbSide: "側欄",
+    sbShowSide: "顯示側欄（Ctrl+Shift+B）", sbHideSide: "隱藏側欄（Ctrl+Shift+B）",
+    zoomResetTip: "顯示比例：點擊復位 100%（Ctrl+滾輪縮放）",
+    themeLight: "淺色", themeDark: "深色", themeEye: "護眼", themeOled: "墨黑", themePaper: "暖紙",
+    copyCode: "複製", copied: "已複製", copyFail: "複製失敗",
+    readingFocus: "閱讀專注", cmdkOpen: "開啟檔案…", cmdkGroupCmd: "命 令", cmdkGroupRecent: "最近檔案", cmdkEmpty: "（無匹配的命令或檔案）", cmdkPh: "輸入命令或檔名…", cmdkFoot: "↑↓ 選擇 · Enter 執行 · Esc 關閉 · Ctrl+K 呼出",
   },
   "en": {
     open: "Open", save: "Save", openTip: "Open a .md/.markdown/.txt file (or drag one into the window)", saveTip: "Save the current document (Ctrl+S)", welcomeName: "Welcome", untitled: "Untitled", noDoc: "(none)",
@@ -183,8 +210,8 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     fontSizeTip: "Font size: select text first, then pick a size",
     selectFirstTip: "Select the text in the editor first, then pick a size",
     wordCount: "words",
-    focusMode: "Focus", findBtn: "Find",
-    focusTip: "Focus mode (F8): dim other paragraphs",
+    focusMode: "Typing focus", findBtn: "Find",
+    focusTip: "Typing focus (F8): dim other paragraphs",
     findTip: "Find & replace (Ctrl+F / Ctrl+H)",
     findPlaceholder: "Find…", replacePlaceholder: "Replace with…",
     replaceOne: "Replace", replaceAll: "Replace all",
@@ -198,7 +225,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     esSearching: "Searching all drives…", esNone: "No matches on this computer", esIndexing: "Building drive-wide file index ({n} items scanned) — partial results become searchable within a minute", esFail: "Query failed",
   diagOk: "Diagnostics exported (logs + version + system info). Send this file for bug reports:", diagFail: "Failed to export diagnostics:", esSplitTip: "Drag to resize the name column, double-click to reset",
     diagBtn: "Diagnostics", diagTip: "Export diagnostics: logs + version + system info in one text file, for bug reports",
-    recentTitle: "Recent", clearRecentTip: "Clear recent files", clearRecent: "🗑 Clear",
+    recentTitle: "Recent", clearRecentTip: "Clear recent files", clearRecent: "Clear",
     treePathPh: "Path, Enter to go", treeRefreshTip: "Refresh folder",
     gsearchPh: "Search sibling files here, Enter (Ctrl+Shift+F)", gsearchNone: "(no match)",
     gsearchNoDoc: "(open a file to search its folder)", gsearchEmpty: "(type a keyword)",
@@ -215,6 +242,12 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     tabClose: "Close", tabCloseOthers: "Close others", tabCloseRight: "Close to the right", tabCloseLeft: "Close to the left", tabCloseAll: "Close all", tabCloseSelected: "Close selected",
     themeTip: "Theme: light / dark / eye-care (follows system until chosen)",
     appName: "MD Editor",
+    statusSaved: "Saved", statusUnsaved: "Unsaved", readMin: "min", sbSide: "Sidebar",
+    sbShowSide: "Show sidebar (Ctrl+Shift+B)", sbHideSide: "Hide sidebar (Ctrl+Shift+B)",
+    zoomResetTip: "Zoom: click to reset 100% (Ctrl+wheel)",
+    themeLight: "Light", themeDark: "Dark", themeEye: "Eye care", themeOled: "OLED Black", themePaper: "Warm Paper",
+    copyCode: "Copy", copied: "Copied", copyFail: "Copy failed",
+    readingFocus: "Reading focus", cmdkOpen: "Open file…", cmdkGroupCmd: "COMMANDS", cmdkGroupRecent: "Recent files", cmdkEmpty: "(no matching command or file)", cmdkPh: "Type a command or file name…", cmdkFoot: "↑↓ Select · Enter Run · Esc Close · Ctrl+K Toggle",
   },
 };
 
@@ -339,7 +372,7 @@ function clearFontSelHl() {
 function applyFontSizeToSelection(px: number) {
   // 源码模式：textarea 原始文本，直接插入 <span> 标签
   if (savedTa) {
-    if (savedStart === savedEnd) { alert(t("selectFirstTip")); return; }
+    if (savedStart === savedEnd) { showToast(t("selectFirstTip"), "info"); return; }
     const selTxt = savedTa.value.substring(savedStart, savedEnd);
     const wrapped = `<span style="font-size:${px}px">${selTxt}</span>`;
     savedTa.focus();
@@ -348,9 +381,9 @@ function applyFontSizeToSelection(px: number) {
     return;
   }
   // 富文本模式：contenteditable 选区
-  if (!savedRange || savedRange.collapsed) { alert(t("selectFirstTip")); return; }
+  if (!savedRange || savedRange.collapsed) { showToast(t("selectFirstTip"), "info"); return; }
   const editable = activeEditableArea();
-  if (!editable) { alert(t("selectFirstTip")); return; }
+  if (!editable) { showToast(t("selectFirstTip"), "info"); return; }
   editable.focus();
   const span = document.createElement("span");
   span.style.fontSize = px + "px";
@@ -428,6 +461,42 @@ function esc(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
+// ---- v0.4.0 toast：替代原生 alert（阻塞式、观感突兀）。底部中央浮现 2.6s 自动消退；
+// 三态 info/danger/success（左轨道条色区分）；同文本去重不堆叠；同屏最多 3 条 ----
+let toastRoot: HTMLElement | null = null;
+function showToast(msg: string, kind: "info" | "danger" | "success" = "info"): void {
+  if (!toastRoot) {
+    toastRoot = document.createElement("div");
+    toastRoot.id = "toast-root";
+    document.body.appendChild(toastRoot);
+  }
+  for (const el of Array.from(toastRoot.children)) {
+    if ((el as HTMLElement).dataset.msg === msg) { scheduleToastHide(el as HTMLElement); return; }
+  }
+  const t0 = document.createElement("div");
+  t0.className = "toast" + (kind === "info" ? "" : " " + kind);
+  t0.textContent = msg;
+  t0.title = msg; // 超长路径 ellipsis 后 hover 看全文
+  t0.dataset.msg = msg;
+  toastRoot.appendChild(t0);
+  requestAnimationFrame(() => t0.classList.add("show"));
+  while (toastRoot.children.length > 3) toastRoot.firstElementChild!.remove();
+  scheduleToastHide(t0);
+}
+function scheduleToastHide(el: HTMLElement): void {
+  window.clearTimeout(Number(el.dataset.timer || 0));
+  const tid = window.setTimeout(() => {
+    el.classList.remove("show");
+    window.setTimeout(() => el.remove(), 260); // 等退场过渡完再摘除
+  }, 2600);
+  el.dataset.timer = String(tid);
+}
+
+// prefers-reduced-motion：平滑滚动降级为瞬时（CSS 过渡已由全局媒体查询接管，这里管 JS 驱动的滚动）
+function reducedMotion(): boolean {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
 // ---- 章节解析：基于 md 源码行，跳过代码围栏里的 # ----
 function parseSections(md: string): Section[] {
   const lines = md.split("\n");
@@ -466,6 +535,9 @@ function rebuildOutline() {
   const secs = parseSections(doc ? doc.content : mdValue());
   const ul = document.getElementById("outline")!;
   ul.innerHTML = "";
+  // v0.4.0：映射重建放在 empty 早退之前——切到无标题文档时也要清掉旧文档的元素引用，
+  // 否则 outlineHeads 残留前一篇的 detached 节点（gBCR 恒 0），scrollspy 判定全乱
+  rebuildHeadMap();
   if (secs.length === 0) {
     ul.innerHTML = '<li class="empty">' + esc(t("noHeadings")) + "</li>";
     return;
@@ -516,6 +588,7 @@ function rebuildOutline() {
     ul.appendChild(li);
   });
   applyOutlineFilter(); // 重建后重放过滤态（大纲随编辑实时重建，不清过滤框）
+  updateReadingTrace(); // 内容变化后当前章节/进度立即重算（不等下一次滚动）——.cur 丢失在此自愈
 }
 
 function scheduleOutline() {
@@ -526,30 +599,183 @@ function scheduleOutline() {
   }, 400);
 }
 
-function scrollToHeading(idx: number) {
+// v0.4.0 阅读轨迹：大纲章节 ↔ 正文标题 的元素级映射（scrollspy 与点击定位共用）。
+// 匹配算法沿用旧 scrollToHeading 的文本+同名序号（跳过 Setext 等未进大纲标题的干扰），
+// 但结果缓存为元素引用——点击定位不再每次全文档重扫，同名标题错位同步根治（映射一次建立）。
+let outlineHeads: (HTMLElement | null)[] = [];
+function rebuildHeadMap(): void {
   const doc = activeDoc();
   const secs = parseSections(doc ? doc.content : vditor ? mdValue() : "");
-  const target = secs[idx];
-  if (!target) return;
-  const heads = Array.from(
+  const domHeads = Array.from(
     document.querySelectorAll<HTMLElement>(
       "#editor h1, #editor h2, #editor h3, #editor h4, #editor h5, #editor h6"
     )
   );
-  // 优先按标题纯文本定位（同名计数），可跳过 Setext 等未进大纲标题的重名干扰；
-  // 命中失败再回退 DOM 索引（无 Setext 时与原行为等价）
-  const sameBefore = secs.slice(0, idx).filter((s) => s.title === target.title).length;
-  let seen = 0;
-  for (const h of heads) {
-    if ((h.textContent || "").trim() === target.title) {
-      if (seen === sameBefore) {
-        h.scrollIntoView({ behavior: "smooth", block: "start" });
-        return;
+  const used = new Set<HTMLElement>();
+  outlineHeads = secs.map((target, idx) => {
+    const sameBefore = secs.slice(0, idx).filter((s) => s.title === target.title).length;
+    let seen = 0;
+    for (const h of domHeads) {
+      if (used.has(h)) continue;
+      if ((h.textContent || "").trim() === target.title) {
+        if (seen === sameBefore) { used.add(h); return h; }
+        seen++;
       }
-      seen++;
     }
+    return null; // 渲染中间态/特殊形态匹配不到：scrollspy 跳过该槽位
+  });
+}
+
+function scrollToHeading(idx: number) {
+  const h = outlineHeads[idx];
+  if (!h) return;
+  h.scrollIntoView({ behavior: reducedMotion() ? "auto" : "smooth", block: "start" });
+  setOutlineCurrent(idx); // 点击即时反馈（不等滚动事件链路）
+}
+
+// ---- v0.4.0 阅读轨迹（brief 记忆点）：大纲当前章节 + 顶部进度线 + 状态栏百分比，三处同源联动 ----
+let spyCur = -1;
+let spyRaf = false;
+function setOutlineCurrent(idx: number): void {
+  spyCur = idx;
+  const items = document.querySelectorAll("#outline .outline-item");
+  items.forEach((li) => li.classList.remove("cur"));
+  if (idx < 0 || idx >= items.length) return;
+  const li = items[idx];
+  li.classList.add("cur");
+  // 大纲滚动跟随：目标不可见才平移（block:nearest 不抢滚动位置），与正文滚动解耦不回环
+  li.scrollIntoView({ block: "nearest", inline: "nearest", behavior: reducedMotion() ? "auto" : "smooth" });
+}
+function outlineCurIdx(): number {
+  const items = document.querySelectorAll("#outline .outline-item");
+  for (let i = 0; i < items.length; i++) if (items[i].classList.contains("cur")) return i;
+  return -1;
+}
+function updateReadingTrace(): void {
+  const bar = document.getElementById("read-progress");
+  const sbPos = document.getElementById("sb-pos");
+  const sc = editorScrollEl();
+  if (!sc) {
+    if (bar) bar.style.transform = "scaleX(0)";
+    if (sbPos) sbPos.textContent = "";
+    return;
   }
-  if (heads[idx]) heads[idx].scrollIntoView({ behavior: "smooth", block: "start" });
+  // 进度线 + 状态栏百分比（同一数据源）
+  const max = sc.scrollHeight - sc.clientHeight;
+  const ratio = max > 0 ? Math.min(1, Math.max(0, sc.scrollTop / max)) : 0;
+  if (bar) bar.style.transform = `scaleX(${ratio})`;
+  if (sbPos) sbPos.textContent = Math.round(ratio * 100) + "%";
+  // scrollspy：感应线=编辑区视口顶 +90px（让标题进入即认领，迟于视觉顶行一拍更稳）
+  const line = sc.getBoundingClientRect().top + 90;
+  let cur = -1;
+  for (let i = 0; i < outlineHeads.length; i++) {
+    const h = outlineHeads[i];
+    if (h && h.getBoundingClientRect().top <= line) cur = i;
+  }
+  // 值变化或 DOM 丢失 .cur（rebuildOutline 的 innerHTML 重建丢类，spyCur 还是旧值会骗过值判据）都重绘
+  if (cur !== spyCur || outlineCurIdx() !== cur) setOutlineCurrent(cur);
+  repositionCodeBtn(); // 代码块复制按钮 overlay 跟随滚动重定位
+}
+function onEditorScroll(): void {
+  if (spyRaf) return;
+  spyRaf = true;
+  requestAnimationFrame(() => { spyRaf = false; updateReadingTrace(); });
+}
+function initReadingTrace(): void {
+  // 只跟编辑区滚动（capture 全局 scroll 会收到大纲面板自身滚动——跟随平移会回环）
+  document.addEventListener("scroll", (e) => {
+    const t = e.target;
+    if (t instanceof Element && t.closest("#editor")) onEditorScroll();
+  }, true);
+  window.addEventListener("resize", onEditorScroll);
+}
+
+// ---- v0.4.0 代码块增强：语言徽标 + 复制按钮。
+// 语言徽标 = pre[data-lang] 属性 + CSS ::after 渲染（Lute DOM→md 序列化忽略属性，源码零污染——
+// v0.3.12 表格列宽 th.style.width 同族先例）；复制按钮 = overlay 层绝对定位（不进 contenteditable，
+// wysiwyg 的 DOM 即源码，往 pre 里塞 button 会污染序列化）。----
+async function copyText(s: string): Promise<boolean> {
+  try { await navigator.clipboard.writeText(s); return true; }
+  catch {
+    // 兜底：非安全上下文/剪贴板 API 被拒时走 execCommand 老路径
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = s;
+      ta.style.cssText = "position:fixed;left:-99999px;top:0";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      ta.remove();
+      return ok;
+    } catch { return false; }
+  }
+}
+let codeLangTimer = 0;
+function refreshCodeLangs(): void {
+  // 幂等：只给还没打标的 pre 写 data-lang（渲染重放时已打标的跳过）
+  document.querySelectorAll<HTMLElement>("#editor pre > code[class*='language-']").forEach((c) => {
+    const pre = c.parentElement as HTMLElement | null;
+    if (!pre || pre.dataset.lang !== undefined) return;
+    const m = /language-([\w+#-]+)/.exec(c.className);
+    if (m) pre.dataset.lang = m[1];
+  });
+}
+let codeBtnFor: HTMLElement | null = null; // 当前按钮指向的 pre
+function positionCodeBtn(pre: HTMLElement | null): void {
+  const layer = document.getElementById("code-btn-layer");
+  const btn = layer?.querySelector<HTMLButtonElement>(".code-copy-btn");
+  if (!layer || !btn) return;
+  if (!pre) {
+    btn.classList.remove("visible");
+    codeBtnFor = null;
+    return;
+  }
+  codeBtnFor = pre;
+  const host = document.getElementById("editor-wrap")!.getBoundingClientRect();
+  const r = pre.getBoundingClientRect();
+  btn.style.top = r.top - host.top + 4 + "px";
+  btn.style.right = Math.max(0, host.right - r.right) + 8 + "px";
+  btn.classList.add("visible");
+}
+function repositionCodeBtn(): void {
+  if (codeBtnFor && codeBtnFor.isConnected) positionCodeBtn(codeBtnFor);
+}
+function initCodeBlocks(): void {
+  const layer = document.getElementById("code-btn-layer");
+  if (!layer) return;
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "code-copy-btn";
+  btn.textContent = t("copyCode");
+  btn.addEventListener("pointerdown", (e) => e.stopPropagation()); // 不抢编辑区选区/焦点
+  btn.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    const pre = codeBtnFor;
+    if (!pre) return;
+    const code = pre.querySelector("code") || pre;
+    const ok = await copyText(code.textContent || "");
+    const prev = btn.textContent;
+    btn.textContent = ok ? "✓ " + t("copied") : t("copyFail");
+    window.setTimeout(() => { btn.textContent = prev; }, 900);
+  });
+  layer.appendChild(btn);
+  // 悬停哪个代码块，按钮就定位到哪个（事件委托：Vditor 重渲染不丢绑定）
+  const ed = document.getElementById("editor")!;
+  ed.addEventListener("pointerover", (e) => {
+    const pre = (e.target as Element).closest<HTMLElement>("pre");
+    if (pre && pre.querySelector("code")) positionCodeBtn(pre);
+  });
+  ed.addEventListener("pointerout", (e) => {
+    const to = e.relatedTarget as Element | null;
+    if (!to || !to.closest?.("pre")) positionCodeBtn(null);
+  });
+  // 语言徽标：编辑器子树变化（输入/重渲染/模式切换）→ 防抖打标
+  const obs = new MutationObserver(() => {
+    window.clearTimeout(codeLangTimer);
+    codeLangTimer = window.setTimeout(refreshCodeLangs, 300);
+  });
+  obs.observe(ed, { childList: true, subtree: true });
+  refreshCodeLangs();
 }
 
 async function deleteSection(id: string) {
@@ -672,6 +898,7 @@ function renderTabs() {
     });
     bar.appendChild(tab);
   });
+  updateSaveState(); // v0.4.0 状态栏保存态：dirty 变化必经 renderTabs（tab ● 同源）
 }
 
 // 标签右键菜单（Notepad++：关闭/关闭其它/关闭右侧/全部关闭；Ctrl+Click 多选时加"关闭选中"）
@@ -1087,7 +1314,7 @@ function openDoc(path: string | null, content: string, name?: string, encoding?:
   // 新拒开线 2M 字符：超过后键入延迟超 400ms、渲染超 8s，体验不成立。所有打开路径
   // （树/最近/快开/dnd/命令行）统一在此拦截。
   if (content.length > MAX_OPEN_CHARS) {
-    alert(t("fileTooBig") + bigSizeLabel(content.length) + t("fileTooBigSuf"));
+    showToast(t("fileTooBig") + bigSizeLabel(content.length) + t("fileTooBigSuf"), "danger");
     return;
   }
   // 同路径已打开 → 直接切换过去，不重复开
@@ -1170,7 +1397,7 @@ async function loadLazyDoc(doc: Doc, silent = false): Promise<void> {
   try {
     const [content, enc] = await invoke<[string, string]>("open_file", { path: doc.path });
     if (content.length > MAX_OPEN_CHARS) { // 会话期间文件被撑大：同样过拒开线
-      alert(t("fileTooBig") + bigSizeLabel(content.length) + t("fileTooBigSuf"));
+      showToast(t("fileTooBig") + bigSizeLabel(content.length) + t("fileTooBigSuf"), "danger");
       doc.loading = false;
       closeDoc(doc.id);
       return;
@@ -1189,7 +1416,7 @@ async function loadLazyDoc(doc: Doc, silent = false): Promise<void> {
     // 死标签一批弹 N 个 alert 不可接受（2026-09-08 实况）；用户主动点开仍提示
     doc.loading = false;
     closeDoc(doc.id);
-    if (!silent) alert(t("openFail") + e);
+    if (!silent) showToast(t("openFail") + e, "danger");
     return;
   }
   doc.loading = false;
@@ -1284,7 +1511,7 @@ function showExtBar(doc: Doc, deleted: boolean): void {
 async function reloadFromDisk(doc: Doc): Promise<void> {
   try {
     const [content, enc] = await invoke<[string, string]>("open_file", { path: doc.path });
-    if (content.length > MAX_OPEN_CHARS) { alert(t("fileTooBig") + bigSizeLabel(content.length) + t("fileTooBigSuf")); return; }
+    if (content.length > MAX_OPEN_CHARS) { showToast(t("fileTooBig") + bigSizeLabel(content.length) + t("fileTooBigSuf"), "danger"); return; }
     doc.content = content;
     doc.base = content.replace(/\r\n/g, "\n");
     doc.large = content.length > LARGE_DOC_CHARS;
@@ -1303,20 +1530,35 @@ async function reloadFromDisk(doc: Doc): Promise<void> {
     }
     refreshMeta(doc);
   } catch (e) {
-    alert(t("openFail") + e);
+    showToast(t("openFail") + e, "danger");
   }
 }
 
-// ----- 状态栏（v0.3.26 起；v0.3.27 删文件大小段）：已选字符数 + 总字数(Vditor counter)，并入左下角 counter -----
+// ----- 状态栏（v0.3.26 起；v0.4.0 移到底部精密状态栏）：已选字符数 + 总字数 + 预计阅读时长 -----
 let counterLen = 0; // Vditor counter after(len) 的缓存（selectionchange 时重拼文案用）
 let statusSelLen = 0;
 function updateStatus(): void {
-  const el = document.querySelector<HTMLElement>(".vditor-counter");
-  if (!el) return;
+  // v0.4.0 编辑器左下 counter 胶囊退役（CSS 隐藏，Vditor counter 仍作数据源），文案写进底部状态栏
   const parts: string[] = [];
   if (statusSelLen > 0) parts.push(t("statusSelected").replace("{n}", String(statusSelLen)));
   parts.push(`${counterLen} ${t("wordCount")}`);
-  el.innerText = parts.join(" · ");
+  const sbCount = document.getElementById("sb-count");
+  if (sbCount) sbCount.textContent = parts.join(" · ");
+  const sbRead = document.getElementById("sb-read");
+  if (sbRead) {
+    // 预计阅读时长：中文 300-500 字/分取 400；空文档/极短不显示（克制）
+    sbRead.textContent = counterLen >= 200 ? "≈ " + Math.max(1, Math.round(counterLen / 400)) + " " + t("readMin") : "";
+  }
+}
+// v0.4.0 保存态（状态栏左段）：dirty=强调色"未保存"，干净=灰"已保存"；无文档隐藏
+function updateSaveState(): void {
+  const el = document.getElementById("sb-save");
+  if (!el) return;
+  const d = activeDoc();
+  if (!d) { el.hidden = true; return; }
+  el.hidden = false;
+  if (d.dirty) { el.textContent = "● " + t("statusUnsaved"); el.className = "sb-seg dirty"; }
+  else { el.textContent = t("statusSaved"); el.className = "sb-seg saved"; }
 }
 function trackSelectionStatus(): void {
   const sel = getSelection();
@@ -1851,7 +2093,7 @@ function handleRenamed(oldPath: string, newPath: string): void {
   markTreeCurrent();
 }
 function copyTextToClipboard(text: string): void {
-  const done = () => alert(t("fmCopyDone") + " " + text);
+  const done = () => showToast(t("fmCopyDone") + " " + text, "success");
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
   } else fallbackCopy(text, done);
@@ -1888,7 +2130,7 @@ function initFtreeMenu(): void {
     try {
       if (act === "open" && path) { loadFile(path); return; }
       if (act === "new-md" || act === "new-txt") {
-        if (!baseDir) { alert(t("fmNoBase")); return; }
+        if (!baseDir) { showToast(t("fmNoBase"), "info"); return; }
         const kind = act === "new-txt" ? "txt" : "md";
         const title = kind === "txt" ? t("fmNewTxtTitle") : t("fmNewMdTitle");
         const name = await ftreeAsk({ title, input: true, initial: kind === "txt" ? "未命名.txt" : t("untitledMd") });
@@ -1899,7 +2141,7 @@ function initFtreeMenu(): void {
         return;
       }
       if (act === "new-dir") {
-        if (!baseDir) { alert(t("fmNoBase")); return; }
+        if (!baseDir) { showToast(t("fmNoBase"), "info"); return; }
         const name = await ftreeAsk({ title: t("fmNewDirTitle"), input: true, initial: t("untitledDir") });
         if (!name) return;
         await invoke<string>("create_dir", { dir: baseDir, name });
@@ -1925,7 +2167,7 @@ function initFtreeMenu(): void {
       if (act === "reveal" && path) { invoke("reveal_path", { path }); return; }
       if (act === "copy-path" && path) { copyTextToClipboard(path); return; }
     } catch (err) {
-      alert(String(err)); // Rust 侧 Err（重名/非法名/权限等）直接展示
+      showToast(String(err), "danger"); // Rust 侧 Err（重名/非法名/权限等）直接展示
     }
   });
   // 点菜单外任意处收起
@@ -2024,6 +2266,146 @@ function closeQuickOpen(): void {
   (document.getElementById("quickopen-modal") as HTMLElement).hidden = true;
 }
 
+// ===== v0.4.0 命令面板（Ctrl+K）：命令 + 最近文件 三段式 =====
+// 设计原则：命令执行一律复用既有绑定（按钮 click / 既有函数），面板只做"发现与直达"，
+// 不复制业务逻辑——导出走 #export-menu 已绑定按钮，与工具栏菜单永远同路径。
+interface CmdkItem { kind: "cmd" | "file"; label: string; sub?: string; kbd?: string; run: () => void; }
+let cmdkItems: CmdkItem[] = [];
+let cmdkSel = 0;
+function buildCmdkItems(): CmdkItem[] {
+  const btn = (id: string) => document.getElementById(id) as HTMLElement | null;
+  const click = (id: string) => () => { btn(id)?.click(); };
+  const items: CmdkItem[] = [];
+  // —— 文件 ——
+  items.push({ kind: "cmd", label: t("cmdkOpen"), kbd: "Ctrl+Shift+O", run: click("btn-open") });
+  items.push({ kind: "cmd", label: t("save"), kbd: "Ctrl+S", run: () => { const d = activeDoc(); if (d) void saveDoc(d); } });
+  // —— 导出（复用已绑定 handler 的菜单按钮，含空文档确认等完整链路） ——
+  const exp: Array<[string, string]> = [
+    ["pdf", "exportPdf"], ["html", "exportHtmlStyled"], ["html-plain", "exportHtmlPlain"],
+    ["image", "exportPng"], ["docx", "exportDocx"],
+  ];
+  for (const [k, key] of exp) {
+    items.push({
+      kind: "cmd", label: t(key),
+      run: () => { (document.querySelector(`#export-menu button[data-export="${k}"]`) as HTMLElement | null)?.click(); },
+    });
+  }
+  items.push({ kind: "cmd", label: t("printBtn"), kbd: "Ctrl+P", run: click("btn-print") });
+  // —— 视图 ——
+  items.push({ kind: "cmd", label: currentMode === "wysiwyg" ? t("switchToIR") : t("switchToWYSIWYG"), kbd: "Ctrl+Alt+M", run: click("btn-mode") });
+  items.push({ kind: "cmd", label: sideCollapsed ? t("sbShowSide") : t("sbHideSide"), kbd: "Ctrl+Shift+B", run: () => setSideCollapsed(!sideCollapsed) });
+  items.push({ kind: "cmd", label: t("focusMode"), kbd: "F8", run: () => setFocusMode(!focusModeOn) });
+  items.push({ kind: "cmd", label: t("readingFocus"), kbd: "Ctrl+Shift+D", run: () => setReadingFocus(!readingFocusOn) });
+  for (const nm of ["light", "dark", "eye", "oled", "paper"] as ThemeName[]) {
+    items.push({ kind: "cmd", label: t(themeNameKey(nm)), run: () => applyTheme(nm) });
+  }
+  // —— 工具 ——
+  items.push({ kind: "cmd", label: t("findBtn"), kbd: "Ctrl+F", run: click("btn-find") });
+  items.push({ kind: "cmd", label: t("histBtn"), run: click("btn-history") });
+  items.push({ kind: "cmd", label: t("diagBtn"), run: click("btn-diag") });
+  return items;
+}
+function renderCmdkList(): void {
+  const input = document.getElementById("cmdk-input") as HTMLInputElement;
+  const list = document.getElementById("cmdk-list")!;
+  const q = input.value.trim().toLowerCase();
+  const cmds = buildCmdkItems().filter((c) => !q || c.label.toLowerCase().includes(q));
+  const files = recentList()
+    .filter((p) => !q || (p.split(/[\\/]/).pop() || "").toLowerCase().includes(q) || p.toLowerCase().includes(q))
+    .slice(0, 5)
+    .map<CmdkItem>((p) => ({
+      kind: "file",
+      label: p.split(/[\\/]/).pop() || p,
+      sub: p.replace(/[\\/][^\\/]*$/, ""),
+      run: () => { void loadFile(p); },
+    }));
+  cmdkItems = [...cmds, ...files];
+  cmdkSel = Math.min(cmdkSel, Math.max(0, cmdkItems.length - 1));
+  list.innerHTML = "";
+  if (cmdkItems.length === 0) {
+    list.innerHTML = `<div class="cmdk-empty">${esc(t("cmdkEmpty"))}</div>`;
+    return;
+  }
+  let lastKind = "";
+  cmdkItems.forEach((it, i) => {
+    if (it.kind !== lastKind) {
+      lastKind = it.kind;
+      const g = document.createElement("div");
+      g.className = "cmdk-group";
+      g.textContent = it.kind === "file" ? t("cmdkGroupRecent") : t("cmdkGroupCmd");
+      list.appendChild(g);
+    }
+    const el = document.createElement("div");
+    el.className = "cmdk-item" + (i === cmdkSel ? " sel" : "");
+    el.innerHTML = `<span class="l">${esc(it.label)}</span>`
+      + (it.sub ? `<span class="p">${esc(it.sub)}</span>` : "")
+      + (it.kbd ? `<span class="k">${esc(it.kbd)}</span>` : "");
+    el.addEventListener("mouseenter", () => { if (cmdkSel !== i) { cmdkSel = i; refreshCmdkSel(); } });
+    el.addEventListener("click", () => { execCmdk(i); });
+    list.appendChild(el);
+  });
+}
+function refreshCmdkSel(): void {
+  document.querySelectorAll("#cmdk-list .cmdk-item").forEach((el, i) => el.classList.toggle("sel", i === cmdkSel));
+  const cur = document.querySelectorAll("#cmdk-list .cmdk-item")[cmdkSel];
+  (cur as HTMLElement | undefined)?.scrollIntoView({ block: "nearest" });
+}
+function execCmdk(i: number): void {
+  const it = cmdkItems[i];
+  closeCmdk();
+  if (it) it.run();
+}
+function openCmdk(): void {
+  (document.getElementById("cmdk-modal") as HTMLElement).hidden = false;
+  const input = document.getElementById("cmdk-input") as HTMLInputElement;
+  input.value = "";
+  cmdkSel = 0;
+  renderCmdkList();
+  input.focus();
+}
+function closeCmdk(): void {
+  (document.getElementById("cmdk-modal") as HTMLElement).hidden = true;
+}
+function toggleCmdk(): void {
+  const m = document.getElementById("cmdk-modal");
+  if (!m) return;
+  if (m.hidden) openCmdk(); else closeCmdk();
+}
+function initCmdk(): void {
+  const input = document.getElementById("cmdk-input") as HTMLInputElement;
+  input.addEventListener("input", () => { cmdkSel = 0; renderCmdkList(); });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (cmdkItems.length === 0) return;
+      const d = e.key === "ArrowDown" ? 1 : -1;
+      cmdkSel = (cmdkSel + d + cmdkItems.length) % cmdkItems.length;
+      refreshCmdkSel();
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      execCmdk(cmdkSel);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      closeCmdk();
+    }
+  });
+  // 点遮罩关闭（点面板自身不关）
+  document.getElementById("cmdk-modal")?.addEventListener("pointerdown", (e) => {
+    if ((e.target as HTMLElement).id === "cmdk-modal") closeCmdk();
+  });
+}
+
+// ---- v0.4.0 阅读专注（Ctrl+Shift+D / 命令面板）：收侧栏 + 工具栏/标签栏降存在感（保持占位）。 ----
+// 与 F8 打字专注（段落淡化）分层：一个管"写作沉浸"，一个管"阅读沉浸"。状态栏保留（位置感知不撤）。
+let readingFocusOn = false;
+function setReadingFocus(on: boolean): void {
+  readingFocusOn = on;
+  document.body.classList.toggle("reading-focus", on);
+  const f = document.getElementById("sb-focus");
+  if (f) f.textContent = t("readingFocus");
+  if (on) setSideCollapsed(true, true); // 收导航（持久化：专注态收起是用户意图，重启保持）
+}
+
 // ----- 主题三态（v0.3.15：浅色/深色/护眼豆沙绿）。外壳走 CSS 变量（html[data-theme]），
 // Vditor 编辑区内容主题走 content-theme/<name>.css（light/dark/eye，eye 为自建）。
 // ⚠ setTheme 真实签名=(theme, contentTheme, codeTheme, contentThemePath)：v0.3.14 曾把
@@ -2033,8 +2415,12 @@ let themeName: ThemeName = "light";
 function applyTheme(name: ThemeName, persist = true): void {
   themeName = name;
   document.documentElement.dataset.theme = name;
-  const sel = document.getElementById("theme-select") as HTMLSelectElement | null;
-  if (sel) sel.value = name;
+  // v0.4.0 主题入口移到状态栏（工具栏减负）：按钮文案 + 弹出菜单勾选态
+  const sbt = document.getElementById("sb-theme");
+  if (sbt) { sbt.textContent = t(themeNameKey(name)); sbt.title = t("themeTip"); }
+  document.querySelectorAll("#theme-menu button").forEach((b) => {
+    b.classList.toggle("cur", (b as HTMLElement).dataset.theme === name);
+  });
   if (vditor) {
     // v0.3.21 新增 oled(墨黑)/paper(暖纸)：编辑区底色走 CSS 覆盖（eye 同模式），Vditor 侧只分深浅两档
     const vd = name === "dark" || name === "oled" ? "dark" : "classic";
@@ -2055,6 +2441,25 @@ function initTheme(): void {
   const saved = (typeof v === "string" && ["light", "dark", "eye", "oled", "paper"].includes(v)) ? (v as ThemeName) : null;
   const name: ThemeName = saved ?? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
   applyTheme(name, saved !== null);
+}
+/** 主题名 → i18n 键（状态栏按钮 + 弹出菜单共用） */
+function themeNameKey(name: ThemeName): string {
+  return name === "light" ? "themeLight" : name === "dark" ? "themeDark"
+    : name === "eye" ? "themeEye" : name === "oled" ? "themeOled" : "themePaper";
+}
+
+// ---- v0.4.0 侧栏折叠（阅读专注的前提之一；瞬时切换——拖宽交互要求 width 即时跟手）----
+let sideCollapsed = false;
+function setSideCollapsed(on: boolean, persist = true): void {
+  sideCollapsed = on;
+  document.getElementById("outline-panel")?.classList.toggle("collapsed", on);
+  const btn = document.getElementById("sb-side");
+  if (btn) {
+    btn.textContent = t("sbSide");
+    btn.title = on ? t("sbShowSide") : t("sbHideSide");
+    btn.classList.toggle("folded", on); // 折叠态降一档灰，提示"已收起"
+  }
+  if (persist) saveUiStateKey("sideCollapsed", on);
 }
 
 // ----- 大纲过滤：输入即时隐藏不匹配项；rebuildOutline 重建后需重放（否则过滤态丢失） -----
@@ -2091,7 +2496,7 @@ function initSidePanels(): void {
     if (!v) return;
     invoke<TreeEntry[]>("list_md_dir", { path: v }).then(() => void locateTreeAt(v)).catch(() => {
       pathInp.value = ftreeRoot || "";
-      alert(t("treeBadPath") + v);
+      showToast(t("treeBadPath") + v, "danger");
     });
   });
   document.getElementById("ftree-refresh")!.addEventListener("click", () => { refreshFileTree(); });
@@ -2130,9 +2535,33 @@ function initSidePanels(): void {
     } else if (e.key === "Escape") { e.preventDefault(); closeQuickOpen(); }
   });
   // 主题下拉（三态选择）
-  document.getElementById("theme-select")!.addEventListener("change", (e) => {
-    applyTheme((e.target as HTMLSelectElement).value as ThemeName);
+  // v0.4.0 主题菜单（状态栏 sb-theme 弹出，替代工具栏 theme-select 下拉）
+  const themeMenu = document.getElementById("theme-menu")!;
+  themeMenu.querySelectorAll("button").forEach((b) => {
+    b.addEventListener("click", () => {
+      applyTheme((b as HTMLElement).dataset.theme as ThemeName);
+      themeMenu.hidden = true;
+    });
   });
+  document.getElementById("sb-theme")!.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (themeMenu.hidden) {
+      const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      themeMenu.style.right = Math.max(8, window.innerWidth - r.right) + "px";
+    }
+    themeMenu.hidden = !themeMenu.hidden;
+  });
+  document.addEventListener("pointerdown", (e) => {
+    if (!themeMenu.hidden && !(e.target as Element | null)?.closest?.("#theme-menu, #sb-theme")) {
+      themeMenu.hidden = true;
+    }
+  });
+  // v0.4.0 侧栏折叠：Ctrl+Shift+B / 状态栏按钮（捕获层抢在 Vditor 元素层之前）
+  window.addEventListener("keydown", (e) => {
+    if (!(e.ctrlKey || e.metaKey) || !e.shiftKey || e.altKey) return;
+    if (e.key.toLowerCase() === "b") { e.preventDefault(); e.stopPropagation(); setSideCollapsed(!sideCollapsed); }
+  }, true);
+  document.getElementById("sb-side")!.addEventListener("click", () => setSideCollapsed(!sideCollapsed));
   // 全局快捷键：Ctrl+Shift+O 快开 / Ctrl+Shift+F 跨文件搜索（Ctrl+F 单文件查找不受影响）。
   // ⚠ 必须 capture：焦点在编辑区时 Vditor 的 keydown 在元素层 stopPropagation，
   // 冒泡阶段的 window 监听收不到——真机"按了没反应"（e2e 焦点不在编辑区测不出）的根因
@@ -2167,7 +2596,7 @@ async function loadFile(path: string) {
     }
     openDoc(path, content, undefined, enc);
   } catch (e) {
-    alert(t("openFail") + e);
+    showToast(t("openFail") + e, "danger");
   }
 }
 let pendingLargeOpen: { path: string; content: string; enc: string } | null = null;
@@ -2180,7 +2609,7 @@ async function handleOpenPdf(pdfPath: string) {
   try {
     src = await invoke<string | null>("find_pdf_source", { pdfPath });
   } catch (e) {
-    alert(t("openFail") + e);
+    showToast(t("openFail") + e, "danger");
     return;
   }
   if (src) {
@@ -2212,10 +2641,10 @@ async function handleOpenPdf(pdfPath: string) {
       try {
         await openPath(pdfPath);
       } catch (e2) {
-        alert(t("openFail") + e2);
+        showToast(t("openFail") + e2, "danger");
       }
     } else {
-      alert(t("openFail") + e);
+      showToast(t("openFail") + e, "danger");
     }
   }
 }
@@ -2564,7 +2993,15 @@ function applyAllText() {
   const gsi = document.getElementById("gsearch-input") as HTMLInputElement | null; if (gsi) gsi.placeholder = t("gsearchPh");
   const qot = document.getElementById("qo-title"); if (qot) qot.textContent = t("quickOpenTitle");
   const qoi = document.getElementById("qo-input") as HTMLInputElement | null; if (qoi) qoi.placeholder = t("quickOpenPh");
-  const ts = document.getElementById("theme-select"); if (ts) ts.title = t("themeTip");
+  const cki = document.getElementById("cmdk-input") as HTMLInputElement | null; if (cki) cki.placeholder = t("cmdkPh");
+  const ckf = document.getElementById("cmdk-foot"); if (ckf) ckf.textContent = t("cmdkFoot");
+  // v0.4.0 状态栏 + 主题菜单（theme-select 已从工具栏移除）
+  const sbz = document.getElementById("sb-zoom"); if (sbz) sbz.title = t("zoomResetTip");
+  setSideCollapsed(sideCollapsed, false); // 重刷侧栏按钮文案（不动状态不落盘）
+  document.querySelectorAll<HTMLElement>("#theme-menu button").forEach((b) => {
+    const nm = b.dataset.theme as ThemeName | undefined;
+    if (nm) b.textContent = t(themeNameKey(nm));
+  });
   const tm = document.getElementById("tab-menu");
   if (tm) {
     const setTxt = (act: string, key: string) => {
@@ -2740,7 +3177,7 @@ async function saveDoc(doc: Doc): Promise<boolean> {
   }
   if (doc.content === "") {
     const seq = currentLang === "en" ? '"' : "「";
-    alert(seq + doc.name + t("saveEmptySuf"));
+    showToast(seq + doc.name + t("saveEmptySuf"), "info");
     return false;
   }
   try {
@@ -2752,7 +3189,7 @@ async function saveDoc(doc: Doc): Promise<boolean> {
     scheduleSessionSave();
     return true;
   } catch (e) {
-    alert(t("saveFail") + doc.name + " — " + e);
+    showToast(t("saveFail") + doc.name + " — " + e, "danger");
     return false;
   }
 }
@@ -2850,7 +3287,7 @@ function typewriterScroll() {
   const cur = r.top - sc.getBoundingClientRect().top;
   const target = sc.clientHeight * 0.4;
   const delta = cur - target;
-  if (Math.abs(delta) > 28) sc.scrollTo({ top: sc.scrollTop + delta, behavior: "smooth" });
+  if (Math.abs(delta) > 28) sc.scrollTo({ top: sc.scrollTop + delta, behavior: reducedMotion() ? "auto" : "smooth" });
 }
 
 function setFocusMode(on: boolean) {
@@ -2899,7 +3336,7 @@ function scrollCaretIntoBand() {
   if (r.height > 0 && r.top >= scRect.top - 5 && r.bottom <= scRect.bottom + 5) return; // 已可见
   if (r.height > 0) { typewriterScroll(); return; }
   const el = sel.getRangeAt(0).startContainer.parentElement as HTMLElement | null;
-  el?.scrollIntoView({ block: "center", behavior: "smooth" });
+  el?.scrollIntoView({ block: "center", behavior: reducedMotion() ? "auto" : "smooth" });
 }
 
 // ---- 查找替换（第二批）：overlay 高亮层方案 ----
@@ -3685,10 +4122,10 @@ async function renderMermaidPng(code: string, seq: number): Promise<{ data: Uint
 /** 导出片段（HTML 两档/PNG/PDF 公共管线：getHTML + 相对图片解析 + math/mermaid 渲染），失败返回 null */
 async function exportFragment(mathOutput: "html" | "mathml" = "html"): Promise<string | null> {
   const doc = activeDoc();
-  if (!doc || !vditor) { alert(t("exportNoDoc")); return null; }
+  if (!doc || !vditor) { showToast(t("exportNoDoc"), "info"); return null; }
   let fragmentHtml = "";
-  try { fragmentHtml = vditor.getHTML(); } catch (e) { alert(t("exportFail") + e); return null; }
-  if (!fragmentHtml) { alert(t("exportNoDoc")); return null; }
+  try { fragmentHtml = vditor.getHTML(); } catch (e) { showToast(t("exportFail") + e, "danger"); return null; }
+  if (!fragmentHtml) { showToast(t("exportNoDoc"), "info"); return null; }
   const tmp = document.createElement("div");
   tmp.innerHTML = fragmentHtml;
   resolveImageSources(tmp, doc.path);
@@ -3724,8 +4161,8 @@ async function exportHtml(styled: boolean): Promise<void> {
     : `<!DOCTYPE html>\n<html lang="${langAttr}">\n<head><meta charset="UTF-8"></head>\n<body>\n${frag}\n</body>\n</html>\n`;
   try {
     await invoke("write_export_file", { path, content: html });
-    alert(t("exportDone") + path);
-  } catch (e) { alert(t("exportFail") + e); }
+    showToast(t("exportDone") + path, "success");
+  } catch (e) { showToast(t("exportFail") + e, "danger"); }
 }
 
 /** 图片长图：离屏容器渲染 → html2canvas → PNG。超 canvas 上限自动分片（Typora 官方做不到的差异化点） */
@@ -3771,9 +4208,9 @@ async function exportImagePng(): Promise<void> {
       await invoke("save_binary_file", { path: p, dataB64: slices[i].split(",")[1] });
     }
     if (overlay) (document.getElementById("export-pct") as HTMLElement).style.width = "100%";
-    alert(slices.length === 1 ? t("exportDone") + path : t("exportImageSlices") + slices.length + " 张");
+    showToast(slices.length === 1 ? t("exportDone") + path : t("exportImageSlices") + slices.length + " 张", "success");
   } catch (e) {
-    alert(t("exportFail") + e);
+    showToast(t("exportFail") + e, "danger");
   } finally {
     if (overlay) overlay.hidden = true;
   }
@@ -3803,14 +4240,14 @@ async function openHistory(): Promise<void> {
   const list = document.getElementById("hist-list") as HTMLUListElement;
   const preview = document.getElementById("hist-preview") as HTMLPreElement;
   const restoreBtn = document.getElementById("hist-restore") as HTMLButtonElement;
-  if (!doc?.path) { alert(t("histNoDoc")); return; }
+  if (!doc?.path) { showToast(t("histNoDoc"), "info"); return; }
   document.getElementById("hist-title")!.textContent = `${doc.name} · ` + t("histTitle");
   list.innerHTML = ""; preview.textContent = t("histPreview"); histSelected = "";
   restoreBtn.disabled = true;
   modal.hidden = false;
   let versions: { file: string; mtimeMs: number; size: number }[] = [];
   try { versions = await invoke("list_versions", { path: doc.path }); }
-  catch (e) { alert(t("histRestoreFail") + e); modal.hidden = true; return; }
+  catch (e) { showToast(t("histRestoreFail") + e, "danger"); modal.hidden = true; return; }
   if (versions.length === 0) {
     const li = document.createElement("li");
     li.textContent = t("histEmpty");
@@ -3854,9 +4291,9 @@ function bindHistory(): void {
     if (!sp) return;
     try {
       const saved = await invoke<string>("export_diagnostics", { path: sp });
-      alert(t("diagOk") + "\n" + saved);
+      showToast(t("diagOk") + "  " + saved, "success");
     } catch (e) {
-      alert(t("diagFail") + "\n" + e);
+      showToast(t("diagFail") + "  " + e, "danger");
     }
   });
   document.getElementById("hist-close")!.addEventListener("click", () => {
@@ -3875,8 +4312,8 @@ function bindHistory(): void {
       suppressInput = false;
       if (doc) { doc.content = content; doc.dirty = true; updateTitle(); scheduleOutline(); }
       (document.getElementById("history-modal") as HTMLElement).hidden = true;
-      alert(t("histRestored"));
-    } catch (e) { alert(t("histRestoreFail") + e); }
+      showToast(t("histRestored"), "success");
+    } catch (e) { showToast(t("histRestoreFail") + e, "danger"); }
   });
 }
 async function printCurrentDoc(): Promise<void> {
@@ -3895,7 +4332,7 @@ async function printCurrentDoc(): Promise<void> {
     printingCleanupTimer = window.setTimeout(cleanupPrintRoot, 120000);
   } catch (e) {
     cleanupPrintRoot();
-    alert(t("exportFail") + e);
+    showToast(t("exportFail") + e, "danger");
   }
 }
 
@@ -3966,9 +4403,9 @@ function allocColWidths(weights: number[], total: number): number[] {
 /** markdown-it token → docx 元素转换（覆盖：标题/段落/行内样式/链接/嵌套列表(原生numbering)/引用(含嵌套与内嵌列表)/代码块/表格/图片(真嵌入)/脚注/分隔线） */
 async function exportDocx(): Promise<void> {
   const doc = activeDoc();
-  if (!doc || !vditor) { alert(t("exportNoDoc")); return; }
+  if (!doc || !vditor) { showToast(t("exportNoDoc"), "info"); return; }
   const md = await rescueFootnoteDefs(mdValue(), doc.path);
-  if (!md) { alert(t("exportNoDoc")); return; }
+  if (!md) { showToast(t("exportNoDoc"), "info"); return; }
   const path = await pickExportPath(".docx", "Word");
   if (!path) return;
   const overlay = document.getElementById("export-overlay");
@@ -4229,9 +4666,9 @@ async function exportDocx(): Promise<void> {
     });
     await invoke("save_binary_file", { path, dataB64: b64 });
     if (overlay) (document.getElementById("export-pct") as HTMLElement).style.width = "100%";
-    alert(t("exportDone") + path);
+    showToast(t("exportDone") + path, "success");
   } catch (e) {
-    alert(t("exportFail") + e);
+    showToast(t("exportFail") + e, "danger");
   } finally {
     if (overlay) overlay.hidden = true;
   }
@@ -4284,7 +4721,7 @@ function bindExportMenu(): void {
 async function exportPdf() {
   if (!vditor || exporting) return;   // 重入锁：导出进行中(msedge 打印 1-3s)的 Ctrl+P/重复点击直接忽略
   const doc = activeDoc();
-  if (!doc) { alert(t("exportNoDoc")); return; }
+  if (!doc) { showToast(t("exportNoDoc"), "info"); return; }
   // 先把当前编辑器实时内容回写 doc（与保存一致，getValue 空读守卫：空值不覆盖）
   const v = mdValue();
   if (v !== "" || doc.content === "") doc.content = v;
@@ -4324,6 +4761,7 @@ async function exportPdf() {
   let unlisten: (() => void) | null = null;
   let done = false; // 完成标志：invoke resolve 后置 true，阻止迟到的 saving 事件把 100% 倒退回 95%
   let resultMsg = "";
+  let resultOk = true;
   try {
     exporting = true;
     // 统一走 pickExportPath：生产弹原生保存对话框；e2e（--export-selftest）直拼路径。
@@ -4366,9 +4804,10 @@ async function exportPdf() {
     setPct(100);
     if (exportMsg) exportMsg.textContent = currentLang === "en" ? "Exported." : currentLang === "zh-TW" ? "匯出完成。" : "导出完成。";
     await new Promise<void>(r => setTimeout(r, 350)); // 让 100% 短暂停留再收尾，避免进度条一闪而过
-    const doneLabel = currentLang === "en" ? "Exported:\n" : currentLang === "zh-TW" ? "匯出完成：\n" : "导出完成：\n";
+    const doneLabel = currentLang === "en" ? "Exported: " : currentLang === "zh-TW" ? "匯出完成：" : "导出完成：";
     resultMsg = "✅ " + doneLabel + savePath;
   } catch (e) {
+    resultOk = false;
     resultMsg = t("exportFail") + e;
   } finally {
     stopEst();
@@ -4376,7 +4815,7 @@ async function exportPdf() {
     exporting = false;                     // 释放重入锁（统一释放点，杜绝锁泄漏）
     if (overlay) overlay.hidden = true;    // 先关遮罩再弹结果，避免进度条与结果框并存
   }
-  alert(resultMsg);
+  showToast(resultMsg, resultOk ? "success" : "danger");
 }
 
 async function boot() {
@@ -4514,7 +4953,7 @@ async function boot() {
       try {
         await win.destroy();
       } catch (e) {
-        alert(t("closeFail") + e);
+        showToast(t("closeFail") + e, "danger");
       }
     });
   } catch {
@@ -4536,14 +4975,14 @@ async function boot() {
       if (!f) return;
       if (/\.pdf$/i.test(f.name)) {
         if (f.size > DRAG_PDF_MAX) {
-          alert(currentLang === "en" ? "PDF > 5MB, please use the Open button." : "PDF 超过 5MB，请改用「打开」按钮选择文件。");
+          showToast(currentLang === "en" ? "PDF > 5MB, please use the Open button." : "PDF 超过 5MB，请改用「打开」按钮选择文件。", "danger");
           return;
         }
         try {
           const buf = new Uint8Array(await f.arrayBuffer());
           await invoke("open_dropped_pdf", { content: Array.from(buf), name: f.name });
         } catch (err) {
-          alert((currentLang === "en" ? "Open failed: " : "打开失败：") + err);
+          showToast((currentLang === "en" ? "Open failed: " : "打开失败：") + err, "danger");
         }
       } else if (/\.(md|markdown|mdown|txt)$/i.test(f.name)) {
         const text = await f.text();
@@ -4597,7 +5036,7 @@ async function boot() {
       updateTitle();
       renderTabs();
     } catch (e) {
-      alert(t("saveFail") + e);
+      showToast(t("saveFail") + e, "danger");
     }
   });
 
@@ -4633,6 +5072,9 @@ async function boot() {
   initTabMenu();
   initFtreeMenu();
   initNoticeBars(); // v0.3.26 外改检测/大文档提示条按钮
+  initReadingTrace(); // v0.4.0 阅读轨迹：scrollspy + 顶部进度线
+  initCodeBlocks(); // v0.4.0 代码块语言徽标 + 复制按钮
+  initCmdk(); // v0.4.0 命令面板（Ctrl+K）
   switchSidePane("outline"); // v0.3.21 默认显示大纲页（用户 2026-08-30 定调；文件页点页签可达）
   // Word 式显示比例：Ctrl+滚轮 / Ctrl+加减 / Ctrl+0 复位 / 右下角拉杆——只缩正文内容区
   // （.vditor-content），格式工具条(.vditor-toolbar)/应用工具栏/大纲/标签页都不缩。
@@ -4645,13 +5087,20 @@ async function boot() {
     document.getElementById("editor")?.style.setProperty("--doc-zoom", String(zoomLevel));
     const zb = document.getElementById("zoom-badge");
     if (zb) zb.textContent = Math.round(zoomLevel * 100) + "%";
+    const sz = document.getElementById("sb-zoom");
+    if (sz) sz.textContent = Math.round(zoomLevel * 100) + "%";
     const zs = document.getElementById("zoom-slider") as HTMLInputElement | null;
     if (zs) zs.value = String(Math.round(zoomLevel * 100));
     persistZoom();
   };
+  // v0.4.0 状态栏比例徽标：点击复位 100%（与 Ctrl+0 同路径）
+  document.getElementById("sb-zoom")?.addEventListener("click", () => {
+    zoomLevel = 1.0; applyZoom(); revealZoomBar();
+  });
   // v0.3.26：ui-state 已在 boot 开头同步 await 就绪，这里直接用（原 then 时序的 memRecent
   // 合并不再需要——load 先于任何 pushRecent 完成）
   initTheme();
+  if (uiStateAll.sideCollapsed === true) setSideCollapsed(true, false); // v0.4.0 恢复侧栏折叠态（不回写）
   renderRecent();
   renderFindHistory(); // v0.3.26 查找历史 datalist
   const diskZoom = typeof uiStateAll.zoom === "number" ? (uiStateAll.zoom as number) : NaN;

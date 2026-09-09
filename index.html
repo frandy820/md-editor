@@ -3,6 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="stylesheet" href="/src/styles.css" />
+    <!-- v0.4.0 主题防闪：三份真实 content-theme 预载（oled/paper 已映射到 dark/light），
+         Vditor setTheme 运行时插 link 即命中缓存，切换无白/黑闪窗口 -->
+    <link rel="preload" as="style" href="/vditor-assets/dist/css/content-theme/light.css" />
+    <link rel="preload" as="style" href="/vditor-assets/dist/css/content-theme/dark.css" />
+    <link rel="preload" as="style" href="/vditor-assets/dist/css/content-theme/eye.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MD 编辑器</title>
     <script type="module" src="/src/main.ts" defer></script>
@@ -10,13 +15,13 @@
   <body>
     <div id="toolbar">
       <div class="tb-group">
-        <button id="btn-open" type="button"><span class="tb-ico">📂</span><span class="tb-label">打开</span></button>
-        <button id="btn-save" type="button"><span class="tb-ico">💾</span><span class="tb-label">保存</span></button>
+        <button id="btn-open" type="button">打开</button>
+        <button id="btn-save" type="button">保存</button>
       </div>
       <span class="tb-divider"></span>
       <div class="tb-group">
         <span id="export-wrap">
-          <button id="btn-export" type="button" title="导出：PDF / HTML / 图片 / Word"><span class="tb-ico">📤</span><span class="tb-label">导出 ▾</span></button>
+          <button id="btn-export" type="button" title="导出：PDF / HTML / 图片 / Word">导出 ▾</button>
           <div id="export-menu" hidden>
             <button data-export="pdf" type="button">PDF（矢量）</button>
             <button data-export="html" type="button">HTML（带样式）</button>
@@ -25,14 +30,14 @@
             <button data-export="docx" type="button">Word (.docx)</button>
           </div>
         </span>
-        <button id="btn-print" type="button" title="打印正文（Ctrl+P）：弹系统打印预览，可选打印机/份数/双面"><span class="tb-ico">🖨</span><span class="tb-label">打印</span></button>
+        <button id="btn-print" type="button" title="打印正文（Ctrl+P）：弹系统打印预览，可选打印机/份数/双面">打印</button>
       </div>
       <span class="tb-divider"></span>
       <div class="tb-group tb-tools">
-        <button id="btn-focus-mode" type="button" title="专注模式（F8）：淡化非当前段落"><span class="tb-ico">🎯</span><span class="tb-label">专注</span></button>
-        <button id="btn-find" type="button" title="查找替换（Ctrl+F / Ctrl+H）"><span class="tb-ico">🔍</span><span class="tb-label">查找</span></button>
-        <button id="btn-history" type="button" title="版本历史：保存时自动归档旧版，可预览/一键恢复"><span class="tb-ico">🕘</span><span class="tb-label">历史</span></button>
-        <button id="btn-diag" type="button" title="导出诊断包：运行日志+版本+系统信息，单个文本文件，用于问题反馈"><span class="tb-ico">🧰</span><span class="tb-label">诊断</span></button>
+        <button id="btn-focus-mode" type="button" title="专注模式（F8）：淡化非当前段落">打字专注</button>
+        <button id="btn-find" type="button" title="查找替换（Ctrl+F / Ctrl+H）">查找</button>
+        <button id="btn-history" type="button" title="版本历史：保存时自动归档旧版，可预览/一键恢复">历史</button>
+        <button id="btn-diag" type="button" title="导出诊断包：运行日志+版本+系统信息，单个文本文件，用于问题反馈">诊断</button>
       </div>
       <div class="tb-spacer"></div>
       <div class="tb-group">
@@ -42,23 +47,15 @@
       <span class="tb-divider"></span>
       <div class="tb-group">
         <input id="font-size-select" type="number" min="8" max="72" step="1" value="16" title="编辑区字号" style="width: 4em" />
-        <select id="theme-select" title="界面主题：浅色 / 深色 / 护眼（未选过跟随系统）">
-          <option value="light">🌙 浅色</option>
-          <option value="dark">☀️ 深色</option>
-          <option value="eye">🌿 护眼</option>
-          <option value="oled">🌑 墨黑</option>
-          <option value="paper">📜 暖纸</option>
-        </select>
         <select id="lang-select" title="Language / 语言">
           <option value="zh-CN">简体中文</option>
           <option value="zh-TW">繁體中文</option>
           <option value="en">English</option>
         </select>
-        <span id="encoding-badge"></span>
-        <span id="app-version" title="软件版本（报问题时先看这里）">v0.3.29</span>
       </div>
     </div>
     <div id="tabs"></div>
+    <div id="read-progress" aria-hidden="true"></div>
     <div id="main">
       <aside id="outline-panel">
         <div id="side-gutter" title="拖动调整侧栏宽度"></div>
@@ -80,7 +77,7 @@
           <input id="ftree-filter" type="text" placeholder="过滤文件名…" autocomplete="off" spellcheck="false" />
           <ul id="es-results" hidden></ul>
           <div class="ftree" id="ftree"></div>
-          <div class="recent-title"><span id="recent-title">最近</span><button id="recent-clear" type="button" title="清空最近文件列表">🗑 清空</button></div>
+          <div class="recent-title"><span id="recent-title">最近</span><button id="recent-clear" type="button" title="清空最近文件列表">清空</button></div>
           <ul id="recent-list"></ul>
         </div>
       </aside>
@@ -108,6 +105,7 @@
           <span id="zoom-badge">100%</span>
         </div>
         <div id="find-overlay"></div>
+        <div id="code-btn-layer" aria-hidden="true"></div>
         <div id="ext-mod-bar" hidden>
           <span id="ext-mod-msg"></span>
           <button id="ext-reload" type="button"></button>
@@ -120,8 +118,28 @@
         <datalist id="find-hist-dl"></datalist>
         <datalist id="rep-hist-dl"></datalist>
         <div id="big-load" hidden>正在加载大文件，请稍候…</div>
-        <div id="empty-state" hidden><div class="empty-hint" id="empty-hint">📋 点击顶部「📂 打开」，或把 .md 文件拖入窗口，开始编辑</div></div>
+        <div id="empty-state" hidden><div class="empty-hint" id="empty-hint">点击顶部「打开」按钮，或把 .md 文件拖入窗口，开始编辑</div></div>
       </main>
+    </div>
+    <footer id="status-bar">
+      <button id="sb-side" type="button" title="显示 / 隐藏侧栏（Ctrl+Shift+B）">◫</button>
+      <span id="sb-save" class="sb-seg" hidden></span>
+      <span id="sb-focus" class="sb-seg"></span>
+      <span id="sb-count" class="sb-seg"></span>
+      <span id="sb-read" class="sb-seg"></span>
+      <span id="sb-pos" class="sb-seg"></span>
+      <span class="sb-spacer"></span>
+      <button id="sb-theme" type="button" title="切换主题"></button>
+      <span id="encoding-badge" class="sb-seg"></span>
+      <button id="sb-zoom" type="button" title="显示比例：点击复位 100%">100%</button>
+      <span id="app-version" title="软件版本（报问题时先看这里）">v0.4.0</span>
+    </footer>
+    <div id="theme-menu" hidden>
+      <button data-theme="light" type="button"></button>
+      <button data-theme="dark" type="button"></button>
+      <button data-theme="eye" type="button"></button>
+      <button data-theme="oled" type="button"></button>
+      <button data-theme="paper" type="button"></button>
     </div>
     <div id="close-confirm" class="modal-mask" hidden>
       <div class="modal">
@@ -159,6 +177,13 @@
         <input id="qo-input" type="text" placeholder="输入文件名过滤，↑↓选择，回车打开…" autocomplete="off" spellcheck="false" />
         <ul id="qo-list"></ul>
         <div class="qo-hint">↑↓ 选择 · Enter 打开 · Esc 关闭</div>
+      </div>
+    </div>
+    <div id="cmdk-modal" class="modal-mask" hidden>
+      <div class="modal cmdk-modal">
+        <input id="cmdk-input" type="text" placeholder="输入命令或文件名…" autocomplete="off" spellcheck="false" />
+        <div id="cmdk-list"></div>
+        <div class="cmdk-foot" id="cmdk-foot">↑↓ 选择 · Enter 执行 · Esc 关闭</div>
       </div>
     </div>
     <div id="tab-menu" hidden>
