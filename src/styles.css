@@ -117,43 +117,16 @@ html[data-theme="eye"] {
 html[data-theme="eye"] #editor,
 html[data-theme="eye"] #editor .vditor,
 html[data-theme="eye"] #editor .vditor-content { background-color: #C7EDCC; }
+/* v0.4.0 修：Vditor 格式工具条（加粗/斜体那行）背景由 Vditor 内部主题控制，
+   classic 档恒白——护眼/暖纸下那条白横条刺眼（用户实报），强制渗透同主题底色 */
+html[data-theme="eye"] #editor .vditor-toolbar { background-color: #cfe6d4 !important; }
 /* 正文层（pre.vditor-reset）白底来自 Vditor 运行时动态插入的 css，晚于本文件加载
    会覆盖普通优先级——!important 对抗，护眼必须渗透到光标所在的内容层 */
 html[data-theme="eye"] .vditor-reset { background-color: transparent !important; }
 
 
-/* ===== v0.3.21 墨黑主题（GitHub 用户诉求：暗背景+代码块高对比）——OLED 纯黑系 ===== */
-html[data-theme="oled"] {
-  --canvas: #050507; --surface: #000000; --surface-raised: #0e0e12; --surface-hover: #1c1c26;
-  --border-subtle: #26262e; --border-strong: #34343e;
-  --text-primary: #e6e6ec; --text-secondary: #c8c8d2; --text-tertiary: #a8a8b6;
-  --accent: #7d9bff; --accent2: #9ab2ff; --accent-soft: #232338; --accent-border: #4a5a8a;
-  --danger: #ef6f5f; --success: #4cae5c;
-  --bg-elem: #0a0a0d; --bg-panel2: #0a0a0d;
-  --bg-input: #141419; --bg-float: rgba(14,14,18,0.96);
-  --bg-hover2: #171722; --bg-active: #23233a;
-  --border3: #22222a; --border4: #1c1c24;
-  --muted: #8a8a98; --muted2: #767684; --muted3: #62626e; --muted4: #50505a;
-  --h1c: #8ab2fc; --h2c: #5ecab6; --h3c: #f4a863; --h4c: #ba93e8; --h5c: #92acce; --h6c: #9c9cae;
-  --shadow: 0 4px 16px rgba(0,0,0,.7);
-  color-scheme: dark;
-}
-/* 编辑区近纯黑；代码块是本主题的主角：深底+亮描边，一眼锁定 */
-html[data-theme="oled"] #editor,
-html[data-theme="oled"] #editor .vditor,
-html[data-theme="oled"] #editor .vditor-content { background-color: #050507; }
-html[data-theme="oled"] .vditor-reset { background-color: transparent !important; }
-html[data-theme="oled"] .vditor-reset code,
-html[data-theme="oled"] .vditor-reset pre { background-color: #16161e !important; border: 1px solid #34344a; }
-html[data-theme="oled"] .vditor-reset pre code { border: none; }
-/* v0.3.21 内容元素渗透（用户实测：表格在 content-theme 下仍白底）——!important 对抗 Vditor 动态 css */
-html[data-theme="oled"] .vditor-reset table th,
-html[data-theme="oled"] .vditor-reset table td { background-color: #0d0d12 !important; border: 1px solid #2e2e3a !important; }
-html[data-theme="oled"] .vditor-reset table th { background-color: #15151d !important; }
-html[data-theme="oled"] .vditor-reset blockquote { background-color: #0e0e14 !important; border-left: 3px solid #4a5a8a !important; color: #c8c8d2 !important; }
-html[data-theme="oled"] .vditor-reset hr { border: none; border-top: 1px solid #2e2e3a !important; background: none !important; }
-html[data-theme="oled"] .vditor-reset mark { background: #6b5a1e !important; color: #fff !important; }
-html[data-theme="oled"] .vditor-reset kbd { background-color: #16161e !important; border: 1px solid #34344a !important; }
+/* v0.4.0 墨黑(oled)主题已并入深色（用户定调：两者视觉近似，dark #101116 保留三阶层次更耐看）。
+   旧 ui-state 存 oled 的由 initTheme 映射到 dark，不丢深色体验。 */
 
 /* ===== v0.3.21 暖纸主题（GitHub 用户诉求：柔和纸感+代码块显眼）——米黄纸系 ===== */
 html[data-theme="paper"] {
@@ -170,10 +143,11 @@ html[data-theme="paper"] {
   --h1c: #8a4a1a; --h2c: #6a5a14; --h3c: #a8500d; --h4c: #6d3f78; --h5c: #4a5f7a; --h6c: #75684f;
   --shadow: 0 4px 16px rgba(120,100,60,.22);
 }
-/* 暖纸主底=编辑区米黄纸（eye 同模式：CSS 覆盖渗透到内容层） */
+/* 暖纸主底=编辑区米黄纸（eye 同模式：CSS 覆盖渗透到内容层）；格式工具条同修白横条 */
 html[data-theme="paper"] #editor,
 html[data-theme="paper"] #editor .vditor,
 html[data-theme="paper"] #editor .vditor-content { background-color: #f7f1e0; }
+html[data-theme="paper"] #editor .vditor-toolbar { background-color: #e2d7bc !important; }
 html[data-theme="paper"] .vditor-reset { background-color: transparent !important; }
 /* 代码块棕底+边框：暖纸底上高对比锁定 */
 html[data-theme="paper"] .vditor-reset code,
@@ -285,6 +259,22 @@ html[data-theme="light"] .vditor-reset hr { border: none; border-top: 1px solid 
 #export-menu button:hover { background: var(--bg-hover); color: var(--text); }
 #export-menu button:disabled { color: var(--muted3); cursor: default; }
 #export-menu button:disabled:hover { background: none; }
+/* v0.4.0 文件/视图菜单（#export-menu 同模式；菜单项分隔线=发丝线缩进） */
+#file-wrap, #view-wrap { position: relative; }
+#file-menu, #view-menu {
+  position: absolute; top: 100%; left: 0; z-index: 2100000; margin-top: 3px;
+  background: var(--bg-surface); border: 1px solid var(--border2); border-radius: var(--r-sm);
+  box-shadow: var(--shadow); padding: 5px; min-width: 190px;
+}
+#file-menu[hidden], #view-menu[hidden] { display: none; }
+#file-menu button, #view-menu button {
+  display: block; width: 100%; text-align: left; padding: 6px 12px;
+  border: none; background: none; border-radius: var(--r-sm); font-size: 12.5px; cursor: pointer; color: var(--text2);
+}
+#file-menu button:hover, #view-menu button:hover { background: var(--bg-hover); color: var(--text); }
+.menu-sep { height: 1px; margin: 4px 8px; background: var(--border2); }
+/* v0.4.0 旧工具栏按钮退役锚点容器 */
+#legacy-btns[hidden] { display: none !important; }
 #lang-select, #font-size-select { padding: 4px 6px; font-size: 12px; border: 1px solid var(--border2); border-radius: var(--r-sm); background: var(--bg-input); color: var(--text3); cursor: pointer; }
 #lang-select:hover, #font-size-select:hover { border-color: var(--border); color: var(--text); }
 #encoding-badge { color: var(--muted2); font-size: 12px; }
@@ -530,11 +520,10 @@ html[data-theme="dark"] #gsearch-results mark { background: rgba(255,180,0,0.4);
    左侧一列孤立空白（用户报"左边一列空白要干啥"）。⚠ Vditor JS 会给元素写内联
    padding:10px 35px（与 toolbar 的 193px 同族动态逻辑），普通选择器打不过内联——必须 !important */
 #editor .vditor-reset { padding-left: 8px !important; padding-right: 8px !important; }
-/* v0.4.0 阅读版心：左对齐贴侧栏（有常驻侧栏的编辑器形态——居中会在侧栏与正文间
-   制造大片无用空白，用户实测难受），右侧留白自然；窄窗（编辑区 <版心宽）自然收缩。
-   .vditor-reset 自身是滚动容器（editorScrollEl），max-width + margin-right:auto 让
-   滚动条贴正文右缘；CSS zoom 等比作用其上，行长字符数恒定 */
-#editor .vditor-reset { max-width: var(--measure); margin-right: auto; }
+/* v0.4.0 版心终版：**不限制行宽**（用户两轮实报大片留白难受——720 居中/840 左对齐
+   都被否，本地工作台正文铺满编辑区，Word/Notepad++ 同形态）。
+   .vditor-reset 自身是滚动容器（editorScrollEl），全宽+padding 8px 起步；
+   --measure token 保留供未来"阅读模式"可选行宽用，默认不启用 */
 
 /* ===== v0.4.0 精密状态栏：保存态/字数/预计阅读/光标行 | 编码/主题/缩放/版本 ===== */
 #status-bar {

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="stylesheet" href="/src/styles.css" />
-    <!-- v0.4.0 主题防闪：三份真实 content-theme 预载（oled/paper 已映射到 dark/light），
+    <!-- v0.4.0 主题防闪：三份真实 content-theme 预载（paper 已映射到 light），
          Vditor setTheme 运行时插 link 即命中缓存，切换无白/黑闪窗口 -->
     <link rel="preload" as="style" href="/vditor-assets/dist/css/content-theme/light.css" />
     <link rel="preload" as="style" href="/vditor-assets/dist/css/content-theme/dark.css" />
@@ -14,38 +14,46 @@
   </head>
   <body>
     <div id="toolbar">
+      <!-- v0.4.0 工具栏收敛（Word/Typora 编排：低频进菜单、高频直出）：
+           文件 ▾（打开/保存/历史/导出全家/打印/诊断）+ 查找 + 视图 ▾（专注/侧栏/面板/模式）+ 字号/语言 -->
       <div class="tb-group">
-        <button id="btn-open" type="button">打开</button>
-        <button id="btn-save" type="button">保存</button>
-      </div>
-      <span class="tb-divider"></span>
-      <div class="tb-group">
-        <span id="export-wrap">
-          <button id="btn-export" type="button" title="导出：PDF / HTML / 图片 / Word">导出 ▾</button>
-          <div id="export-menu" hidden>
-            <button data-export="pdf" type="button">PDF（矢量）</button>
-            <button data-export="html" type="button">HTML（带样式）</button>
-            <button data-export="html-plain" type="button">HTML（纯净）</button>
-            <button data-export="image" type="button">图片 PNG（长图）</button>
-            <button data-export="docx" type="button">Word (.docx)</button>
+        <span id="file-wrap">
+          <button id="btn-file-menu" type="button">文件 ▾</button>
+          <div id="file-menu" hidden>
+            <button id="fm-open" type="button">打开…</button>
+            <button id="fm-save" type="button">保存</button>
+            <div class="menu-sep"></div>
+            <button id="fm-history" type="button">版本历史</button>
+            <div class="menu-sep"></div>
+            <button id="fm-export-pdf" type="button">PDF（矢量）</button>
+            <button id="fm-export-html" type="button">HTML（带样式）</button>
+            <button id="fm-export-html-plain" type="button">HTML（纯净）</button>
+            <button id="fm-export-image" type="button">图片 PNG（长图）</button>
+            <button id="fm-export-docx" type="button">Word (.docx)</button>
+            <button id="fm-print" type="button">打印…</button>
+            <div class="menu-sep"></div>
+            <button id="fm-diag" type="button">导出诊断包</button>
           </div>
         </span>
-        <button id="btn-print" type="button" title="打印正文（Ctrl+P）：弹系统打印预览，可选打印机/份数/双面">打印</button>
-      </div>
-      <span class="tb-divider"></span>
-      <div class="tb-group tb-tools">
-        <button id="btn-focus-mode" type="button" title="专注模式（F8）：淡化非当前段落">打字专注</button>
         <button id="btn-find" type="button" title="查找替换（Ctrl+F / Ctrl+H）">查找</button>
-        <button id="btn-history" type="button" title="版本历史：保存时自动归档旧版，可预览/一键恢复">历史</button>
-        <button id="btn-diag" type="button" title="导出诊断包：运行日志+版本+系统信息，单个文本文件，用于问题反馈">诊断</button>
       </div>
       <div class="tb-spacer"></div>
       <div class="tb-group">
-        <button id="btn-mode" type="button" title="切回即时渲染模式（Ctrl+Alt+M）"><span class="tb-label">切回即时渲染</span></button>
+        <span id="view-wrap">
+          <button id="btn-view-menu" type="button">视图 ▾</button>
+          <div id="view-menu" hidden>
+            <button id="vm-focus" type="button">打字专注</button>
+            <button id="vm-reading" type="button">阅读专注</button>
+            <div class="menu-sep"></div>
+            <button id="vm-side" type="button">侧栏</button>
+            <button id="vm-cmdk" type="button">命令面板</button>
+            <button id="vm-qopen" type="button">快速打开</button>
+            <div class="menu-sep"></div>
+            <button id="vm-mode" type="button">切换编辑模式</button>
+          </div>
+        </span>
         <span id="mode-badge" class="mode-badge wysiwyg" title="当前：所见即所得模式（可直接编辑表格）">所见即所得</span>
-      </div>
-      <span class="tb-divider"></span>
-      <div class="tb-group">
+        <span class="tb-divider"></span>
         <input id="font-size-select" type="number" min="8" max="72" step="1" value="16" title="编辑区字号" style="width: 4em" />
         <select id="lang-select" title="Language / 语言">
           <option value="zh-CN">简体中文</option>
@@ -53,6 +61,28 @@
           <option value="en">English</option>
         </select>
       </div>
+    </div>
+    <!-- v0.4.0 旧工具栏按钮退役为隐藏锚点：所有事件绑定原样保留，
+         文件/视图菜单项与命令面板一律转发这些按钮的 click（零业务逻辑复制）。
+         export-menu 的 click 委托监听挂在容器上，节点保留即有效（display:none 不影响 el.click() 派发） -->
+    <div id="legacy-btns" hidden aria-hidden="true">
+      <button id="btn-open" type="button">打开</button>
+      <button id="btn-save" type="button">保存</button>
+      <button id="btn-focus-mode" type="button">打字专注</button>
+      <button id="btn-history" type="button">历史</button>
+      <button id="btn-diag" type="button">诊断</button>
+      <span id="export-wrap">
+        <button id="btn-export" type="button">导出 ▾</button>
+        <div id="export-menu" hidden>
+          <button data-export="pdf" type="button">PDF（矢量）</button>
+          <button data-export="html" type="button">HTML（带样式）</button>
+          <button data-export="html-plain" type="button">HTML（纯净）</button>
+          <button data-export="image" type="button">图片 PNG（长图）</button>
+          <button data-export="docx" type="button">Word (.docx)</button>
+        </div>
+      </span>
+      <button id="btn-print" type="button">打印</button>
+      <button id="btn-mode" type="button">切换编辑模式</button>
     </div>
     <div id="tabs"></div>
     <div id="read-progress" aria-hidden="true"></div>
@@ -138,7 +168,6 @@
       <button data-theme="light" type="button"></button>
       <button data-theme="dark" type="button"></button>
       <button data-theme="eye" type="button"></button>
-      <button data-theme="oled" type="button"></button>
       <button data-theme="paper" type="button"></button>
     </div>
     <div id="close-confirm" class="modal-mask" hidden>

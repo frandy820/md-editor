@@ -69,6 +69,7 @@ const VDITOR_LANG: Record<Lang, "zh_CN" | "zh_TW" | "en_US"> = { "zh-CN": "zh_CN
 
 const UI_TEXT: Record<Lang, Record<string, string>> = {
   "zh-CN": {
+    menuFile: "文件", menuView: "视图", openMenu: "打开…", printMenu: "打印…",
     open: "打开", save: "保存", openTip: "打开 .md/.markdown/.txt 文件（可拖入窗口）", saveTip: "保存当前文档（Ctrl+S）", welcomeName: "欢迎", untitled: "未命名", noDoc: "（无）",
     emptyHint: "点击顶部「打开」按钮，或把 .md 文件拖入窗口，开始编辑",
     noHeadings: "（暂无标题：用 # 添加章节）",
@@ -125,11 +126,12 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     statusSaved: "已保存", statusUnsaved: "未保存", readMin: "分钟", sbSide: "侧栏",
     sbShowSide: "显示侧栏（Ctrl+Shift+B）", sbHideSide: "隐藏侧栏（Ctrl+Shift+B）",
     zoomResetTip: "显示比例：点击复位 100%（Ctrl+滚轮缩放）",
-    themeLight: "浅色", themeDark: "深色", themeEye: "护眼", themeOled: "墨黑", themePaper: "暖纸",
+    themeLight: "浅色", themeDark: "深色", themeEye: "护眼", themePaper: "暖纸",
     copyCode: "复制", copied: "已复制", copyFail: "复制失败",
     cmdkOpen: "打开文件…", cmdkGroupCmd: "命 令", cmdkGroupRecent: "最近文件", cmdkEmpty: "（无匹配的命令或文件）", cmdkPh: "输入命令或文件名…", cmdkFoot: "↑↓ 选择 · Enter 执行 · Esc 关闭 · Ctrl+K 呼出",
   },
   "zh-TW": {
+    menuFile: "檔案", menuView: "檢視", openMenu: "開啟…", printMenu: "列印…",
     open: "開啟", save: "儲存", openTip: "開啟 .md/.markdown/.txt 文件（可拖入視窗）", saveTip: "儲存當前文件（Ctrl+S）", welcomeName: "歡迎", untitled: "未命名", noDoc: "（無）",
     emptyHint: "點擊頂部「開啟」按鈕，或把 .md 檔案拖入視窗，開始編輯",
     noHeadings: "（暫無標題：用 # 新增章節）",
@@ -185,11 +187,12 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     statusSaved: "已儲存", statusUnsaved: "未儲存", readMin: "分鐘", sbSide: "側欄",
     sbShowSide: "顯示側欄（Ctrl+Shift+B）", sbHideSide: "隱藏側欄（Ctrl+Shift+B）",
     zoomResetTip: "顯示比例：點擊復位 100%（Ctrl+滾輪縮放）",
-    themeLight: "淺色", themeDark: "深色", themeEye: "護眼", themeOled: "墨黑", themePaper: "暖紙",
+    themeLight: "淺色", themeDark: "深色", themeEye: "護眼", themePaper: "暖紙",
     copyCode: "複製", copied: "已複製", copyFail: "複製失敗",
     readingFocus: "閱讀專注", cmdkOpen: "開啟檔案…", cmdkGroupCmd: "命 令", cmdkGroupRecent: "最近檔案", cmdkEmpty: "（無匹配的命令或檔案）", cmdkPh: "輸入命令或檔名…", cmdkFoot: "↑↓ 選擇 · Enter 執行 · Esc 關閉 · Ctrl+K 呼出",
   },
   "en": {
+    menuFile: "File", menuView: "View", openMenu: "Open…", printMenu: "Print…",
     open: "Open", save: "Save", openTip: "Open a .md/.markdown/.txt file (or drag one into the window)", saveTip: "Save the current document (Ctrl+S)", welcomeName: "Welcome", untitled: "Untitled", noDoc: "(none)",
     emptyHint: 'Click "Open" above, or drag a .md file into the window to start editing',
     noHeadings: "(No headings yet: use # to add a section)",
@@ -245,7 +248,7 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     statusSaved: "Saved", statusUnsaved: "Unsaved", readMin: "min", sbSide: "Sidebar",
     sbShowSide: "Show sidebar (Ctrl+Shift+B)", sbHideSide: "Hide sidebar (Ctrl+Shift+B)",
     zoomResetTip: "Zoom: click to reset 100% (Ctrl+wheel)",
-    themeLight: "Light", themeDark: "Dark", themeEye: "Eye care", themeOled: "OLED Black", themePaper: "Warm Paper",
+    themeLight: "Light", themeDark: "Dark", themeEye: "Eye care", themePaper: "Warm Paper",
     copyCode: "Copy", copied: "Copied", copyFail: "Copy failed",
     readingFocus: "Reading focus", cmdkOpen: "Open file…", cmdkGroupCmd: "COMMANDS", cmdkGroupRecent: "Recent files", cmdkEmpty: "(no matching command or file)", cmdkPh: "Type a command or file name…", cmdkFoot: "↑↓ Select · Enter Run · Esc Close · Ctrl+K Toggle",
   },
@@ -2296,7 +2299,7 @@ function buildCmdkItems(): CmdkItem[] {
   items.push({ kind: "cmd", label: sideCollapsed ? t("sbShowSide") : t("sbHideSide"), kbd: "Ctrl+Shift+B", run: () => setSideCollapsed(!sideCollapsed) });
   items.push({ kind: "cmd", label: t("focusMode"), kbd: "F8", run: () => setFocusMode(!focusModeOn) });
   items.push({ kind: "cmd", label: t("readingFocus"), kbd: "Ctrl+Shift+D", run: () => setReadingFocus(!readingFocusOn) });
-  for (const nm of ["light", "dark", "eye", "oled", "paper"] as ThemeName[]) {
+  for (const nm of ["light", "dark", "eye", "paper"] as ThemeName[]) {
     items.push({ kind: "cmd", label: t(themeNameKey(nm)), run: () => applyTheme(nm) });
   }
   // —— 工具 ——
@@ -2410,7 +2413,7 @@ function setReadingFocus(on: boolean): void {
 // Vditor 编辑区内容主题走 content-theme/<name>.css（light/dark/eye，eye 为自建）。
 // ⚠ setTheme 真实签名=(theme, contentTheme, codeTheme, contentThemePath)：v0.3.14 曾把
 // cdn 误传到第二参——界面主题切了但内容主题仍 light（暗色下表格发白的根因）。
-type ThemeName = "light" | "dark" | "eye" | "oled" | "paper";
+type ThemeName = "light" | "dark" | "eye" | "paper"; // v0.4.0 墨黑(oled)并入深色
 let themeName: ThemeName = "light";
 function applyTheme(name: ThemeName, persist = true): void {
   themeName = name;
@@ -2422,30 +2425,30 @@ function applyTheme(name: ThemeName, persist = true): void {
     b.classList.toggle("cur", (b as HTMLElement).dataset.theme === name);
   });
   if (vditor) {
-    // v0.3.21 新增 oled(墨黑)/paper(暖纸)：编辑区底色走 CSS 覆盖（eye 同模式），Vditor 侧只分深浅两档
-    const vd = name === "dark" || name === "oled" ? "dark" : "classic";
-    // contentTheme 必须映射到真实存在的 css（目录仅 light/dark/eye）：oled→dark、paper→light。
-    // v0.3.28 修：直接传 name 时 oled.css 404 回退 light=墨黑下正文黑字黑底（用户实报）
-    const ct = name === "oled" ? "dark" : name === "paper" ? "light" : name;
+    const vd = name === "dark" ? "dark" : "classic"; // Vditor 侧只分深浅两档
+    // contentTheme 必须映射到真实存在的 css（目录仅 light/dark/eye）：paper→light
+    const ct = name === "paper" ? "light" : name;
     try { vditor.setTheme(vd, ct, undefined, "/vditor-assets/dist/css/content-theme"); } catch { /* 未就绪：重建时随 options 生效 */ }
   }
   if (persist) saveUiStateKey("theme", name);
 }
-/** content-theme 实名（boot options 与 applyTheme 共用）：oled→dark、paper→light，其余原样 */
+/** content-theme 实名（boot options 与 applyTheme 共用）：paper→light，其余原样 */
 function contentThemeOf(name: ThemeName): string {
-  return name === "oled" ? "dark" : name === "paper" ? "light" : name;
+  return name === "paper" ? "light" : name;
 }
 function initTheme(): void {
   // 未选过（磁盘无合法 theme 值）→ 跟随系统，且不写盘（选过才固定）
   const v = uiStateAll.theme;
-  const saved = (typeof v === "string" && ["light", "dark", "eye", "oled", "paper"].includes(v)) ? (v as ThemeName) : null;
+  // v0.4.0 oled 并入 dark：旧 ui-state 存 oled 的映射到 dark，不丢深色体验
+  const v0 = v === "oled" ? "dark" : v;
+  const saved = (typeof v0 === "string" && ["light", "dark", "eye", "paper"].includes(v0)) ? (v0 as ThemeName) : null;
   const name: ThemeName = saved ?? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
   applyTheme(name, saved !== null);
 }
 /** 主题名 → i18n 键（状态栏按钮 + 弹出菜单共用） */
 function themeNameKey(name: ThemeName): string {
   return name === "light" ? "themeLight" : name === "dark" ? "themeDark"
-    : name === "eye" ? "themeEye" : name === "oled" ? "themeOled" : "themePaper";
+    : name === "eye" ? "themeEye" : "themePaper";
 }
 
 // ---- v0.4.0 侧栏折叠（阅读专注的前提之一；瞬时切换——拖宽交互要求 width 即时跟手）----
@@ -2922,6 +2925,7 @@ function updateModeUI() {
       setBtn("btn-mode", t("switchToIR"));
       btn.title = t("switchToIRTip");
     }
+    const vm = document.getElementById("vm-mode"); if (vm) vm.textContent = t("switchToIR");
     if (badge) {
       badge.textContent = t("modeWYSIWYG");
       badge.title = t("modeWYSIWYGTip");
@@ -2932,6 +2936,7 @@ function updateModeUI() {
       setBtn("btn-mode", t("switchToWYSIWYG"));
       btn.title = t("switchToWYSIWYGTip");
     }
+    const vm2 = document.getElementById("vm-mode"); if (vm2) vm2.textContent = t("switchToWYSIWYG");
     if (badge) {
       badge.textContent = t("modeIR");
       badge.title = t("modeIRTip");
@@ -2995,6 +3000,16 @@ function applyAllText() {
   const qoi = document.getElementById("qo-input") as HTMLInputElement | null; if (qoi) qoi.placeholder = t("quickOpenPh");
   const cki = document.getElementById("cmdk-input") as HTMLInputElement | null; if (cki) cki.placeholder = t("cmdkPh");
   const ckf = document.getElementById("cmdk-foot"); if (ckf) ckf.textContent = t("cmdkFoot");
+  // v0.4.0 文件/视图菜单文案（菜单项全部复用既有键）
+  const bfm2 = document.getElementById("btn-file-menu"); if (bfm2) bfm2.textContent = t("menuFile") + " ▾";
+  const bvm2 = document.getElementById("btn-view-menu"); if (bvm2) bvm2.textContent = t("menuView") + " ▾";
+  const setTxt = (id: string, key: string) => { const el = document.getElementById(id); if (el) el.textContent = t(key); };
+  setTxt("fm-open", "openMenu"); setTxt("fm-save", "save"); setTxt("fm-history", "histBtn");
+  setTxt("fm-export-pdf", "exportPdf"); setTxt("fm-export-html", "exportHtmlStyled");
+  setTxt("fm-export-html-plain", "exportHtmlPlain"); setTxt("fm-export-image", "exportPng");
+  setTxt("fm-export-docx", "exportDocx"); setTxt("fm-print", "printMenu"); setTxt("fm-diag", "diagBtn");
+  setTxt("vm-focus", "focusMode"); setTxt("vm-reading", "readingFocus"); setTxt("vm-side", "sbSide");
+  setTxt("vm-cmdk", "cmdkOpen"); setTxt("vm-qopen", "quickOpenTitle");
   // v0.4.0 状态栏 + 主题菜单（theme-select 已从工具栏移除）
   const sbz = document.getElementById("sb-zoom"); if (sbz) sbz.title = t("zoomResetTip");
   setSideCollapsed(sideCollapsed, false); // 重刷侧栏按钮文案（不动状态不落盘）
@@ -4674,6 +4689,64 @@ async function exportDocx(): Promise<void> {
   }
 }
 
+// v0.4.0 文件/视图菜单：Word/Typora 式编排（低频进菜单、高频直出）。
+// 转发原则——菜单项 click → 既有按钮 click / 既有函数，本函数零业务逻辑。
+function bindFileViewMenus(): void {
+  const closeBoth = () => {
+    document.getElementById("file-menu")!.hidden = true;
+    document.getElementById("view-menu")!.hidden = true;
+  };
+  // 两个菜单头：互斥开关
+  for (const [btnId, menuId, wrapId] of [
+    ["btn-file-menu", "file-menu", "file-wrap"],
+    ["btn-view-menu", "view-menu", "view-wrap"],
+  ] as const) {
+    document.getElementById(btnId)!.addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeBoth();
+      const m = document.getElementById(menuId)!;
+      m.hidden = false;
+      void wrapId; // 结构对称保留（定位由 CSS 完成）
+    });
+  }
+  // 点外部关闭
+  document.addEventListener("pointerdown", (e) => {
+    const t = e.target as Element | null;
+    if (!t?.closest?.("#file-wrap, #view-wrap")) closeBoth();
+  });
+  // 选中即关（冒泡到容器统一收起，转发 handler 先行）
+  for (const mid of ["file-menu", "view-menu"]) {
+    document.getElementById(mid)?.addEventListener("click", () => {
+      document.getElementById(mid)!.hidden = true;
+    });
+  }
+  // —— 文件菜单：全部转发既有按钮 ——
+  const fwd = (id: string, targetId: string) => {
+    document.getElementById(id)?.addEventListener("click", () => {
+      (document.getElementById(targetId) as HTMLButtonElement | null)?.click();
+    });
+  };
+  fwd("fm-open", "btn-open"); fwd("fm-save", "btn-save"); fwd("fm-history", "btn-history");
+  fwd("fm-print", "btn-print"); fwd("fm-diag", "btn-diag");
+  const fwdSel = (id: string, sel: string) => {
+    document.getElementById(id)?.addEventListener("click", () => {
+      (document.querySelector(sel) as HTMLButtonElement | null)?.click();
+    });
+  };
+  fwdSel("fm-export-pdf", '#export-menu button[data-export="pdf"]');
+  fwdSel("fm-export-html", '#export-menu button[data-export="html"]');
+  fwdSel("fm-export-html-plain", '#export-menu button[data-export="html-plain"]');
+  fwdSel("fm-export-image", '#export-menu button[data-export="image"]');
+  fwdSel("fm-export-docx", '#export-menu button[data-export="docx"]');
+  // —— 视图菜单：转发按钮 + 直调开关函数 ——
+  fwd("vm-focus", "btn-focus-mode");
+  fwd("vm-mode", "btn-mode");
+  document.getElementById("vm-reading")?.addEventListener("click", () => setReadingFocus(!readingFocusOn));
+  document.getElementById("vm-side")?.addEventListener("click", () => setSideCollapsed(!sideCollapsed));
+  document.getElementById("vm-cmdk")?.addEventListener("click", () => toggleCmdk());
+  document.getElementById("vm-qopen")?.addEventListener("click", () => openQuickOpen());
+}
+
 function bindExportMenu(): void {
   const btn = document.getElementById("btn-export")!;
   const menu = document.getElementById("export-menu")!;
@@ -5042,6 +5115,10 @@ async function boot() {
 
   // 导出中心下拉菜单（PDF/HTML/图片/Word/打印）。Ctrl+P=打印，在上方 capture 阶段统一拦截
   bindExportMenu();
+
+  // v0.4.0 文件/视图菜单（工具栏收敛）：菜单项一律转发既有按钮 click——
+  // 旧按钮已退役为 #legacy-btns 隐藏锚点（绑定零动），与命令面板同一零复制原则
+  bindFileViewMenus();
 
   // Ctrl+S 保存（编辑器标配；此前只有保存按钮+30s 自动保存，真实用户测试发现的缺口）
   window.addEventListener("keydown", (e) => {
