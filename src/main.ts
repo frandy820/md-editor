@@ -100,7 +100,6 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     histBtn: "历史", histTitle: "版本历史（保存时自动归档，每文件留 50 版/30 天）", histEmpty: "暂无历史版本——本文件保存覆盖旧版后才会产生归档",
     histRestore: "恢复此版本", histRestored: "已载入所选版本（未保存），确认内容后 Ctrl+S 保存落盘", histRestoreFail: "恢复失败：", histNoDoc: "（请先打开一个已保存的文档）", histPreview: "（预览）",
     tblRowUp: "整行上移", tblRowDown: "整行下移",
-    tblMoveUp: "上移表格", tblMoveDown: "下移表格",
     sideOutline: "大纲", sideFiles: "文件",
     printBtn: "打印", printTip: "打印正文（Ctrl+P）：弹系统打印预览，可选打印机/份数/双面",
     outlineFilterPh: "过滤大纲…", filterFilesPh: "过滤树 / 全盘搜文件名…",
@@ -163,7 +162,6 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     histBtn: "歷史", histTitle: "版本歷史（儲存時自動歸檔，每文件留 50 版/30 天）", histEmpty: "暫無歷史版本——本文件儲存覆蓋舊版後才會產生歸檔",
     histRestore: "恢復此版本", histRestored: "已載入所選版本（未儲存），確認內容後 Ctrl+S 儲存落盤", histRestoreFail: "恢復失敗：", histNoDoc: "（請先開啟一個已儲存的文件）", histPreview: "（預覽）",
     tblRowUp: "整行上移", tblRowDown: "整行下移",
-    tblMoveUp: "上移表格", tblMoveDown: "下移表格",
     sideOutline: "大綱", sideFiles: "檔案",
     printBtn: "列印", printTip: "列印正文（Ctrl+P）：彈系統列印預覽，可選印表機/份數/雙面",
     outlineFilterPh: "過濾大綱…", filterFilesPh: "過濾樹 / 全碟搜檔名…",
@@ -226,7 +224,6 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     histBtn: "History", histTitle: "Version history (auto-archived on save, 50 versions / 30 days per file)", histEmpty: "No versions yet — archives appear after this file is saved over an older version",
     histRestore: "Restore this version", histRestored: "Version loaded (unsaved). Review and press Ctrl+S to write to disk", histRestoreFail: "Restore failed: ", histNoDoc: "(Open a saved document first)", histPreview: "(preview)",
     tblRowUp: "Move row up", tblRowDown: "Move row down",
-    tblMoveUp: "Move table up", tblMoveDown: "Move table down",
     sideOutline: "Outline", sideFiles: "Files",
     printBtn: "Print", printTip: "Print the document (Ctrl+P): system print preview — printer, copies, duplex",
     outlineFilterPh: "Filter outline…", filterFilesPh: "Filter tree / search all drives…",
@@ -2875,18 +2872,13 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
     // panel 元素——dataset 标记会残留导致重注入被跳过（e2e T3 实测踩坑）。
     customWysiwygToolbar: (type: string, popover?: HTMLElement) => {
       if (type !== "table" || !popover || popover.querySelector(".mded-tbl-btn")) return;
-      // 表格 popover 里原生 up/down（移动整个表格块）与下方自研两键（移动当前行）图标
-      // 相同、悬停提示一个是「上/下<Ctrl+Shift+U/D>」一个是「整行上/下移」，语义分不清
-      // （用户实报"两个向上两个向下箭头，一个英文一个中文"）。改写原生按钮提示明示
-      // 「表格」对象，热键后缀保留（真实有效）；Vditor 构造序 genUp/genDown 先于本回调，
-      // 改写时按钮已在 popover 内。
+      // v0.4.5 隐藏原生 up/down（移动整个表格块）：与自研两键（移动当前行）图标相同，
+      // 用户定调两对箭头重复只留一对。只藏不删——Vditor 热键 Ctrl+Shift+U/D 的实现是
+      // popover.querySelector('[data-type="up"]').click()（dist processKeydown），remove
+      // 会连热键带移动表格功能一起杀掉；display:none 视觉消失、DOM 在热键仍活。Vditor
+      // 每次重建 popover 重新生成按钮，须每轮回调都设（防重守卫已落在 .mded-tbl-btn 上）。
       popover.querySelectorAll<HTMLButtonElement>('button[data-type="up"], button[data-type="down"]')
-        .forEach((b) => {
-          const old = b.getAttribute("aria-label") || "";
-          const hk = old.includes("<") ? old.slice(old.indexOf("<")) : "";
-          b.setAttribute("aria-label",
-            (b.getAttribute("data-type") === "up" ? t("tblMoveUp") : t("tblMoveDown")) + hk);
-        });
+        .forEach((b) => { b.style.display = "none"; });
       // 光标兜底链：选区 anchorNode → 最近一次真实点击过的单元格（点按钮的 mousedown
       // preventDefault 保选区，但 caret 形态/重渲染都可能让 anchorNode 失效，缓存最稳）
       const lastCell = (): HTMLTableCellElement | null => lastTblCell;
