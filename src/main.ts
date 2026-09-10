@@ -2960,6 +2960,15 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
       const sep = document.createElement("span");
       sep.style.cssText = "float:left;width:1px;height:16px;background:currentColor;opacity:.25;margin:2px 3px 0";
       popover.appendChild(sep);
+      // v0.4.9 按光标行位置置灰（moveRow 守卫的视觉面，用户定调）：表头行/非 tbody=两键
+      // 都灰（移动只对数据行有意义）；tbody 首行上移灰、末行下移灰（无相邻行可换位）。
+      // popover 随光标选区变化每轮重构（注入即重算），moveRow 内 sib 守卫仍是行为兜底。
+      const cell0 = curCell();
+      const tr0 = cell0?.closest("tr");
+      const body0 = tr0?.parentElement;
+      const inTbody = !!(body0 && body0.tagName === "TBODY");
+      const canUp = inTbody && !!tr0!.previousElementSibling;
+      const canDown = inTbody && !!tr0!.nextElementSibling;
       ([["up", "tblRowUp", () => moveRow(-1)],
         ["down", "tblRowDown", () => moveRow(1)]] as [string, string, () => void][]).forEach(([icon, key, fn]) => {
         const btn = document.createElement("button");
@@ -2967,6 +2976,7 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
         btn.className = "vditor-icon vditor-tooltipped vditor-tooltipped__n mded-tbl-btn";
         btn.setAttribute("aria-label", t(key));
         btn.innerHTML = `<svg><use xlink:href="#vditor-icon-${icon}"></use></svg>`;
+        btn.disabled = (icon === "up" && !canUp) || (icon === "down" && !canDown);
         btn.addEventListener("mousedown", (e) => e.preventDefault()); // 防点击夺走选区（curCell 依赖）
         btn.addEventListener("click", fn);
         popover.appendChild(btn);
@@ -3493,17 +3503,20 @@ function editorScrollEl(): HTMLElement | null {
 // 速度定标（用户问"人眼看动态文字什么速度最舒服"）：滚动阅读时眼不必逐字追踪——视线在
 // 屏幕中带随行下移、读完一屏回扫（return sweep），舒适上界≈自己的默读吞吐。中文默读均值
 // ~350 字/分钟（研究区间 250-400），全宽 ~60 字/行、行高 ~26px → ~12 秒/行 ≈ 2-3 px/s。
-// 默认 3.0 px/s（约 400 字/分钟档，中速）；个体差异大（学术共识是让用户自选）→ ↑↓ 键
-// ±0.5 实时调速。护眼关键=慢+连续：requestAnimationFrame 每帧累积速度增量、凑到写入
+// 默认 6.0 px/s（v0.4.9 由 3.0 上调：用户实读反馈"有点慢"——理论定标 2-3px/s 偏保守，
+// 实际舒适区间向默读速度上限偏移，6px/s≈800字/分钟扫读档；↑↓ 仍可实时微调）；
+// 个体差异大（学术共识是让用户自选）→ ↑↓ 键 ±0.5 实时调速并持久化。
+// 护眼关键=慢+连续：requestAnimationFrame 每帧累积速度增量、凑到写入
 // 粒度（0.5px）才落 scrollTop（亚像素赋值会被引擎量化舍回 0，见 rsAcc 注释），3px/s
 // 下≈每秒 6 次半像素步进，肉眼无感级平滑，杜绝定时器整像素跳变的"字在抖"。
 let rsOn = false;
-let rsSpeed = 3.0; // px/s，调速范围 [0.5, 30]
+let rsSpeed = 6.0; // px/s，调速范围 [0.5, 30]。v0.4.9 默认 3→6（用户实读"有点慢"）；
+// 用户调速值持久化 ui-state.rsSpeed，boot 恢复（默认值只在首次使用时生效）
 let rsLast = 0;
 let rsRaf = 0;
-let rsAcc = 0; // 亚像素累积器：scrollTop 的 sub-pixel 赋值会被引擎量化舍回 0（每帧
-// +=0.05 实测永远不动，赋 5 却生效），凑到写入粒度后一次写入；写后读回差值退补——
-// 无论引擎量化粒度多少，速度精确不丢
+let rsPos = 0; // JS 侧浮点真值位置（相对 rsBase）——唯一速度真值源
+let rsBase = 0; // 启动/容器切换时的 scrollTop 基准
+let rsEl: HTMLElement | null = null; // 容器引用跟踪（换了重置基准）
 function rsShowSpd(): void { showToast(t("readScrollSpd").replace("{v}", rsSpeed.toFixed(1)), "info"); }
 function rsStop(silent = false): void {
   if (!rsOn) return;
@@ -3511,19 +3524,20 @@ function rsStop(silent = false): void {
   cancelAnimationFrame(rsRaf);
   if (!silent) showToast(t("readScrollOff"), "info");
 }
+// v0.4.9b 绝对值写入法（v0.4.8 的增量+读回退补实测放大 ~2 倍被否）：zoom 容器下
+// scrollTop 写读不同尺度且小值区量化——写 0.5 读回 0、写 1 读 1.111(=1/0.9)、
+// 写 ≥10 读回恒等（映射实验实测）。任何"读回值参与速度计算"的写法都被此映射搅
+// 乱（实测位移恒 n/0.9 形态）。改为 JS 侧浮点 rsPos 累积速度、每帧写绝对值
+// rsBase+rsPos：引擎量化自洽，位置走出小值区(<10px)后读回恒等、速度精确=rsSpeed；
+// 开头 <10px 内有 1/0.9 (~11%) 偏差，一秒内即越过，无感。
 function rsLoop(ts: number): void {
   if (!rsOn) return;
   const dt = (ts - rsLast) / 1000; rsLast = ts;
   const el = editorScrollEl();
   if (!el || !document.body.contains(el)) { rsStop(true); return; } // 模式切换/文档重建导致容器消失
-  rsAcc += rsSpeed * dt;
-  if (rsAcc >= 0.5) {
-    const before = el.scrollTop;
-    el.scrollTop = before + rsAcc;
-    rsAcc -= el.scrollTop - before; // 未生效的余量退回累积器
-    if (rsAcc < 0) rsAcc = 0;
-    if (rsAcc > 50) rsAcc = 50; // 防容器卡顿时积压
-  }
+  if (el !== rsEl) { rsEl = el; rsBase = el.scrollTop; rsPos = 0; }
+  rsPos += rsSpeed * dt;
+  el.scrollTop = rsBase + rsPos;
   if (el.scrollTop >= el.scrollHeight - el.clientHeight - 0.5) { rsStop(true); showToast(t("readScrollEnd"), "info"); return; }
   rsRaf = requestAnimationFrame(rsLoop);
 }
@@ -3531,6 +3545,7 @@ function rsStart(): void {
   const el = editorScrollEl();
   if (!el) return;
   rsOn = true; rsLast = performance.now();
+  rsEl = null; // 首帧重设基准（沿用上次容器引用会跳过基准初始化）
   rsRaf = requestAnimationFrame(rsLoop);
   showToast(t("readScrollOn"), "info");
 }
@@ -3575,6 +3590,7 @@ function setupReadingScroll(): void {
       e.preventDefault(); e.stopPropagation();
       const step = e.key === "ArrowDown" || e.key === "-" ? -0.5 : 0.5;
       rsSpeed = Math.min(30, Math.max(0.5, rsSpeed + step));
+      saveUiStateKey("rsSpeed", rsSpeed); // v0.4.9 调速持久化：下次启动记住
       rsShowSpd();
       return;
     }
@@ -5220,6 +5236,10 @@ async function boot() {
     uiStateAll = {};
   }
   uiStateLoaded = true;
+  // v0.4.9 阅读滚动速度恢复（用户上次调速值优先于默认 6.0）
+  if (typeof uiStateAll.rsSpeed === "number") {
+    rsSpeed = Math.min(30, Math.max(0.5, uiStateAll.rsSpeed as number));
+  }
 
   // 模式切换：顶部「所见即所得」按钮 + Ctrl+Alt+M 快捷键
   document.getElementById("btn-mode")!.addEventListener("click", () => {

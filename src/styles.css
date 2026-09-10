@@ -212,6 +212,9 @@ html[data-theme="light"] .vditor-reset pre code.hljs { background: transparent; 
    （--none）本就 max-width:none 不受影响。极窄编辑区（<360px）下 popover 超宽
    与 Vditor 原生 320px 同性质的边缘场景，不额外处理。 */
 .vditor-wysiwyg > .vditor-panel:has(.mded-tbl-btn) { max-width: none; }
+/* v0.4.9 整行上移/下移置灰态：表头行/首末行无可换位目标。pointer-events:none 连 hover
+   视觉都不给（Vditor .vditor-icon hover 换底色会让 disabled 看似可点），死透 */
+.mded-tbl-btn:disabled { opacity: .35; pointer-events: none; }
 
 /* ===== v0.3.29 瑞士网格正文排版（light 主题内容覆盖，设计稿 C）：
    近黑粗标题 / 细克莱因蓝引用线 / 行内码浅灰底 / 代码块深底浅字 /
