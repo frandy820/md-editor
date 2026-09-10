@@ -482,20 +482,28 @@ function esc(s: string): string {
 // ---- v0.4.0 toast：替代原生 alert（阻塞式、观感突兀）。底部中央浮现 2.6s 自动消退；
 // 三态 info/danger/success（左轨道条色区分）；同文本去重不堆叠；同屏最多 3 条 ----
 let toastRoot: HTMLElement | null = null;
-function showToast(msg: string, kind: "info" | "danger" | "success" = "info"): void {
+function showToast(msg: string, kind: "info" | "danger" | "success" = "info", replaceKey?: string): void {
   if (!toastRoot) {
     toastRoot = document.createElement("div");
     toastRoot.id = "toast-root";
     document.body.appendChild(toastRoot);
   }
+  // 判重键=replaceKey（v0.4.10：调速连按每按一次值都变，按 msg 判重失效会叠多条——
+  // 用户实报"两个速度提示框"。传固定 key 的调用同键只保一条，就地改文本+重置消退）
+  const key = replaceKey || msg;
   for (const el of Array.from(toastRoot.children)) {
-    if ((el as HTMLElement).dataset.msg === msg) { scheduleToastHide(el as HTMLElement); return; }
+    const elh = el as HTMLElement;
+    if (elh.dataset.msg === key) {
+      elh.textContent = msg; elh.title = msg;
+      scheduleToastHide(elh);
+      return;
+    }
   }
   const t0 = document.createElement("div");
   t0.className = "toast" + (kind === "info" ? "" : " " + kind);
   t0.textContent = msg;
   t0.title = msg; // 超长路径 ellipsis 后 hover 看全文
-  t0.dataset.msg = msg;
+  t0.dataset.msg = key;
   toastRoot.appendChild(t0);
   requestAnimationFrame(() => t0.classList.add("show"));
   while (toastRoot.children.length > 3) toastRoot.firstElementChild!.remove();
@@ -3510,14 +3518,15 @@ function editorScrollEl(): HTMLElement | null {
 // 粒度（0.5px）才落 scrollTop（亚像素赋值会被引擎量化舍回 0，见 rsAcc 注释），3px/s
 // 下≈每秒 6 次半像素步进，肉眼无感级平滑，杜绝定时器整像素跳变的"字在抖"。
 let rsOn = false;
-let rsSpeed = 6.0; // px/s，调速范围 [0.5, 30]。v0.4.9 默认 3→6（用户实读"有点慢"）；
-// 用户调速值持久化 ui-state.rsSpeed，boot 恢复（默认值只在首次使用时生效）
+let rsSpeed = 6.0; // px/s，调速范围 [0.5, 100]。v0.4.9 默认 3→6（用户实读"有点慢"）；
+// v0.4.10 上限 30→100（用户实报不够快）+分级步进（见 keydown）。用户调速值持久化
+// ui-state.rsSpeed，boot 恢复（默认值只在首次使用时生效）
 let rsLast = 0;
 let rsRaf = 0;
 let rsPos = 0; // JS 侧浮点真值位置（相对 rsBase）——唯一速度真值源
 let rsBase = 0; // 启动/容器切换时的 scrollTop 基准
 let rsEl: HTMLElement | null = null; // 容器引用跟踪（换了重置基准）
-function rsShowSpd(): void { showToast(t("readScrollSpd").replace("{v}", rsSpeed.toFixed(1)), "info"); }
+function rsShowSpd(): void { showToast(t("readScrollSpd").replace("{v}", rsSpeed.toFixed(1)), "info", "rs-spd"); }
 function rsStop(silent = false): void {
   if (!rsOn) return;
   rsOn = false;
@@ -3588,9 +3597,13 @@ function setupReadingScroll(): void {
     if (e.key === "Escape") { rsStop(); return; }
     if (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "+" || e.key === "=" || e.key === "-") {
       e.preventDefault(); e.stopPropagation();
-      const step = e.key === "ArrowDown" || e.key === "-" ? -0.5 : 0.5;
-      rsSpeed = Math.min(30, Math.max(0.5, rsSpeed + step));
-      saveUiStateKey("rsSpeed", rsSpeed); // v0.4.9 调速持久化：下次启动记住
+      // v0.4.10 分级步进：0.5 固定步进从 6 调到上限要按上百下（用户实报"最快只有 30 吗，
+      // 还是慢"）——上限提至 100（快速扫读档），步进随速度放大：<10 用 0.5 精调、
+      // 10-30 用 2、≥30 用 5，6→100 约 25 按可达
+      const dir = e.key === "ArrowDown" || e.key === "-" ? -1 : 1;
+      const step = (rsSpeed >= 30 ? 5 : rsSpeed >= 10 ? 2 : 0.5) * dir;
+      rsSpeed = Math.min(100, Math.max(0.5, rsSpeed + step));
+      saveUiStateKey("rsSpeed", rsSpeed); // 调速持久化：下次启动记住
       rsShowSpd();
       return;
     }
@@ -5238,7 +5251,7 @@ async function boot() {
   uiStateLoaded = true;
   // v0.4.9 阅读滚动速度恢复（用户上次调速值优先于默认 6.0）
   if (typeof uiStateAll.rsSpeed === "number") {
-    rsSpeed = Math.min(30, Math.max(0.5, uiStateAll.rsSpeed as number));
+    rsSpeed = Math.min(100, Math.max(0.5, uiStateAll.rsSpeed as number));
   }
 
   // 模式切换：顶部「所见即所得」按钮 + Ctrl+Alt+M 快捷键
