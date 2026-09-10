@@ -189,6 +189,23 @@ html[data-theme="light"] .vditor-reset pre code.hljs { background: transparent; 
    右溢出不可达。 */
 .vditor-wysiwyg > .vditor-panel.vditor-panel--none { left: 8px !important; }
 
+/* v0.4.6 popover 按钮 tooltip 左对齐钳制：Vditor tooltip(__n 方向)=right:50%+
+   translateX(50%) 居中于按钮、white-space:pre 不换行。popover 左端第一个按钮
+   （中心 x≈23px）的 tooltip（如「删除<Ctrl+Shift+X>」宽 ~130px）左端必然伸
+   出编辑区左缘、压进左侧导航栏区域被截/被盖（用户实报表格 popover "Ctrl 被
+   遮住一点点"）。改左对齐：tooltip 左缘=按钮左缘（≥8px 恒在编辑区内），小
+   箭头对齐按钮左部。**选择器必须 .vditor-panel 通配**——popover 有两族：
+   块 popover（front-matter/H1，.vditor-wysiwyg > .vditor-panel--none，left
+   被 v0.4.3 钉 8px）与表格 popover（嵌在表格块内的 .vditor-panel，left 跟
+   表格 offsetLeft 走——表格顶格时同样≈8px，用户实报场景）。作用于两族统一；
+   右缘不新引入风险——居中版在窄窗口同样右伸，左对齐版右伸量=原宽一半。 */
+.vditor-panel .vditor-tooltipped::after {
+  right: auto; left: 0; transform: none;
+}
+.vditor-panel .vditor-tooltipped::before {
+  right: auto; left: 5px; margin-right: 0;
+}
+
 /* ===== v0.3.29 瑞士网格正文排版（light 主题内容覆盖，设计稿 C）：
    近黑粗标题 / 细克莱因蓝引用线 / 行内码浅灰底 / 代码块深底浅字 /
    表头小写字距+2px 近黑底线 / 链接克莱因蓝。特异性 (0,2,1) 压过 Vditor light.css
