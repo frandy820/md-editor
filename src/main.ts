@@ -100,6 +100,10 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     histBtn: "历史", histTitle: "版本历史（保存时自动归档，每文件留 50 版/30 天）", histEmpty: "暂无历史版本——本文件保存覆盖旧版后才会产生归档",
     histRestore: "恢复此版本", histRestored: "已载入所选版本（未保存），确认内容后 Ctrl+S 保存落盘", histRestoreFail: "恢复失败：", histNoDoc: "（请先打开一个已保存的文档）", histPreview: "（预览）",
     tblRowUp: "整行上移", tblRowDown: "整行下移",
+    readScrollOn: "阅读滚动已开启：↑↓ 调速，双击空白 / Esc / 滚轮停止",
+    readScrollOff: "阅读滚动已停止",
+    readScrollEnd: "阅读滚动：已到文末",
+    readScrollSpd: "阅读滚动速度：{v} 像素/秒（↑↓ 调速，Esc 停止）",
     sideOutline: "大纲", sideFiles: "文件",
     printBtn: "打印", printTip: "打印正文（Ctrl+P）：弹系统打印预览，可选打印机/份数/双面",
     outlineFilterPh: "过滤大纲…", filterFilesPh: "过滤树 / 全盘搜文件名…",
@@ -162,6 +166,10 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     histBtn: "歷史", histTitle: "版本歷史（儲存時自動歸檔，每文件留 50 版/30 天）", histEmpty: "暫無歷史版本——本文件儲存覆蓋舊版後才會產生歸檔",
     histRestore: "恢復此版本", histRestored: "已載入所選版本（未儲存），確認內容後 Ctrl+S 儲存落盤", histRestoreFail: "恢復失敗：", histNoDoc: "（請先開啟一個已儲存的文件）", histPreview: "（預覽）",
     tblRowUp: "整行上移", tblRowDown: "整行下移",
+    readScrollOn: "閱讀滾動已開啟：↑↓ 調速，雙擊空白 / Esc / 滾輪停止",
+    readScrollOff: "閱讀滾動已停止",
+    readScrollEnd: "閱讀滾動：已到文末",
+    readScrollSpd: "閱讀滾動速度：{v} 像素/秒（↑↓ 調速，Esc 停止）",
     sideOutline: "大綱", sideFiles: "檔案",
     printBtn: "列印", printTip: "列印正文（Ctrl+P）：彈系統列印預覽，可選印表機/份數/雙面",
     outlineFilterPh: "過濾大綱…", filterFilesPh: "過濾樹 / 全碟搜檔名…",
@@ -254,6 +262,10 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     themeLoadFail: "Failed to load theme",
     copyCode: "Copy", copied: "Copied", copyFail: "Copy failed",
     readingFocus: "Reading focus", cmdkOpen: "Open file…", cmdkGroupCmd: "COMMANDS", cmdkGroupRecent: "Recent files", cmdkEmpty: "(no matching command or file)", cmdkPh: "Type a command or file name…", cmdkFoot: "↑↓ Select · Enter Run · Esc Close · Ctrl+K Toggle",
+    readScrollOn: "Auto-scroll on: ↑/↓ adjust speed, double-click blank / Esc / wheel to stop",
+    readScrollOff: "Auto-scroll stopped",
+    readScrollEnd: "Auto-scroll: reached end of document",
+    readScrollSpd: "Auto-scroll speed: {v} px/s (↑/↓ adjust, Esc stop)",
   },
 };
 
@@ -2751,6 +2763,8 @@ function initSidePanels(): void {
       (document.getElementById("gsearch-input") as HTMLInputElement).focus();
     }
   }, true);
+  // v0.4.8 阅读滚动（正文空白双击 toggle 自动滚动）
+  setupReadingScroll();
 }
 
 function updateTitle() {
@@ -2879,6 +2893,22 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
       // 每次重建 popover 重新生成按钮，须每轮回调都设（防重守卫已落在 .mded-tbl-btn 上）。
       popover.querySelectorAll<HTMLButtonElement>('button[data-type="up"], button[data-type="down"]')
         .forEach((b) => { b.style.display = "none"; });
+      // v0.4.7 表格 popover 全部单行：Vditor 在按钮后追加行/列数字输入框（span>input，
+      // inline 非 float）+ " x " 文本节点——inline 内容触发 CSS float 规则 4（其后 float
+      // 元素的顶不得高于该 inline 所在行盒的顶），把自研两键钉到第二/三行（用户实报
+      // "整行上移/下移/列在第二列第三行不好看"）。把这些 inline 内容也转 float:left
+      // 同流；panel 320px 宽度上限解除见 styles.css（12 按钮+两输入框 ~350px 需单行）。
+      popover.querySelectorAll<HTMLElement>("span.vditor-tooltipped").forEach((s) => {
+        s.style.cssText += ";float:left;margin:2px 2px 0";
+      });
+      for (const n of [...popover.childNodes]) {
+        if (n.nodeType === 3 && (n.nodeValue || "").trim()) {
+          const s = document.createElement("span");
+          s.style.cssText = "float:left;margin:3px 2px 0";
+          s.textContent = n.nodeValue;
+          popover.replaceChild(s, n);
+        }
+      }
       // 光标兜底链：选区 anchorNode → 最近一次真实点击过的单元格（点按钮的 mousedown
       // preventDefault 保选区，但 caret 形态/重渲染都可能让 anchorNode 失效，缓存最稳）
       const lastCell = (): HTMLTableCellElement | null => lastTblCell;
@@ -2924,8 +2954,11 @@ function vditorOptions(mode: "ir" | "wysiwyg"): VditorOptions {
         }
         syncDoc();
       };
+      // v0.4.7 分隔线必须 float:left 与按钮同流：panel 按钮全靠 .vditor-icon{float:left}
+      // 排布，inline 元素会触发 CSS float 规则 4（其后 float 元素的顶不得高于该 inline 所在
+      // 行盒的顶），把自研两键钉到第二/三行（用户实报"整行上移/下移在第二列第三列"）。
       const sep = document.createElement("span");
-      sep.style.cssText = "width:1px;height:16px;background:currentColor;opacity:.25;margin:0 3px;align-self:center";
+      sep.style.cssText = "float:left;width:1px;height:16px;background:currentColor;opacity:.25;margin:2px 3px 0";
       popover.appendChild(sep);
       ([["up", "tblRowUp", () => moveRow(-1)],
         ["down", "tblRowDown", () => moveRow(1)]] as [string, string, () => void][]).forEach(([icon, key, fn]) => {
@@ -3454,6 +3487,103 @@ function editorScrollEl(): HTMLElement | null {
     el = el.parentElement;
   }
   return null;
+}
+
+// ---- v0.4.8 阅读滚动：正文空白处双击开关自动平滑滚动（代替手动滚轮的"读长文"模式）----
+// 速度定标（用户问"人眼看动态文字什么速度最舒服"）：滚动阅读时眼不必逐字追踪——视线在
+// 屏幕中带随行下移、读完一屏回扫（return sweep），舒适上界≈自己的默读吞吐。中文默读均值
+// ~350 字/分钟（研究区间 250-400），全宽 ~60 字/行、行高 ~26px → ~12 秒/行 ≈ 2-3 px/s。
+// 默认 3.0 px/s（约 400 字/分钟档，中速）；个体差异大（学术共识是让用户自选）→ ↑↓ 键
+// ±0.5 实时调速。护眼关键=慢+连续：requestAnimationFrame 每帧累积速度增量、凑到写入
+// 粒度（0.5px）才落 scrollTop（亚像素赋值会被引擎量化舍回 0，见 rsAcc 注释），3px/s
+// 下≈每秒 6 次半像素步进，肉眼无感级平滑，杜绝定时器整像素跳变的"字在抖"。
+let rsOn = false;
+let rsSpeed = 3.0; // px/s，调速范围 [0.5, 30]
+let rsLast = 0;
+let rsRaf = 0;
+let rsAcc = 0; // 亚像素累积器：scrollTop 的 sub-pixel 赋值会被引擎量化舍回 0（每帧
+// +=0.05 实测永远不动，赋 5 却生效），凑到写入粒度后一次写入；写后读回差值退补——
+// 无论引擎量化粒度多少，速度精确不丢
+function rsShowSpd(): void { showToast(t("readScrollSpd").replace("{v}", rsSpeed.toFixed(1)), "info"); }
+function rsStop(silent = false): void {
+  if (!rsOn) return;
+  rsOn = false;
+  cancelAnimationFrame(rsRaf);
+  if (!silent) showToast(t("readScrollOff"), "info");
+}
+function rsLoop(ts: number): void {
+  if (!rsOn) return;
+  const dt = (ts - rsLast) / 1000; rsLast = ts;
+  const el = editorScrollEl();
+  if (!el || !document.body.contains(el)) { rsStop(true); return; } // 模式切换/文档重建导致容器消失
+  rsAcc += rsSpeed * dt;
+  if (rsAcc >= 0.5) {
+    const before = el.scrollTop;
+    el.scrollTop = before + rsAcc;
+    rsAcc -= el.scrollTop - before; // 未生效的余量退回累积器
+    if (rsAcc < 0) rsAcc = 0;
+    if (rsAcc > 50) rsAcc = 50; // 防容器卡顿时积压
+  }
+  if (el.scrollTop >= el.scrollHeight - el.clientHeight - 0.5) { rsStop(true); showToast(t("readScrollEnd"), "info"); return; }
+  rsRaf = requestAnimationFrame(rsLoop);
+}
+function rsStart(): void {
+  const el = editorScrollEl();
+  if (!el) return;
+  rsOn = true; rsLast = performance.now();
+  rsRaf = requestAnimationFrame(rsLoop);
+  showToast(t("readScrollOn"), "info");
+}
+// 双击是否落在正文"空白"（非文字上）。不能用 caretRangeFromPoint 的 startContainer
+// 判定：行尾右侧空白/行间隙的点击会"吸附"到最近文本节点（startContainer 恒 text），
+// 视觉空白全被误判成文字。改字符级检测：取吸附到的文本节点，逐字符 Rect 看点击点
+// 是否真落在某个字的矩形上（±2px 容差）——行间隙/行尾右侧/段间空白/图片都算空白，
+// 落在字上才让默认双击选词。工具栏与浮层不算正文。
+function rsDblHitBlank(e: MouseEvent): boolean {
+  const tgt = e.target as HTMLElement | null;
+  if (!tgt || tgt.closest(".vditor-toolbar, .vditor-panel, .vditor-hint, .vditor-tip")) return false;
+  const ed = document.getElementById("editor");
+  if (!ed || !ed.contains(tgt)) return false;
+  const d = document as Document & { caretRangeFromPoint?: (x: number, y: number) => Range | null };
+  const hit = d.caretRangeFromPoint ? d.caretRangeFromPoint(e.clientX, e.clientY) : null;
+  const n = hit?.startContainer;
+  if (!n || n.nodeType !== 3 || !(n.nodeValue || "")) return true;
+  const rng = document.createRange();
+  for (let i = 0; i < (n.nodeValue || "").length; i++) {
+    rng.setStart(n, i); rng.setEnd(n, i + 1);
+    const cr = rng.getBoundingClientRect();
+    if (e.clientX >= cr.left - 2 && e.clientX <= cr.right + 2 && e.clientY >= cr.top - 2 && e.clientY <= cr.bottom + 2) {
+      return false; // 点在字符矩形上=文字区
+    }
+  }
+  return true;
+}
+function setupReadingScroll(): void {
+  // 双击空白 toggle（委托到 #editor：Vditor 模式/语言重建子树不丢）。dblclick 序列自带
+  // 两次 click，不在 mousedown 停滚——停止路径=再双击/Esc/滚轮/打字/失焦，单击正文不停
+  document.getElementById("editor")!.addEventListener("dblclick", (e) => {
+    if (!rsDblHitBlank(e)) return;
+    e.preventDefault();
+    if (rsOn) rsStop(); else rsStart();
+  });
+  // 键盘（window 捕获层，与 Ctrl+Z/S 同策略——Vditor 元素层 keydown 会 stopPropagation）：
+  // Esc=停；↑↓/+-=调速（拦截，不动作光标）；其他键=停（打字/编辑意图，不拦默认行为）
+  window.addEventListener("keydown", (e) => {
+    if (!rsOn) return;
+    if (e.key === "Escape") { rsStop(); return; }
+    if (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "+" || e.key === "=" || e.key === "-") {
+      e.preventDefault(); e.stopPropagation();
+      const step = e.key === "ArrowDown" || e.key === "-" ? -0.5 : 0.5;
+      rsSpeed = Math.min(30, Math.max(0.5, rsSpeed + step));
+      rsShowSpd();
+      return;
+    }
+    rsStop(); // 其他任何键（含打字、翻页键）=用户编辑/导航意图，停滚让位
+  }, true);
+  // 手动滚轮=停（用户接管滚动）；窗口失焦=停
+  document.getElementById("editor")!.addEventListener("wheel", () => { rsStop(); }, { passive: true, capture: true });
+  window.addEventListener("blur", () => { rsStop(true); });
+  document.addEventListener("visibilitychange", () => { if (document.hidden) rsStop(true); });
 }
 
 // 专注模式：光标所在顶层块（编辑区根的直接子元素）标 .fw-current，CSS 淡化其余

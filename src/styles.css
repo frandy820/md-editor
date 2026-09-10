@@ -206,6 +206,13 @@ html[data-theme="light"] .vditor-reset pre code.hljs { background: transparent; 
   right: auto; left: 5px; margin-right: 0;
 }
 
+/* v0.4.7 表格 popover 解除 Vditor 320px 宽度上限：按钮 12 个（up/down 隐藏后 10
+   可见）+自研两键+分隔线+行/列数字输入框共 ~350px，超上限必折行（用户定调全部
+   单行）。:has(.mded-tbl-btn) 只命中注入过自研按钮的表格 popover；块 popover
+   （--none）本就 max-width:none 不受影响。极窄编辑区（<360px）下 popover 超宽
+   与 Vditor 原生 320px 同性质的边缘场景，不额外处理。 */
+.vditor-wysiwyg > .vditor-panel:has(.mded-tbl-btn) { max-width: none; }
+
 /* ===== v0.3.29 瑞士网格正文排版（light 主题内容覆盖，设计稿 C）：
    近黑粗标题 / 细克莱因蓝引用线 / 行内码浅灰底 / 代码块深底浅字 /
    表头小写字距+2px 近黑底线 / 链接克莱因蓝。特异性 (0,2,1) 压过 Vditor light.css
