@@ -379,6 +379,16 @@ html[data-theme="light"] .vditor-reset hr { border: none; border-top: 1px solid 
 .tab-name { color: var(--text); }
 .tab-close { color: var(--muted2); padding: 0 2px; }
 .tab-close:hover { color: var(--danger); }
+/* v0.4.11 双击标签名重命名：就地输入框（宽度按内容自适应，field-sizing 不支持时回退 min-width） */
+.tab-rename {
+  font: inherit; font-size: 12.5px; color: var(--text);
+  background: var(--surface2, var(--bg, #fff));
+  border: 1px solid var(--accent); border-radius: 4px;
+  padding: 1px 4px; height: 20px; min-width: 90px; max-width: 260px;
+  field-sizing: content; /* Chromium 123+；不支持时回退 size 默认宽（~20 字符） */
+  outline: none;
+}
+.tab-rename:focus { box-shadow: 0 0 0 2px var(--accent-soft, rgba(0, 47, 167, .15)); }
 
 #main { flex: 1 1 auto; display: flex; overflow: hidden; }
 

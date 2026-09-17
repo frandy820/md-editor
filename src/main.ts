@@ -31,6 +31,9 @@ window.addEventListener("keydown", (e) => {
   if (e.isComposing && !(isZY && (e.ctrlKey || e.metaKey))) return;
   if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
   const inEditor = !!(e.target as Element | null)?.closest?.(".vditor");
+  // 审查 m1（v0.4.11b）：标签改名输入框内不抢键——window capture 层 target 的 stopPropagation
+  // 拦不住本层，Ctrl+S 弹原生对话框/Ctrl+K 抢焦点都会使输入框 blur=半截名被提交
+  const inRenameInput = !!(e.target as Element | null)?.closest?.(".tab-rename");
   if ((e.key === "z" || e.key === "Z") && inEditor) {
     e.preventDefault(); e.stopPropagation();
     if (e.shiftKey) docRedo(); else docUndo();
@@ -39,12 +42,17 @@ window.addEventListener("keydown", (e) => {
     docRedo();
   } else if ((e.key === "s" || e.key === "S")) {
     // Ctrl+S：此前只有按钮/关闭确认/30s 自动保存，快捷键从未绑定（版本历史文案却宣称它）
+    // Ctrl+Shift+S=另存为（v0.4.11，Word/Typora 同款）
+    if (inRenameInput) return;
     e.preventDefault(); e.stopPropagation();
     const d = activeDoc();
-    if (d) void saveDoc(d);
+    if (!d) return;
+    if (e.shiftKey) void saveDocAs(d);
+    else void saveDoc(d);
   } else if ((e.key === "k" || e.key === "K") && !e.shiftKey) {
     // v0.4.0 命令面板：⚠ Vditor 的 ⌘K=插入链接且同在 window 捕获层「先注册先执行」——
     // 拦截必须与撤销键同批次（模块顶层），boot 里注册会晚于它而收不到
+    if (inRenameInput) return; // 审查 m1：改名输入框内不抢焦点（同 s 分支）
     e.preventDefault(); e.stopPropagation();
     toggleCmdk();
   }
@@ -77,6 +85,8 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     deleteChapter: "删除该章节（含正文）", closeTab: "关闭",
     openFail: "打开失败：", saveFail: "保存失败：", closeFail: "关闭失败：",
     saveEmptySuf: "」内容为空，已跳过保存（避免清空文件）",
+    saveAs: "另存为…", tabRenameNoPath: "文档尚未保存，还没有文件名可改",
+    saveAsDupTab: "目标文件已在其它标签打开：", tabRenameLoading: "文档正在装载，请稍候再改名",
     delTitle: "删除章节", delConfirmSuf: "」及其所有子内容？",
     closeSaveMsg: "有未保存的修改，是否保存？", closeSave: "保存并关闭", closeDiscard: "不保存关闭", closeCancel: "取消",
     modeWYSIWYG: "所见即所得", modeIR: "即时渲染", switchToIR: "切回即时渲染", switchToWYSIWYG: "所见即所得",
@@ -144,6 +154,8 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     deleteChapter: "刪除該章節（含正文）", closeTab: "關閉",
     openFail: "開啟失敗：", saveFail: "儲存失敗：", closeFail: "關閉失敗：",
     saveEmptySuf: "」內容為空，已跳過儲存（避免清空檔案）",
+    saveAs: "另存為…", tabRenameNoPath: "文件尚未儲存，還沒有檔名可改",
+    saveAsDupTab: "目標檔案已在其它標籤開啟：", tabRenameLoading: "文件正在載入，請稍候再改名",
     delTitle: "刪除章節", delConfirmSuf: "」及其所有子內容？",
     closeSaveMsg: "有未儲存的修改，是否儲存？", closeSave: "儲存並關閉", closeDiscard: "不儲存關閉", closeCancel: "取消",
     modeWYSIWYG: "所見即所得", modeIR: "即時渲染", switchToIR: "切回即時渲染", switchToWYSIWYG: "所見即所得",
@@ -210,6 +222,8 @@ const UI_TEXT: Record<Lang, Record<string, string>> = {
     deleteChapter: "Delete this section (with content)", closeTab: "Close",
     openFail: "Open failed: ", saveFail: "Save failed: ", closeFail: "Close failed: ",
     saveEmptySuf: '" is empty, save skipped (to avoid clearing the file)',
+    saveAs: "Save As…", tabRenameNoPath: "Document not saved yet — no file name to rename",
+    saveAsDupTab: "Target file is already open in another tab: ", tabRenameLoading: "Document is still loading, try again in a moment",
     delTitle: "Delete section", delConfirmSuf: '" and all its content?',
     closeSaveMsg: "Unsaved changes. Save?", closeSave: "Save and close", closeDiscard: "Close without saving", closeCancel: "Cancel",
     modeWYSIWYG: "WYSIWYG", modeIR: "Instant Rendering", switchToIR: "Markdown (IR)", switchToWYSIWYG: "WYSIWYG",
@@ -890,6 +904,11 @@ function renderTabs() {
     close.className = "tab-close";
     close.textContent = "✕";
     close.title = t("closeTab");
+    // v0.4.11 双击标签名=重命名（就地输入框；复用树右键 rename_entry+handleRenamed 全联动）
+    name.addEventListener("dblclick", (e) => {
+      e.stopPropagation(); // 防冒泡到 bar.ondblclick（其 .tab 判定已 return，双保险）
+      startTabRename(doc, name);
+    });
     tab.appendChild(name);
     tab.appendChild(close);
     tab.addEventListener("click", (e) => {
@@ -925,6 +944,49 @@ function renderTabs() {
     bar.appendChild(tab);
   });
   updateSaveState(); // v0.4.0 状态栏保存态：dirty 变化必经 renderTabs（tab ● 同源）
+}
+
+// v0.4.11 双击标签名重命名：name span 就地换 input，Enter/失焦提交、Esc 取消。
+// 走 Rust rename_entry（非法名/重名/盘符根守卫全复用）+ handleRenamed（标签/树/地址栏联动）。
+// 已知边缘：编辑窗口期若 30s 自动保存触发 renderTabs 会丢输入框——改名是秒级操作，概率可忽略。
+function startTabRename(doc: Doc, nameEl: HTMLElement): void {
+  if (!doc.path) { showToast(t("tabRenameNoPath"), "info"); return; }
+  if (doc.lazy || doc.loading) { showToast(t("tabRenameLoading"), "info"); return; } // 审查 m2：装载窗口改名→loadLazyDoc 旧路径读盘失败会强关标签
+  // 双击非激活标签时第一次 click 已触发 switchDoc→renderTabs 重建，闭包 nameEl 可能游离——按 docId 重查活元素
+  if (!nameEl.isConnected) {
+    const cur = document.querySelector(`#tabs .tab[data-doc-id="${doc.id}"] .tab-name`) as HTMLElement | null;
+    if (!cur) return; // 标签已被重建移除（极端时序），放弃本次
+    nameEl = cur;
+  }
+  const inp = document.createElement("input");
+  inp.className = "tab-rename";
+  inp.value = doc.name;
+  inp.title = doc.path;
+  nameEl.replaceWith(inp);
+  inp.focus();
+  inp.select();
+  let done = false;
+  const finish = (restore: boolean) => {
+    if (done) return;
+    done = true;
+    const wasConnected = inp.isConnected; // 取于 replaceWith 之前（正常提交路径 replaceWith 后必游离）
+    if (inp.parentNode) inp.replaceWith(nameEl);
+    if (restore) return;
+    if (!wasConnected) return; // 审查 M4：输入框已被 renderTabs 重建移除（30s 自动保存撞改名窗口等）——放弃提交，宁可丢输入不可半截名落盘
+    const nv = inp.value.trim();
+    if (!nv || nv === doc.name) return; // 空名/未改：静默收场
+    invoke<string>("rename_entry", { old: doc.path, newName: nv })
+      .then((np) => handleRenamed(doc.path!, np))
+      .catch((err) => showToast(String(err), "danger")); // Rust 拒绝（重名/非法名）直接展示
+  };
+  inp.addEventListener("keydown", (e) => {
+    e.stopPropagation(); // 阻断冒泡层全局热键与 Vditor 抢占层（window capture 层已由 m1 守卫让位）
+    if (e.isComposing || e.keyCode === 229) return; // 审查 M3：IME 组合态 Enter=上屏候选字，不是提交（防拼音串落盘改名）
+    if (e.key === "Enter") { e.preventDefault(); finish(false); }
+    else if (e.key === "Escape") { e.preventDefault(); finish(true); }
+  });
+  inp.addEventListener("blur", () => finish(false));
+  inp.addEventListener("click", (e) => e.stopPropagation()); // 防落到 tab 上触发再次 switchDoc
 }
 
 // 标签右键菜单（Notepad++：关闭/关闭其它/关闭右侧/全部关闭；Ctrl+Click 多选时加"关闭选中"）
@@ -2117,6 +2179,16 @@ function handleRenamed(oldPath: string, newPath: string): void {
   const dir = docDirOf(newPath);
   if (dir) void reloadDir(dir);
   markTreeCurrent();
+  // 审查 m3（v0.4.11b）收口：最近列表路径跟随（防死路径点击 openFail）+ 会话标签路径跟随
+  // （此前仅标签双击入口存 session、树右键入口不存——两入口行为分叉，统一到本函数）
+  saveUiStateKey("recent", recentList().map((p) => {
+    const pl = p.toLowerCase();
+    if (pl === low) return newPath;
+    if (pl.startsWith(low + "\\")) return newPath + p.slice(oldPath.length); // 目录改名：其下子文件路径跟随
+    return p;
+  }));
+  renderRecent();
+  scheduleSessionSave();
 }
 function copyTextToClipboard(text: string): void {
   const done = () => showToast(t("fmCopyDone") + " " + text, "success");
@@ -2305,6 +2377,7 @@ function buildCmdkItems(): CmdkItem[] {
   // —— 文件 ——
   items.push({ kind: "cmd", label: t("cmdkOpen"), kbd: "Ctrl+Shift+O", run: click("btn-open") });
   items.push({ kind: "cmd", label: t("save"), kbd: "Ctrl+S", run: () => { const d = activeDoc(); if (d) void saveDoc(d); } });
+  items.push({ kind: "cmd", label: t("saveAs"), kbd: "Ctrl+Shift+S", run: () => { const d = activeDoc(); if (d) void saveDocAs(d); } }); // v0.4.11
   // —— 导出（复用已绑定 handler 的菜单按钮，含空文档确认等完整链路） ——
   const exp: Array<[string, string]> = [
     ["pdf", "exportPdf"], ["html", "exportHtmlStyled"], ["html-plain", "exportHtmlPlain"],
@@ -3238,7 +3311,7 @@ function applyAllText() {
   const bfm2 = document.getElementById("btn-file-menu"); if (bfm2) bfm2.textContent = t("menuFile") + " ▾";
   const bvm2 = document.getElementById("btn-view-menu"); if (bvm2) bvm2.textContent = t("menuView") + " ▾";
   const setTxt = (id: string, key: string) => { const el = document.getElementById(id); if (el) el.textContent = t(key); };
-  setTxt("fm-open", "openMenu"); setTxt("fm-save", "save"); setTxt("fm-history", "histBtn");
+  setTxt("fm-open", "openMenu"); setTxt("fm-save", "save"); setTxt("fm-save-as", "saveAs"); setTxt("fm-history", "histBtn");
   setTxt("fm-export-pdf", "exportPdf"); setTxt("fm-export-html", "exportHtmlStyled");
   setTxt("fm-export-html-plain", "exportHtmlPlain"); setTxt("fm-export-image", "exportPng");
   setTxt("fm-export-docx", "exportDocx"); setTxt("fm-print", "printMenu"); setTxt("fm-diag", "diagBtn");
@@ -3436,6 +3509,71 @@ async function saveDoc(doc: Doc): Promise<boolean> {
     doc.bytes = utf8Bytes(doc.content); // v0.3.26 状态栏大小
     refreshMeta(doc); // v0.3.26 保存后刷新外改基准（自己的写也变 mtime，不刷会立即误报）
     scheduleSessionSave();
+    return true;
+  } catch (e) {
+    showToast(t("saveFail") + doc.name + " — " + e, "danger");
+    return false;
+  }
+}
+
+// v0.4.11 另存为（多格式）：MD=写新路径、当前文档切到新文件（旧文件不动，Typora 同语义）；
+// PDF/HTML/PNG/DOCX=导出副本（当前文档不动）——转发既有导出按钮 + pickExportPath 路径注入，
+// 进度遮罩/公式渲染/嵌图/空文档确认/PDF 关联源全链零复制复用。
+// 路径选择：生产=saveDialog（保存类型多选）；e2e 自测=export_selftest_dir 同模式跳过对话框
+async function pickSaveAsPath(doc: Doc): Promise<string | null> {
+  try {
+    const dir = await invoke<string | null>("export_selftest_dir");
+    if (dir) return dir.replace(/[\\/]+$/, "") + "/" + (doc.path || t("untitled") + ".md").split(/[\\/]/).pop()!;
+  } catch { /* 正常启动 */ }
+  const sp = await saveDialog({
+    defaultPath: doc.path || t("untitled") + ".md",
+    filters: [
+      { name: "Markdown", extensions: ["md"] },
+      { name: "PDF", extensions: ["pdf"] },
+      { name: "HTML", extensions: ["html"] },
+      { name: "PNG", extensions: ["png"] },
+      { name: "Word", extensions: ["docx"] },
+    ],
+  });
+  return sp ? (sp as string) : null;
+}
+async function saveDocAs(doc: Doc): Promise<boolean> {
+  if (vditor && activeDoc()?.id === doc.id) {
+    const v = mdValue();
+    if (v !== "" || doc.content === "") doc.content = v; // 守卫同 saveDoc：空值不覆盖
+  }
+  const path = await pickSaveAsPath(doc);
+  if (!path) return false; // 用户取消
+  // 非扩展名/=.md 之外：按扩展名直调导出函数传选定路径（Typora「另存为」选类型同款语义；
+  // v0.4.11b 审查 M1 改造=参数直传，空文档/重入锁早退时零残留）
+  const ext = (path.split(".").pop() || "").toLowerCase();
+  if (ext === "pdf") { void exportPdf(path); return true; }
+  if (ext === "html") { void exportHtml(true, path); return true; }
+  if (ext === "png") { void exportImagePng(path); return true; }
+  if (ext === "docx") { void exportDocx(path); return true; }
+  // MD：空内容拦截（导出分支的空文档由导出链自身守卫）
+  if (doc.content === "") {
+    const seq = currentLang === "en" ? '"' : "「";
+    showToast(seq + doc.name + t("saveEmptySuf"), "info");
+    return false;
+  }
+  // 审查 M5：目标已被其它标签打开 → 拒绝（双标签同 path 会被 30s 自动保存互相覆盖）
+  const dup = docs.find((d) => d !== doc && d.path && d.path.toLowerCase() === path.toLowerCase());
+  if (dup) { showToast(t("saveAsDupTab") + dup.name, "info"); return false; }
+  try {
+    await invoke("save_file", { path, content: doc.content });
+    doc.path = path;
+    doc.name = path.split(/[\\/]/).pop()!;
+    doc.dirty = false;
+    doc.base = doc.content; // 撤销栈干净态基线跟随（同 saveDoc）
+    doc.encoding = "UTF-8"; // 统一写 UTF-8 无 BOM（同手动保存）
+    doc.bytes = utf8Bytes(doc.content);
+    refreshMeta(doc); // 外改基准跟随新路径
+    pushRecent(path);
+    renderTabs();
+    updateTitle();
+    scheduleSessionSave();
+    showToast(t("saveAs") + " " + doc.name, "success");
     return true;
   } catch (e) {
     showToast(t("saveFail") + doc.name + " — " + e, "danger");
@@ -4492,7 +4630,11 @@ async function exportFragment(mathOutput: "html" | "mathml" = "html"): Promise<s
   return tmp.innerHTML;
 }
 
-async function pickExportPath(ext: string, filterName: string): Promise<string | null> {
+// v0.4.11b 参数直传（审查 M1 改造）：「另存为…」选非 md 格式时由 saveDocAs 直接把选定路径
+// 传给对应导出函数（pathOverride），不再用全局注入——注入在导出链早退路径（空文档/重入锁）
+// 会泄漏残留，后续常规导出会静默写进残留路径。直传零残留。
+async function pickExportPath(ext: string, filterName: string, pathOverride?: string): Promise<string | null> {
+  if (pathOverride) return pathOverride;
   const doc = activeDoc();
   const baseName = (doc?.name || t("untitled")).replace(/\.[^.]+$/, "");
   // e2e 自测模式（--export-selftest <dir>）：跳过原生对话框直接拼路径，与生产同代码路径
@@ -4508,10 +4650,10 @@ async function pickExportPath(ext: string, filterName: string): Promise<string |
 }
 
 /** HTML 导出：带样式档=完整排版（与 PDF 同模板）；纯净档=裸 fragment 无 CSS（公式用 MathML 零依赖渲染） */
-async function exportHtml(styled: boolean): Promise<void> {
+async function exportHtml(styled: boolean, pathOverride?: string): Promise<void> {
   const frag = await exportFragment(styled ? "html" : "mathml");
   if (!frag) return;
-  const path = await pickExportPath(".html", "HTML");
+  const path = await pickExportPath(".html", "HTML", pathOverride);
   if (!path) return;
   const langAttr = currentLang === "en" ? "en" : currentLang === "zh-TW" ? "zh-TW" : "zh-CN";
   const html = styled ? wrapExportHtml(frag)
@@ -4523,10 +4665,10 @@ async function exportHtml(styled: boolean): Promise<void> {
 }
 
 /** 图片长图：离屏容器渲染 → html2canvas → PNG。超 canvas 上限自动分片（Typora 官方做不到的差异化点） */
-async function exportImagePng(): Promise<void> {
+async function exportImagePng(pathOverride?: string): Promise<void> {
   const frag = await exportFragment("html");
   if (!frag) return;
-  const path = await pickExportPath(".png", "PNG");
+  const path = await pickExportPath(".png", "PNG", pathOverride);
   if (!path) return;
   const overlay = document.getElementById("export-overlay");
   const msg = document.getElementById("export-msg");
@@ -4758,12 +4900,12 @@ function allocColWidths(weights: number[], total: number): number[] {
 }
 
 /** markdown-it token → docx 元素转换（覆盖：标题/段落/行内样式/链接/嵌套列表(原生numbering)/引用(含嵌套与内嵌列表)/代码块/表格/图片(真嵌入)/脚注/分隔线） */
-async function exportDocx(): Promise<void> {
+async function exportDocx(pathOverride?: string): Promise<void> {
   const doc = activeDoc();
   if (!doc || !vditor) { showToast(t("exportNoDoc"), "info"); return; }
   const md = await rescueFootnoteDefs(mdValue(), doc.path);
   if (!md) { showToast(t("exportNoDoc"), "info"); return; }
-  const path = await pickExportPath(".docx", "Word");
+  const path = await pickExportPath(".docx", "Word", pathOverride);
   if (!path) return;
   const overlay = document.getElementById("export-overlay");
   if (overlay) { (document.getElementById("export-pct") as HTMLElement).style.width = "20%"; (document.getElementById("export-msg") as HTMLElement).textContent = "DOCX…"; overlay.hidden = false; }
@@ -5069,6 +5211,11 @@ function bindFileViewMenus(): void {
     });
   };
   fwd("fm-open", "btn-open"); fwd("fm-save", "btn-save"); fwd("fm-history", "btn-history");
+  // v0.4.11 另存为：无既有按钮锚点，直调（vm-reading 同款零复制原则——逻辑在 saveDocAs 单一出处）
+  document.getElementById("fm-save-as")?.addEventListener("click", () => {
+    const d = activeDoc();
+    if (d) void saveDocAs(d);
+  });
   fwd("fm-print", "btn-print"); fwd("fm-diag", "btn-diag");
   const fwdSel = (id: string, sel: string) => {
     document.getElementById(id)?.addEventListener("click", () => {
@@ -5103,8 +5250,10 @@ function bindExportMenu(): void {
     menu.hidden = true;
     // v0.3.8（P2 修复）：空文档导出前确认——原行为静默产出空白 PDF，用户可能误发空文件。
     // 欢迎文档/清空未写状态都是空；确认后才继续（e2e dialog handler accept 同样覆盖）。
+    // 审查 M2（v0.4.11b）：confirm 是 tauri 插件异步函数，缺 await 时 !Promise 恒 false=守卫
+    // 从 v0.3.8 起就是死代码，本处补 await 修复。
     const curVal = vditor?.getValue()?.trim();
-    if (!curVal && !confirm(t("exportEmptyConfirm"))) return;
+    if (!curVal && !(await confirm(t("exportEmptyConfirm")))) return;
     const kind = item.dataset.export;
     if (kind === "pdf") exportPdf();
     else if (kind === "html") exportHtml(true);
@@ -5113,10 +5262,11 @@ function bindExportMenu(): void {
     else if (kind === "docx") exportDocx();
   });
   // v0.3.21 打印独立成工具栏按钮（用户反馈：放"导出"菜单里语义怪——导出=生成文件，打印=送打印机）
-  document.getElementById("btn-print")!.addEventListener("click", () => {
+  document.getElementById("btn-print")!.addEventListener("click", async () => {
     // 与导出菜单项同款守卫：空文档先确认（防误打白纸），重入锁在 printCurrentDoc 内部 exporting
+    // 审查 M2（v0.4.11b）：confirm 异步，缺 await=死守卫，本处补齐
     const curVal = vditor?.getValue()?.trim();
-    if (!curVal && !confirm(t("exportEmptyConfirm"))) return;
+    if (!curVal && !(await confirm(t("exportEmptyConfirm")))) return;
     printCurrentDoc();
   });
   // 点外部收起（capture，与查找条同模式；排除导出按钮自身）；Esc 同关（浮层统一交互）
@@ -5133,7 +5283,7 @@ function bindExportMenu(): void {
 // 导出当前文档为 PDF：取 Vditor 渲染 HTML → 解析相对图片 → 包装完整文档 → 交 Rust 端
 // msedge --headless --print-to-pdf 生成矢量 PDF（文本可选可搜、Chromium 原生分页、无 canvas 上限）。
 // 取代旧的 html2pdf.js（离屏容器 left:-99999px 致 html2canvas 渲染空白=白纸，且 ~32767px canvas 上限截断长文）。
-async function exportPdf() {
+async function exportPdf(pathOverride?: string) {
   if (!vditor || exporting) return;   // 重入锁：导出进行中(msedge 打印 1-3s)的 Ctrl+P/重复点击直接忽略
   const doc = activeDoc();
   if (!doc) { showToast(t("exportNoDoc"), "info"); return; }
@@ -5181,7 +5331,7 @@ async function exportPdf() {
     exporting = true;
     // 统一走 pickExportPath：生产弹原生保存对话框；e2e（--export-selftest）直拼路径。
     // 旧实现直接 saveDialog——无头 e2e 环境对话框无人点击，await 永不返回，PDF 项根本测不到。
-    const savePath = await pickExportPath(".pdf", "PDF");
+    const savePath = await pickExportPath(".pdf", "PDF", pathOverride);
     if (!savePath) { return; } // 用户取消：exporting 由 finally 释放（overlay 仍 hidden、unlisten 仍 null）
 
     if (overlay) overlay.hidden = false;
@@ -5467,11 +5617,14 @@ async function boot() {
   bindFileViewMenus();
 
   // Ctrl+S 保存（编辑器标配；此前只有保存按钮+30s 自动保存，真实用户测试发现的缺口）
+  // Ctrl+Shift+S 另存为（v0.4.11，Word/Typora 同款）
   window.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "s" || e.key === "S")) {
       e.preventDefault();
       const doc = activeDoc();
-      if (doc) void saveDoc(doc);
+      if (!doc) return;
+      if (e.shiftKey) void saveDocAs(doc);
+      else void saveDoc(doc);
     }
   });
 
